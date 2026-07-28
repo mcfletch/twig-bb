@@ -1,6 +1,0 @@
-OpenGLContext
-pillow
-numpy
-six
-requests
-simpleparse

@@ -1,0 +1,214 @@
+"""Weapon commands: how they are declared, sampled, and what they do.
+
+The binding page is OpenGLContext's and is tested there; what matters here is
+that these commands are declared in the shape that page understands, that a
+number key selects once however long it is held, and that firing goes through
+the weapon's own numbers.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from OpenGLContext.events.inputstate import InputState
+
+from twitchoglc import controls, weapons
+from twitchoglc.player import PlayerState
+
+
+class FakeMode:
+    def __init__(self, name, bindings):
+        self.name = name
+        self.bindings = bindings
+
+
+class FakeNavigation:
+    def __init__(self, modes):
+        self._modes = modes
+
+    def modes(self):
+        return self._modes
+
+
+def key(state, name, down=1):
+    """Feed one key transition, as the event system spells it."""
+    class Event:
+        pass
+    event = Event()
+    event.name = name
+    event.state = down
+    state.process(event)
+
+
+@pytest.fixture
+def bindings():
+    return controls.WeaponBindings()
+
+
+@pytest.fixture
+def table():
+    return weapons.default_table()
+
+
+@pytest.fixture
+def player(table):
+    return PlayerState.starting(table)
+
+
+class TestDeclaration:
+    def test_a_command_is_declared_for_every_number_key_offered(self, bindings):
+        names = [str(binding.command) for binding in bindings.bindings]
+        assert controls.slot_command(1) in names
+        assert controls.slot_command(int(bindings.slots)) in names
+
+    def test_firing_and_the_two_directions_are_declared(self, bindings):
+        names = [str(binding.command) for binding in bindings.bindings]
+        for command in (controls.FIRE, controls.NEXT_WEAPON,
+                        controls.PREVIOUS_WEAPON):
+            assert command in names
+
+    def test_every_command_carries_a_label_for_the_binding_page(self, bindings):
+        for binding in bindings.bindings:
+            assert str(binding.label)
+
+    def test_the_defaults_can_be_asked_for_again(self, bindings):
+        """The binding page's Reset needs this; it is the mode protocol."""
+        assert bindings.defaultBindings()
+
+    def test_a_command_name_says_which_slot_it_selects(self):
+        assert controls.slot_of('weapon.3') == 3
+        assert controls.slot_of(controls.FIRE) is None
+
+
+class TestSampling:
+    def test_a_number_key_fires_its_command_once_per_press(self, bindings):
+        state = InputState()
+        key(state, '2')
+        assert controls.slot_command(2) in bindings.triggered(state)
+        assert bindings.triggered(state) == []
+
+    def test_holding_the_fire_key_keeps_firing(self, bindings):
+        state = InputState()
+        key(state, '<control>')
+        assert bindings.firing(state) is True
+        assert bindings.firing(state) is True
+        key(state, '<control>', down=0)
+        assert bindings.firing(state) is False
+
+    def test_firing_is_not_reported_as_a_one_shot_command(self, bindings):
+        state = InputState()
+        key(state, '<control>')
+        assert controls.FIRE not in bindings.triggered(state)
+
+    def test_a_rebound_key_takes_effect_at_once(self, bindings):
+        state = InputState()
+        bindings.binding(controls.NEXT_WEAPON).keys = ['q']
+        key(state, 'q')
+        assert controls.NEXT_WEAPON in bindings.triggered(state)
+
+    def test_an_unbound_command_never_fires(self, bindings):
+        state = InputState()
+        bindings.binding(controls.NEXT_WEAPON).keys = []
+        key(state, ']')
+        assert controls.NEXT_WEAPON not in bindings.triggered(state)
+
+
+class TestBindingPage:
+    def test_the_table_holds_movement_and_weapons_together(self, bindings):
+        from OpenGLContext.move.modes import KeyBinding
+        walk = FakeMode('walk', [KeyBinding(command='forward', keys=['w'])])
+        table = controls.Controls(FakeNavigation([walk]),
+                                  bindings).binding_table()
+        groups = [group for group, _binding in table]
+        assert 'walk' in groups
+        assert 'weapons' in groups
+
+    def test_movement_comes_first(self, bindings):
+        from OpenGLContext.move.modes import KeyBinding
+        walk = FakeMode('walk', [KeyBinding(command='forward', keys=['w'])])
+        table = controls.Controls(FakeNavigation([walk]),
+                                  bindings).binding_table()
+        assert table[0][0] == 'walk'
+
+    def test_a_context_with_no_navigation_still_offers_the_weapons(self,
+                                                                   bindings):
+        table = controls.Controls(None, bindings).binding_table()
+        assert [group for group, _binding in table] == ['weapons'] * len(
+            bindings.bindings)
+
+    def test_rebinding_reaches_the_declared_binding(self, bindings):
+        made = controls.Controls(None, bindings)
+        assert made.rebind('weapons', controls.NEXT_WEAPON, ['n']) is True
+        assert bindings.keys_for(controls.NEXT_WEAPON) == ['n']
+
+    def test_rebinding_something_undeclared_says_so(self, bindings):
+        made = controls.Controls(None, bindings)
+        assert made.rebind('weapons', 'weapon.teleport', ['t']) is False
+
+
+class TestWhatTheCommandsDo:
+    def test_a_number_key_puts_a_held_weapon_in_hand(self, player, table):
+        player.give('shotgun')
+        events = controls.apply_commands([controls.slot_command(2)], False,
+                                         player, table, now=0.0)
+        assert player.selected == 'shotgun'
+        assert [event.kind for event in events] == ['select']
+
+    def test_selecting_a_weapon_says_which(self, player, table):
+        player.give('shotgun')
+        events = controls.apply_commands([controls.slot_command(2)], False,
+                                         player, table, now=0.0)
+        assert events[0].text == 'SHOTGUN'
+
+    def test_a_weapon_you_do_not_have_says_so(self, player, table):
+        events = controls.apply_commands([controls.slot_command(2)], False,
+                                         player, table, now=0.0)
+        assert [event.kind for event in events] == ['refused']
+        assert 'SHOTGUN' in events[0].text
+
+    def test_selecting_what_is_already_in_hand_says_nothing(self, player,
+                                                            table):
+        assert controls.apply_commands([controls.slot_command(1)], False,
+                                       player, table, now=0.0) == []
+
+    def test_a_slot_with_no_weapon_on_it_does_nothing(self, player, table):
+        assert controls.apply_commands(['weapon.9'], False, player, table,
+                                       now=0.0) == []
+
+    def test_firing_spends_ammunition(self, player, table):
+        before = player.ammo['bullets']
+        controls.apply_commands([], True, player, table, now=1.0)
+        assert player.ammo['bullets'] == before - 1
+
+    def test_the_fire_rate_is_the_weapon_s_own(self, player, table):
+        controls.apply_commands([], True, player, table, now=1.0)
+        spent = player.ammo['bullets']
+        controls.apply_commands([], True, player, table, now=1.01)
+        assert player.ammo['bullets'] == spent, 'fired faster than the table'
+        interval = float(table.by_key('pistol').fireInterval)
+        controls.apply_commands([], True, player, table, now=1.0 + interval)
+        assert player.ammo['bullets'] == spent - 1
+
+    def test_firing_opens_the_cone(self, player, table):
+        controls.apply_commands([], True, player, table, now=1.0)
+        assert player.spread_fraction(1.0) > 0
+
+    def test_an_empty_weapon_says_so_rather_than_firing(self, player, table):
+        player.ammo['bullets'] = 0
+        events = controls.apply_commands([], True, player, table, now=1.0)
+        assert [event.kind for event in events] == ['empty']
+
+    def test_an_empty_weapon_does_not_say_so_every_frame(self, player, table):
+        player.ammo['bullets'] = 0
+        controls.apply_commands([], True, player, table, now=1.0)
+        assert controls.apply_commands([], True, player, table,
+                                       now=1.01) == []
+
+    def test_the_wheel_walks_the_weapons_held(self, player, table):
+        player.give('shotgun')
+        controls.apply_commands([controls.NEXT_WEAPON], False, player, table,
+                                now=0.0)
+        assert player.selected == 'shotgun'
+        controls.apply_commands([controls.PREVIOUS_WEAPON], False, player,
+                                table, now=0.0)
+        assert player.selected == 'pistol'

@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "twitchoglc"
+dynamic = ["version"]
+description = "Quake 2 / Alien Arena / Quake 3 map viewer built on OpenGLContext"
+readme = "README.md"
+license = "BSD-3-Clause"
+requires-python = ">=3.10"
+authors = [
+    { name = "Mike C. Fletcher", email = "mcfletch@vrplumber.com" }
+]
+keywords = [
+    "PyOpenGL", "OpenGL", "OpenGLContext", "Quake", "BSP", "PK3", "map", "viewer",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics :: 3D Rendering",
+    "Intended Audience :: Developers",
+]
+
+# The download path runs through ``OpenGLContext.loaders.resolver``, so there is
+# no ``requests`` dependency; the parsers are hand-written token scanners, so
+# there is no ``simpleparse`` dependency either.
+dependencies = [
+    "numpy>=2.0",
+    "OpenGLContext>=2.3.0a1",
+    "omi_physics>=0.2.1",
+    "pillow",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "ruff", "mypy"]
+
+[project.scripts]
+twitch-viewer = "twitchoglc.viewer:main"
+twitch-hud-demo = "twitchoglc.hudsample:main"
+twitch-download = "twitchoglc.download:main"
+twitch-parse-bsp = "twitchoglc.maploader:main"
+
+[project.urls]
+Homepage = "https://github.com/mcfletch/twitch"
+
+[tool.setuptools.dynamic]
+version = {attr = "twitchoglc.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["twitchoglc*"]
+
+# The stand-in weapon art ships with the package: it is CC0, so unlike the
+# fetched OpenArena content there is nothing to carry onto a redistributor.
+# See twitchoglc/assets/weapons/CREDITS.md.
+[tool.setuptools.package-data]
+twitchoglc = [
+    "assets/weapons/*.glb",
+    "assets/weapons/Textures/*.png",
+    "assets/weapons/CREDITS.md",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "B"]
+ignore = ["E501"]
+
+[tool.mypy]
+# The numpy stubs in this environment use `type` statements, which mypy only
+# parses when told it is checking 3.12 or later.
+python_version = "3.12"
+warn_return_any = false
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "gl: needs a live OpenGL context",
+    "sample: needs a sample map under tmp/ (skipped when absent)",
+    "slow: whole-map loads and timing checks",
+]
