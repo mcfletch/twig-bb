@@ -15,7 +15,7 @@ switching that node rather than branching in the drawing code, and a weapon
 whose accuracy falls off while firing shows that by widening its own reticule.
 
 **The model is data too.**  ``model`` names a file under
-:mod:`twitchoglc.assets`, so replacing the blocked-out stand-in with §7's
+:data:`twitchoglc.art.ASSETS`, so replacing the blocked-out stand-in with §7's
 commissioned asset is an edit to this table and not a code change.  The
 stand-ins that ship with us are CC0; their provenance is in
 [assets/weapons/CREDITS.md](assets/weapons/CREDITS.md).
@@ -24,20 +24,18 @@ stand-ins that ship with us are CC0; their provenance is in
 from __future__ import annotations
 
 import math
-import os
 from typing import List, Optional
 
 from vrml import field, node
 
 from OpenGLContext.ui.hudwidgets import CIRCLE, CROSS, CROSS_DOT, Crosshair
 
+from .art import ASSETS, path_for
+
 __all__ = [
     'Weapon', 'WeaponTable', 'default_table', 'model_path', 'spread_pixels',
     'reticule_spread', 'ASSETS',
 ]
-
-#: Where the art that ships with this package lives.
-ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets')
 
 
 class Weapon(node.Node):
@@ -60,12 +58,28 @@ class Weapon(node.Node):
     #: index so several weapons can share a pool.
     ammoType = field.newField('ammoType', 'SFString', 1, 'bullets')
     ammoPerShot = field.newField('ammoPerShot', 'SFInt32', 1, 1)
+    #: How much of it a player starts with.  A field because *how many rockets
+    #: is worth* is a design decision and not an implementation one: a stand-in
+    #: loadout that handed out sixty of everything made a rocket launcher an
+    #: assault rifle with a bigger bang.  Where two weapons share an
+    #: ``ammoType`` they share one pile, and the largest of their numbers is
+    #: what a player starts with.
+    startingAmmo = field.newField('startingAmmo', 'SFInt32', 1, 40)
     #: Seconds between shots.
     fireInterval = field.newField('fireInterval', 'SFFloat', 1, 0.4)
     #: Damage one shot does at the point it lands, before any falloff.
     damage = field.newField('damage', 'SFFloat', 1, 20.0)
     #: How many projectiles or traces one shot sends: a shotgun's pellets.
     pellets = field.newField('pellets', 'SFInt32', 1, 1)
+
+    #: Which entry of :mod:`twitchoglc.projectiles`' table this weapon throws,
+    #: or empty for a **hitscan** weapon whose shot arrives instantly.  This
+    #: single field is the whole difference between a rifle and a rocket
+    #: launcher as far as the rest of the game is concerned: what a projectile
+    #: then does -- how fast, how far it falls, whether it bounces, what its
+    #: burst costs -- is declared over there, because those are its numbers
+    #: and not the weapon's.
+    projectile = field.newField('projectile', 'SFString', 1, '')
 
     #: The cone the shot can land in, at rest and when firing continuously.
     #: Equal values are a weapon whose accuracy does not fall off.
@@ -74,6 +88,23 @@ class Weapon(node.Node):
 
     #: The reticule drawn while this weapon is selected.
     crosshair = field.newField('crosshair', 'SFNode', 1, node.NULL)
+
+    #: Which entry of :mod:`twitchoglc.combatsound`'s table this weapon is
+    #: heard as.  Empty is the table's generic report, which is what makes a
+    #: new weapon audible before anyone has designed a sound for it; a key
+    #: that names nothing falls back to the same, because a silent weapon
+    #: reads as a broken trigger.
+    fireSound = field.newField('fireSound', 'SFString', 1, '')
+
+    #: How the weapon moves when it is fired: back towards the eye in
+    #: **metres**, up in **degrees**, and the **seconds** it takes to settle.
+    #: This is the one piece of feedback that comes from the thing in the
+    #: player's hands rather than from the world, so it arrives even when the
+    #: shot goes into the sky and meets nothing at all -- and a weapon that did
+    #: not move when it fired read as a weapon that had not fired.
+    recoilKick = field.newField('recoilKick', 'SFFloat', 1, 0.035)
+    recoilRise = field.newField('recoilRise', 'SFFloat', 1, 3.5)
+    recoilRecovery = field.newField('recoilRecovery', 'SFFloat', 1, 0.16)
 
     #: The first-person model, relative to :data:`ASSETS`, and where it sits.
     #: The offset is in metres in view space -- right, up and forward -- and
@@ -130,7 +161,7 @@ class WeaponTable(node.Node):
 
 def model_path(weapon: Weapon) -> str:
     """Where a weapon's model actually is on disk."""
-    return os.path.join(ASSETS, str(weapon.model))
+    return path_for(str(weapon.model))
 
 
 def spread_pixels(degrees: float, viewport_height: int,
@@ -181,26 +212,63 @@ def default_table() -> WeaponTable:
     return WeaponTable(weapons=[
         Weapon(
             key='pistol', title='PISTOL', slot=1,
-            ammoType='bullets', ammoPerShot=1, fireInterval=0.35,
+            ammoType='bullets', ammoPerShot=1, startingAmmo=60,
+            fireInterval=0.35,
             damage=15.0, restSpread=0.6, maxSpread=2.5,
+            recoilKick=0.030, recoilRise=3.5, recoilRecovery=0.14,
             crosshair=Crosshair(shape=CROSS, gap=5, length=7, thickness=2),
+            fireSound='fire-pistol',
             model='weapons/luger-pistol.glb', modelScale=1.0,
             modelOffset=(0.15, -0.19, -0.30),
         ),
         Weapon(
             key='shotgun', title='SHOTGUN', slot=2,
-            ammoType='shells', ammoPerShot=1, fireInterval=0.9,
+            ammoType='shells', ammoPerShot=1, startingAmmo=25,
+            fireInterval=0.9,
             damage=12.0, pellets=8, restSpread=3.5, maxSpread=6.0,
+            recoilKick=0.075, recoilRise=7.0, recoilRecovery=0.30,
             crosshair=Crosshair(shape=CIRCLE, gap=9, thickness=2),
+            fireSound='fire-shotgun',
             model='weapons/pump-shotgun.glb', modelScale=1.0,
             modelOffset=(0.21, -0.27, -0.12),
         ),
         Weapon(
             key='rifle', title='RIFLE', slot=3,
-            ammoType='cells', ammoPerShot=2, fireInterval=0.12,
+            ammoType='cells', ammoPerShot=2, startingAmmo=120,
+            fireInterval=0.12,
             damage=8.0, restSpread=1.2, maxSpread=4.5,
+            recoilKick=0.018, recoilRise=2.0, recoilRecovery=0.09,
             crosshair=Crosshair(shape=CROSS_DOT, gap=4, length=5, thickness=2),
+            fireSound='fire-rifle',
             model='weapons/assault-rifle.glb', modelScale=1.0,
             modelOffset=(0.19, -0.25, -0.14),
+        ),
+        # The two that throw something instead of tracing a line.  Nothing
+        # here says what a rocket *does* -- how fast it goes, whether it
+        # falls, what its burst costs -- because those are the projectile's
+        # numbers and live in twitchoglc.projectiles' own table.  The reticule
+        # is deliberately open: a splash weapon is aimed at a place rather
+        # than at a person, and a tight cross would say otherwise.
+        Weapon(
+            key='rocket', title='ROCKET', slot=4,
+            ammoType='rockets', ammoPerShot=1, startingAmmo=8,
+            fireInterval=0.85,
+            projectile='rocket',
+            recoilKick=0.090, recoilRise=8.0, recoilRecovery=0.34,
+            crosshair=Crosshair(shape=CIRCLE, gap=11, thickness=2),
+            fireSound='fire-rocket',
+            model='weapons/rocket-launcher.glb', modelScale=1.0,
+            modelOffset=(0.16, -0.30, -0.62),
+        ),
+        Weapon(
+            key='grenade', title='GRENADES', slot=5,
+            ammoType='grenades', ammoPerShot=1, startingAmmo=10,
+            fireInterval=0.75,
+            projectile='grenade',
+            recoilKick=0.045, recoilRise=5.0, recoilRecovery=0.22,
+            crosshair=Crosshair(shape=CROSS_DOT, gap=10, length=4, thickness=2),
+            fireSound='fire-grenade',
+            model='weapons/pipe-bomb.glb', modelScale=1.0,
+            modelOffset=(0.20, -0.34, -0.44),
         ),
     ])

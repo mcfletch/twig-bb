@@ -89,6 +89,45 @@ class Batch:
         return len(self.indices) // 3
 
 
+@dataclass(frozen=True)
+class SurfaceIndex:
+    """Which surface each triangle of a collision mesh came from.
+
+    A ray cast against the mesh reports the triangle it met
+    (:attr:`omi_physics.raycast.RayHit.triangle`); this turns that number back
+    into the :class:`~twitchoglc.surfaces.SurfaceStyle` it belongs to, which is
+    what lets an impact on metal differ from one on stone without searching the
+    geometry a second time for a point the cast has already found.
+
+    The mesh is a soup of merged batches, so the index is stored as the
+    *boundaries* between them rather than one style per triangle: a map is
+    tens of thousands of triangles and a few hundred surfaces, and the answer
+    is a binary search over the small number.
+    """
+
+    #: Triangle at which each batch's run **ends**, ascending; the last entry
+    #: is the length of the whole mesh.
+    ends: np.ndarray
+    #: The style of each run, in the same order.
+    styles: Tuple[SurfaceStyle, ...]
+
+    def __len__(self) -> int:
+        """How many triangles the index covers."""
+        return int(self.ends[-1]) if len(self.ends) else 0
+
+    def style_at(self, triangle: int) -> Optional[SurfaceStyle]:
+        """The surface a triangle belongs to, or None if it is not in the mesh.
+
+        None rather than a nearest guess, because a caller reads this to choose
+        an effect and a *wrong* material reads as a bug in the effect while a
+        missing one falls back to the default and is merely plain.
+        """
+        triangle = int(triangle)
+        if triangle < 0 or triangle >= len(self):
+            return None
+        return self.styles[int(np.searchsorted(self.ends, triangle, 'right'))]
+
+
 @dataclass
 class WorldGeometry:
     """Every batch of a map, plus what the rest of the viewer asks of them."""
@@ -101,6 +140,17 @@ class WorldGeometry:
     def triangle_count(self) -> int:
         return sum(batch.triangle_count for batch in self.batches)
 
+    def collision_batches(self) -> List[Batch]:
+        """The batches the collision mesh is built from, in the order it uses.
+
+        One list, read by both :meth:`collision_mesh` and
+        :meth:`collision_surfaces`, because two walks of the batches that could
+        disagree about which are in and in what order would eventually put an
+        impact's material one surface out — and nothing would say so.
+        """
+        return [batch for batch in self.batches
+                if batch.style.solid and not batch.style.liquid]
+
     def collision_mesh(self) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """``(points, triangles)`` for the solid surfaces, or None if there are none.
 
@@ -112,9 +162,7 @@ class WorldGeometry:
         points: List[np.ndarray] = []
         triangles: List[np.ndarray] = []
         offset = 0
-        for batch in self.batches:
-            if not batch.style.solid or batch.style.liquid:
-                continue
+        for batch in self.collision_batches():
             points.append(batch.positions)
             triangles.append(batch.indices.reshape((-1, 3)).astype(np.uint32) + offset)
             offset += len(batch.positions)
@@ -122,6 +170,19 @@ class WorldGeometry:
             return None
         return (np.concatenate(points).astype('d'),
                 np.concatenate(triangles).astype(np.uint32))
+
+    def collision_surfaces(self) -> SurfaceIndex:
+        """What each triangle of :meth:`collision_mesh` is made of.
+
+        Empty rather than None for a map with nothing solid, because every
+        caller of this does the same thing with an empty one as with no index
+        at all -- asks it, and is told nothing.
+        """
+        batches = self.collision_batches()
+        counts = np.cumsum([batch.triangle_count for batch in batches],
+                           dtype='i8')
+        return SurfaceIndex(ends=counts,
+                            styles=tuple(batch.style for batch in batches))
 
 
 class _Group:

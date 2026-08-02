@@ -20,8 +20,8 @@ Keys::
     f                       fly (noclip) on/off
     m                       cycle movement mode: walk, fly, mouse-look
     g                       walk (physics) / free-fly camera
-    1 2 3                   choose a weapon; [ ] and the wheel step through them
-    ctrl                    fire (held)
+    1 - 5                   choose a weapon; [ ] and the wheel step through them
+    left mouse button       fire (held); ctrl does the same
     alt + f                 the developer overlay
     F2                      save a screenshot
     F6 / F10                key bindings / rendering settings
@@ -71,20 +71,31 @@ from OpenGLContext.scenegraph.light import (                     # noqa: E402
     DirectionalLight, PointLight,
 )
 from OpenGLContext.scenegraph.scenegraph import SceneGraph      # noqa: E402
-from omi_physics import model                                   # noqa: E402
 from omi_physics.character import CharacterCapabilities         # noqa: E402
-from omi_physics.world import PhysicsWorld                      # noqa: E402
 
 from OpenGLContext.events.mouseevents import WHEEL_DOWN, WHEEL_UP  # noqa: E402
 from OpenGLContext.ui import bindings, dialogs, settings         # noqa: E402
 from OpenGLContext.ui.overlay import OverlayMixin                # noqa: E402
 from OpenGLContext.ui.panel import Panel                         # noqa: E402
 
-from . import controls, download, jumppads, maploader           # noqa: E402
+from . import avatar                                            # noqa: E402
+from . import blast, collision, combat, combatsound             # noqa: E402
+from . import controls                                          # noqa: E402
+from . import projectiles                                       # noqa: E402
+from . import download                                          # noqa: E402
+from . import effects, falling, feedback, fetcher, game         # noqa: E402
+from . import arena                                             # noqa: E402
+from . import deathcam                                          # noqa: E402
+from . import items as itemsmod                                 # noqa: E402
+from . import jumppads, liquids, maploader, menu, notices        # noqa: E402
+from . import match                                             # noqa: E402
+from . import rules                                             # noqa: E402
+from . import underwater                                        # noqa: E402
 from . import debug as twitchdebug                              # noqa: E402
 from . import weapons as weapontable                            # noqa: E402
 from .firstperson import WeaponHand, aim_at_camera, view_rig    # noqa: E402
-from .hud import GameHUD                                        # noqa: E402
+from .frameclock import FrameClock                              # noqa: E402
+from .hud import GameHUD, now as hudclock                       # noqa: E402
 from .player import PlayerState                                 # noqa: E402
 from .animator import SurfaceAnimator                           # noqa: E402
 from .worldgeometry import SCENE_SCALE                          # noqa: E402
@@ -97,28 +108,42 @@ BaseContext: Any = testingcontext.getInteractive()
 TURN_RATE = 2.0
 LOOK_RATE = 1.5
 
-#: The character's proportions in map units, converted to metres.  ``SPEC-BSP38
-#: §3.2`` gives the standing player as 56 units tall on a 32 x 32 footprint.
-PLAYER_HEIGHT_UNITS = 56.0
-PLAYER_RADIUS_UNITS = 16.0
-PLAYER_EYE_UNITS = 46.0
+#: The character's proportions in map units.  Re-exported from
+#: :mod:`twitchoglc.avatar` rather than restated: the capsule the player walks
+#: in and the capsule a shot meets have to be the same body, and when they
+#: were declared in two places they were forty centimetres apart.
+PLAYER_HEIGHT_UNITS = avatar.PLAYER_HEIGHT_UNITS
+PLAYER_RADIUS_UNITS = avatar.PLAYER_RADIUS_UNITS
+PLAYER_EYE_UNITS = avatar.PLAYER_EYE_UNITS
 
 #: Movement speeds and the jump, in map units per second.  Not format facts:
 #: this viewer's own feel, chosen so a 256-unit hop is reachable.
 WALK_SPEED_UNITS = 300.0
 RUN_SPEED_UNITS = 480.0
 FLY_SPEED_UNITS = 900.0
+#: Swimming is deliberately slow: water is what you push against, and a pool
+#: crossed at walking pace does not read as water.
+SWIM_SPEED_UNITS = 180.0
 JUMP_HEIGHT_UNITS = 64.0
 STEP_HEIGHT_UNITS = 18.0
 
-#: How far above a spawn point's origin the eye starts.  Map spawn origins sit
-#: at the player's centre, not at their feet.
-SPAWN_LIFT_UNITS = 24.0
+#: How far above the *feet* a spawn point's origin sits, in map units: a map's
+#: spawn origins are not at the floor.  One constant, in
+#: :mod:`twitchoglc.avatar`, because the eye a camera binds to and the feet a
+#: body is published at both come from it — declared apart, they drifted by a
+#: metre and left every bot standing inside the floor.
+SPAWN_LIFT_UNITS = avatar.SPAWN_LIFT_UNITS
 
 #: Near/far planes in metres.  A map is tens of thousands of units across, and
 #: the default near plane is far too close at this scale.
 NEAR_PLANE = 0.2
 FAR_PLANE = 4000.0
+
+#: The pack the in-window prompt offers when a Quake 3 map's textures are
+#: missing.  Named here rather than looked up by role because it *is* a choice:
+#: it is the community's freely-licensed replacement set, and offering it is
+#: this viewer's decision rather than a fact about the map.
+CORE_TEXTURE_PACK = 'quake3-core'
 
 #: Scene time a capture pins the surface animation to, in seconds.  Not zero:
 #: at zero every wave is at a zero crossing and a reference image would show a
@@ -135,7 +160,8 @@ def build_parser(prog: str = 'twitch-viewer') -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('target', nargs='?',
                         help='a .bsp map, a .pk3/.zip archive, a http(s) URL, '
-                             'or pack:mapname (see --list-packs)')
+                             'or pack:mapname (see --list-packs).  With none, '
+                             'the start screen offers what is installed')
     parser.add_argument('--list-packs', action='store_true',
                         help='list the downloadable content packs and exit')
     parser.add_argument('--fetch', metavar='PACK', default=None,
@@ -157,10 +183,25 @@ def build_parser(prog: str = 'twitch-viewer') -> argparse.ArgumentParser:
     parser.add_argument('--physics', action=argparse.BooleanOptionalAction,
                         default=True,
                         help='walk with gravity and collision (default on)')
+    parser.add_argument('--bots', type=int, default=0, metavar='N',
+                        help='how many opponents to play against (default 0)')
+    parser.add_argument('--difficulty', default='medium',
+                        choices=list(match.DIFFICULTIES),
+                        help='how well they play (default medium)')
+    parser.add_argument('--frag-limit', type=int, default=15, metavar='N',
+                        help='frags that end the match; 0 for none')
+    parser.add_argument('--time-limit', type=float, default=10.0,
+                        metavar='MINUTES',
+                        help='minutes that end the match; 0 for none')
     parser.add_argument('--hud', action=argparse.BooleanOptionalAction,
                         default=None,
                         help='draw the game HUD; on unless capturing, and '
                              '--hud forces it on for a capture too')
+    parser.add_argument('--effects', default=effects.FULL,
+                        choices=sorted(effects.INTENSITIES),
+                        help='how much impact and blood to draw (default full).  '
+                             'Presentation only: it cannot change what a shot '
+                             'does, so two players may set it differently')
     parser.add_argument('--headlight', action='store_true',
                         help='add a lamp at the camera, for maps with no lightmaps')
     parser.add_argument('--shadows', action=argparse.BooleanOptionalAction,
@@ -180,7 +221,7 @@ def build_parser(prog: str = 'twitch-viewer') -> argparse.ArgumentParser:
     #: Which packs the in-window prompt offers when textures are missing.  A
     #: map from a content pack wants that pack's own content; Quake 3's
     #: replacement set names Quake 3's textures and would help it not at all.
-    parser.set_defaults(texture_packs=[download.QUAKE3_CORE.key])
+    parser.set_defaults(texture_packs=[CORE_TEXTURE_PACK])
     return parser
 
 
@@ -311,18 +352,9 @@ def movement_modes() -> List[Any]:
             turnRate=TURN_RATE, lookRate=LOOK_RATE),
         movemodes.SwimMode(
             name='swim',
-            swimSpeed=WALK_SPEED_UNITS * 0.6 * SCENE_SCALE,
+            swimSpeed=SWIM_SPEED_UNITS * SCENE_SCALE,
             turnRate=TURN_RATE, lookRate=LOOK_RATE),
     ]
-
-
-#: Modes whose movement is free of gravity, so the character has to be taken
-#: out of the falling solver when one of them takes over.  Swimming is one of
-#: them: a swimmer still pulled down by gravity ends up on the bottom of every
-#: pool.  Buoyancy proper -- a fraction of gravity, as ``SwimMode.buoyancy``
-#: describes -- would need the character controller to carry it, and this is
-#: the neutral version of the same idea.
-FLYING_MODES = ('fly', 'swim')
 
 
 def update_submerged(nav: Any, volumes: Any) -> None:
@@ -342,12 +374,17 @@ def update_submerged(nav: Any, volumes: Any) -> None:
 def apply_mode(nav: Any, mode: Any) -> None:
     """Tell the character controller what a mode change means for it.
 
-    Flying is a property of the character rather than of the movement it is
-    given, so a mode that only sets a velocity would fly into the floor.
+    Whether the avatar falls, floats or swims is a property of the *body*
+    rather than of the movement it is given, so a mode that only set a
+    velocity would fly into the floor or swim through a wall.
+
+    The mode answers rather than a table here, because which body state a mode
+    needs is part of what the mode *is*: a list of names in this file would
+    have to be kept in step with a set of nodes that a game is free to add to.
     """
     if nav is None or mode is None:
         return
-    nav.set_fly(mode.name in FLYING_MODES)
+    mode.applyTo(nav)
 
 
 #: Set ``TWITCH_DEBUG_JUMP=1`` to have every jump press report what the capsule
@@ -407,6 +444,7 @@ def character_capabilities() -> CharacterCapabilities:
         walkSpeed=WALK_SPEED_UNITS * SCENE_SCALE,
         runSpeed=RUN_SPEED_UNITS * SCENE_SCALE,
         flySpeed=FLY_SPEED_UNITS * SCENE_SCALE,
+        swimSpeed=SWIM_SPEED_UNITS * SCENE_SCALE,
     )
 
 
@@ -420,25 +458,11 @@ def choose_spawn(loaded: maploader.LoadedMap,
     spawns = loaded.spawn_points()
     if spawns:
         spawn = spawns[index % len(spawns)]
-        eye = np.asarray(spawn.position, dtype='d').copy()
-        eye[1] += SPAWN_LIFT_UNITS * SCENE_SCALE
-        return eye, yaw_for_angle(spawn.angle)
+        return avatar.eye_of(spawn.position), yaw_for_angle(spawn.angle)
     low, high = loaded.world.bounds
     centre = (np.asarray(low, dtype='d') + np.asarray(high, dtype='d')) * 0.5
     centre[1] = float(high[1]) - PLAYER_HEIGHT_UNITS * SCENE_SCALE
     return centre, 0.0
-
-
-def collision_world(loaded: maploader.LoadedMap) -> Optional[PhysicsWorld]:
-    """A physics world holding the map as one static trimesh, or None."""
-    mesh = loaded.collision_mesh()
-    if mesh is None:
-        return None
-    points, triangles = mesh
-    world = PhysicsWorld(gravity=model.Gravity(gravity=9.81, direction=(0, -1, 0)))
-    shape = world.add_shape(model.Shape.trimesh(points, triangles))
-    world.add_body(model.Motion(type=model.STATIC), model.Collider(shape=shape))
-    return world
 
 
 class TwitchContext(OverlayMixin, BaseContext):
@@ -452,6 +476,30 @@ class TwitchContext(OverlayMixin, BaseContext):
 
     config: Any = None
     _target: Optional[str] = None
+    #: The map in play, or None while the start screen is up.
+    loaded: Any = None
+    #: The start screen while it is up, so it can be taken down again.
+    _menuPanel: Any = None
+    #: A download in progress, or None.  Polled once a frame; see
+    #: :meth:`_pollDownload`.
+    _fetch: Any = None
+    _fetchPanel: Any = None
+    #: The map's :class:`~twitchoglc.collision.MapCollision` once walking has
+    #: begun, or None.  What a shot asks for the surface it met.
+    _collision: Any = None
+    #: The one reader of the match's event stream; see
+    #: :class:`~twitchoglc.feedback.Presenter`.
+    _presenter: Any = None
+    #: What plays a tick of the match; see :class:`~twitchoglc.rules.Rules`.
+    #: It owns the map's hazards, its pickups, the opponents' minds and what
+    #: is in the air.
+    rules: Any = None
+    #: The pickups' bodies, and the group holding them.
+    itemGroup: Any = None
+    itemBodies: Any = ()
+    #: Where the view goes while the player is dead; see
+    #: :mod:`twitchoglc.deathcam`.
+    deathCamera: Any = None
     # Supplied by the interactive runtime base (event + navigation mixins),
     # which the minimal type-check-time Context alias does not expose.
     platform: Any
@@ -461,19 +509,19 @@ class TwitchContext(OverlayMixin, BaseContext):
     sg: Any
 
     def OnInit(self) -> None:                   # pragma: no cover - needs a window
+        """Open the window, and either load the named map or offer the menu.
+
+        **A level is something this loads, not something it starts with.**
+        Launching with no map is a reasonable thing to do and lands on the
+        start screen; everything below that a map is needed for is deferred to
+        :meth:`_loadLevel`, which the menu calls when a level is chosen.
+        """
         disable_vsync()
         if self.config is None:
             self.config = build_parser().parse_args([self._target or ''])
-        self.loaded = load_map(self.config, self._target)
-        # Built before the scene, because a surface has to be told it deforms
-        # before its vertex buffers exist -- that is what decides whether its
-        # texture-coordinate buffer is dynamic.
+        self.loaded = None
         self._animator = SurfaceAnimator()
         self._started = time.time()
-        # Before the scene: the weapon in the player's hands is part of it, so
-        # what is held has to be settled before the children are gathered.
-        self._buildLoadout()
-        self.sg = SceneGraph(children=self._scene_children())
         self.platform.setFrustum(near=NEAR_PLANE, far=FAR_PLANE)
         # The event system holds callbacks weakly by design, so a binding built
         # from a bare closure is collected the moment the binding call returns
@@ -484,7 +532,8 @@ class TwitchContext(OverlayMixin, BaseContext):
         self._nav: Optional[PhysicsViewPlatform] = None
         self._pushes: Optional[jumppads.PushSystem] = None
         self._liquids: Any = None
-        self._last = time.time()
+        self._clock = FrameClock()
+        self._clock.reset(time.time())
         # The event system holds its callbacks weakly, so the wheel handlers
         # are kept here rather than being collected as soon as they are bound.
         self._wheelHandlers: List[Any] = []
@@ -493,11 +542,45 @@ class TwitchContext(OverlayMixin, BaseContext):
             self._capture = SettleCapture(self.config.capture,
                                           delay=self.config.capture_delay,
                                           min_frames=self.config.frames)
+        # Before the scene: the weapon in the player's hands is part of it, so
+        # what is held has to be settled before the children are gathered.
+        self._buildLoadout()
+        # What the last launch chose, offered again first: it is what a
+        # returning player wants, and a first launch simply gets the defaults.
+        self.setup = match.recall()
+        self.sg = SceneGraph(children=self._scene_children())
         # After the capture, because building the HUD asks for a redraw and a
         # frame drawn before the capture exists has nothing to report to.
         self._startGame()
         self.addEventHandler('keypress', name='g', function=self._toggle_walk)
         self.bindScreenKeys(self)
+        if self._target:
+            self._loadLevel(self._target)
+        else:
+            self.showMenu()
+
+    def _loadLevel(self, target: str) -> None:  # pragma: no cover - needs a window
+        """Load a map and start playing in it.
+
+        Called from ``OnInit`` when a map was named on the command line, and
+        from the start screen when one is chosen — the two are the same thing
+        happening at different moments, which is the whole reason this is not
+        part of ``OnInit``.
+        """
+        self._target = target
+        self.loaded = load_map(self.config, target)
+        # Rebuilt with the map: a surface has to be told it deforms before its
+        # vertex buffers exist, since that is what decides whether its
+        # texture-coordinate buffer is dynamic.
+        self._animator = SurfaceAnimator()
+        self._started = time.time()
+        self._buildMatch()
+        # What the map left lying about.  Built with the *map* rather than with
+        # the scene, so that reloading a map's textures -- which rebuilds the
+        # scene -- does not put every collected item back on the floor, for the
+        # same reason it does not restore the player's loadout.
+        self.rules.pickups = itemsmod.Pickups(self.loaded.pickups())
+        self.sg = SceneGraph(children=self._scene_children())
         if self.config.physics:
             # Walk mode also decides where the camera starts, so a capture runs
             # it too: a map's spawn point is a far better view of it than the
@@ -507,10 +590,43 @@ class TwitchContext(OverlayMixin, BaseContext):
         if not self.config.capture:
             # A capture has nobody to answer, so it never asks.
             self._offer_core_textures()
+        self.triggerRedraw(1)
 
     # -- scene -----------------------------------------------------------
     def _scene_children(self) -> List[Any]:     # pragma: no cover - needs a window
-        children: List[Any] = [_backdrop(), self.loaded.scene(self._animator)]
+        children: List[Any] = [_backdrop()]
+        if self.loaded is None:
+            # No level yet: the backdrop and nothing else, which is what the
+            # start screen is drawn over.  A menu over an empty world is a
+            # menu; a menu over a half-built one is a bug waiting to be found.
+            return children
+        children.append(self.loaded.scene(self._animator))
+        # The map's own ambience.  Nothing has to drive it: the render pass
+        # collects audible nodes while it gathers the frame and the camera is
+        # the listener, so putting the emitters in the scene is the whole of
+        # the wiring.  A map with no speakers, or one whose sounds were never
+        # fetched, contributes an empty group and costs nothing.
+        self.speakers = self.loaded.speakers()
+        children.append(self.speakers)
+        # One fog node, bound for the life of the map and switched on by its
+        # own fields when the camera goes under.  In the scene rather than on
+        # the context because that is what the render pass looks for, and it
+        # means an authored map could carry its own.
+        self.fog = underwater.liquid_fog()
+        children.append(self.fog)
+        # The opponents.  Capsules until §5's art lands, and deliberately so:
+        # fighting had to be buildable before there was anything to look at.
+        children.append(self.botGroup)
+        # A body per pickup, in the order `rules.pickups` holds them: this is
+        # gathered again whenever the scene is rebuilt, and what has been
+        # *taken* is the rules' business rather than the scene's.
+        self.itemGroup, self.itemBodies = game.item_bodies(self.rules.pickups)
+        children.append(self.itemGroup)
+        # One emitter per kind of impact, never moved: the bursts arrive at
+        # their own places through `burst_at`, so this group is built once and
+        # a firefight edits nothing in the scene.
+        children.append(self.effects.group)
+        children.append(self.projectileGroup)
         # The weapon rides a transform that is put where the camera is each
         # frame, so it is part of the scene rather than something drawn after
         # it: it takes the map's lighting, and it is occluded by geometry the
@@ -531,12 +647,124 @@ class TwitchContext(OverlayMixin, BaseContext):
     def viewpointAttachment(self) -> Any:       # pragma: no cover - needs a window
         """The transform everything held in the player's hands hangs from.
 
-        Carries the weapon *and* the light that shows it -- a map places no
-        dynamic lights, so a weapon lit only by the map is a silhouette.
+        Carries the weapon, and deliberately no light: a fill light riding the
+        camera brightens the *map* more than the weapon, so the weapon carries
+        a small emissive floor in its own material instead.  See
+        :func:`twitchoglc.firstperson.view_rig`.
         """
         if getattr(self, 'camera', None) is None:
             self.camera = view_rig(self.hand)
         return self.camera
+
+    # -- the screens around the outside ----------------------------------
+    def showMenu(self, event: Any = None) -> None:  # pragma: no cover - GL
+        """Put the start screen up: Play, content, settings, credits, quit.
+
+        Modal, so nothing reaches the world behind it.  **One at a time**: a
+        second menu pushed over the first would leave two, and dismissing the
+        top one would reveal a stale copy of itself.
+        """
+        self._closeMenu()
+        self._menuPanel = menu.main_menu(
+            on_play=self._playScreen, on_content=self._contentScreen,
+            on_settings=lambda: self._settings(None),
+            on_credits=self._creditsScreen, on_quit=self.OnQuit,
+            subtitle=self._menuSubtitle())
+        self.pushOverlay(self._menuPanel)
+
+    def _closeMenu(self) -> None:               # pragma: no cover - GL
+        """Take the start screen down, if it is up.
+
+        Every screen the menu opens **replaces** it rather than stacking over
+        it, and starting a match closes it outright.  Left up, it is a modal
+        panel over a level that has loaded and is running: nothing reaches the
+        world, and pressing Start looks like it did nothing at all.
+        """
+        panel = self._menuPanel
+        self._menuPanel = None
+        if panel is not None:
+            panel.close(True)
+
+    def _menuSubtitle(self) -> str:             # pragma: no cover - GL
+        """A line under the title: what is loaded, or what is missing."""
+        if self.loaded is not None:
+            return 'Playing %s' % (self.loaded.name,)
+        if not match.levels_available(self.config.cache_dir):
+            return ('No levels are installed yet. Choose "Get content" to '
+                    'download some.')
+        return ''
+
+    def _playScreen(self) -> None:              # pragma: no cover - GL
+        """Choose a level, the opponents and the rules, then start."""
+        self._closeMenu()
+        self.pushOverlay(menu.play_screen(
+            self.setup, match.levels_available(self.config.cache_dir),
+            on_start=self._startChosen, on_cancel=self.showMenu))
+
+    def _startChosen(self, setup: Any) -> None:  # pragma: no cover - GL
+        """Begin the match the play screen settled on."""
+        match.save(setup)
+        self.config.bots = int(setup.bots)
+        self.config.difficulty = str(setup.difficulty)
+        self.config.frag_limit = int(setup.fragLimit)
+        self.config.time_limit = float(setup.timeLimit)
+        if not setup.level:
+            # Nothing to play in.  Back to the menu rather than into a black
+            # room: the subtitle there says what is missing.
+            self.showMenu()
+            return
+        self._loadLevel(str(setup.level))
+
+    def _contentScreen(self) -> None:           # pragma: no cover - GL
+        """Offer the packs that are not yet on disk, with their size and terms."""
+        self._closeMenu()
+        wanted = [pack for pack in download.ASSET_PACKS
+                  if download.pack_root(pack, self.config.cache_dir) is None]
+        if not wanted:
+            self.pushOverlay(dialogs.message(
+                'Everything in the catalogue is already downloaded.',
+                title='Content', on_close=lambda panel: self.showMenu()))
+            return
+        self.pushOverlay(menu.download_screen(
+            wanted, on_start=lambda: self._startDownload(wanted),
+            on_cancel=self.showMenu))
+
+    def _startDownload(self, packs: Any) -> None:   # pragma: no cover - GL
+        """Fetch the packs on a worker, and watch it from the frame loop."""
+        self._fetch = fetcher.FetchJob(packs, cache_dir=self.config.cache_dir,
+                                       on_progress=lambda: self.triggerRedraw(1))
+        self._fetch.start()
+        self._fetchPanel = menu.progress_screen(
+            self._fetch, on_cancel=lambda: None)
+        self.pushOverlay(self._fetchPanel)
+
+    def _pollDownload(self) -> None:            # pragma: no cover - GL
+        """Publish what the download has managed, once a frame.
+
+        The only place the worker is read, which is what lets everything the
+        screen touches be touched without a lock.
+        """
+        job = getattr(self, '_fetch', None)
+        if job is None:
+            return
+        job.poll()
+        menu.refresh_progress(getattr(self, '_fetchPanel', None), job)
+        if not job.finished:
+            return
+        self._fetch = None
+        self.config.content = (list(self.config.content)
+                               + [root for pack_root in job.roots
+                                  for root in download.content_roots(pack_root)])
+        panel = getattr(self, '_fetchPanel', None)
+        if panel is not None:
+            panel.close(True)
+        self._fetchPanel = None
+        self.showMenu()
+
+    def _creditsScreen(self) -> None:           # pragma: no cover - GL
+        """What this is built from and what it is playing."""
+        self._closeMenu()
+        self.pushOverlay(notices.screen(on_close=lambda panel: self.showMenu()))
 
     # -- the in-window prompt --------------------------------------------
     def _offer_core_textures(self) -> None:     # pragma: no cover - GL
@@ -585,12 +813,70 @@ class TwitchContext(OverlayMixin, BaseContext):
         is gathered, while the HUD must wait until the capture does.
         """
         self.weapons = weapontable.default_table()
-        # Carrying everything, because nothing in a map hands a player a weapon
-        # yet -- item entities are §6.  See PlayerState.carrying.
-        self.player = PlayerState.carrying(self.weapons)
+        # The starting loadout: one weapon and what it holds.  Everything else
+        # is picked up off the level, which is what makes a map a circuit
+        # rather than a room -- see `twitchoglc.items`.
+        self.player = PlayerState.starting(self.weapons)
         self.weaponBindings = controls.WeaponBindings()
         self.hand = WeaponHand(self.weapons)
         self.hand.select(self.weapons.by_key(self.player.selected))
+        self._buildMatch()
+
+    def _buildMatch(self) -> None:              # pragma: no cover - GL
+        """The match this launch is playing, and the minds in it.
+
+        The player's own record *is* the arena's, rather than a second copy:
+        the HUD reads one and the rules write one, and two of them would drift
+        the first time a bot landed a shot.
+        """
+        self.arena = game.start_match(self.loaded, match.MatchSetup(
+            bots=int(self.config.bots), difficulty=str(self.config.difficulty),
+            fragLimit=int(self.config.frag_limit),
+            timeLimit=float(self.config.time_limit)), self.weapons)
+        me = self.arena.combatant(game.PLAYER_ID)
+        if me is None:
+            raise RuntimeError('the match was started without the player in it')
+        self.player = me.player
+        self.botGroup, self.botBodies = game.bot_bodies(self.arena)
+        self.effects = effects.Effects(self.arena,
+                                       intensity=str(self.config.effects))
+        # Everything in the air, and one body per slot to draw it with.  Both
+        # are made once: a scenegraph edited every time a rocket is fired is
+        # one rebuilt at the rate somebody holds the trigger down.
+        self.flight = projectiles.Projectiles(projectiles.default_table())
+        self.projectileGroup, self.projectileBodies = game.projectile_bodies(
+            self.flight.capacity)
+        # Given the same tables the player has, so a bot chooses between
+        # exactly the weapons the player can carry and knows what each throws.
+        self.minds = game.place_bots(self.arena, projectiles=self.flight.table)
+        # What plays the tick.  Built here with no map in it, because the match
+        # is built before a level is chosen -- the start screen needs one --
+        # and given the map's spawns and hazards by `_start_physics`.
+        self.rules = rules.Rules(self.arena, minds=self.minds,
+                                 flight=self.flight,
+                                 capabilities=character_capabilities())
+        # One per match, because it holds the death it is showing.
+        self.deathCamera = deathcam.DeathCamera()
+        # **Every time**, because everything above has just been replaced.  A
+        # presenter left pointing at the previous build goes on drawing a match
+        # nobody is playing, into emitters that are no longer in the scene.
+        self._bindPresenter()
+
+    def _bindPresenter(self) -> None:           # pragma: no cover - GL
+        """Point the one reader of the event stream at what is being played now.
+
+        Called from :meth:`_buildMatch` and again from :meth:`_startGame`: the
+        match is built before there is a HUD to draw it on -- the start screen
+        needs one -- and built again when a level is chosen, so neither moment
+        alone has all the pieces.  Rebinding is cheap and idempotent, and the
+        alternative is the failure this exists to stop: a fight that emits
+        perfectly into objects nothing is drawing.
+        """
+        self._presenter = feedback.Presenter(
+            self.arena, hud=getattr(self, 'hud', None),
+            sounds=combatsound.CombatSound(self.arena, weapons=self.weapons,
+                                           engine=self._audioEngine),
+            effects=self.effects)
 
     def _startGame(self) -> None:               # pragma: no cover - GL
         """Put the HUD on screen and register the overlay's sections.
@@ -603,6 +889,7 @@ class TwitchContext(OverlayMixin, BaseContext):
         ``OPENGLCONTEXT_DISABLE_FPS_DISPLAY``.
         """
         self.hud = GameHUD(self.weapons)
+        self._bindPresenter()
         wanted = self.config.hud
         self.hud.visible = (self.config.capture is None if wanted is None
                             else bool(wanted))
@@ -626,6 +913,12 @@ class TwitchContext(OverlayMixin, BaseContext):
         for button, step in ((WHEEL_UP, 1), (WHEEL_DOWN, -1)):
             self.addEventHandler('mousebutton', button=button, state=1,
                                  function=self._wheelWeapon(step))
+        # The scoreboard, on a *held* key rather than a toggle: it covers the
+        # middle of the screen, and a board somebody left up by accident is a
+        # board they get shot behind.
+        for state, handler in ((1, self._showScores), (0, self._hideScores)):
+            self.addEventHandler('keyboard', name=SCOREBOARD_KEY, state=state,
+                                 function=handler)
 
     def _wheelWeapon(self, step: int) -> Any:   # pragma: no cover - GL
         def turn(event: Any = None) -> None:
@@ -644,10 +937,98 @@ class TwitchContext(OverlayMixin, BaseContext):
         the seam §11 asks for: the HUD reads events and never writes state.
         """
         for event in controls.apply_commands(commands, firing, self.player,
-                                             self.weapons, time.time()):
+                                             self.weapons, hudclock()):
+            if event.kind == 'fire':
+                self._shoot()
             if event.text:
                 self.hud.post(event.text)
         self.triggerRedraw(1)
+
+    def _aim(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Where a shot leaves from, and along what.
+
+        **From the navigator**, because that is the only thing that knows
+        where the player is looking.  The view platform the renderer draws
+        from does not carry the look at all -- its quaternion stays where it
+        started -- so a shot aimed from it goes the same way whichever way the
+        player turns, which reads as the world spinning around a fixed gun:
+        turn left and the impact pans right, look down and the shot goes up.
+
+        The gaze rule is :func:`gaze`, whose agreement with ``_world_dir`` and
+        so with the map-angle convention is a test.
+
+        Before walking has begun there is no navigator and so no camera to aim
+        from: the answer is the scene origin, looking straight ahead.  Nothing
+        fires then -- a shot needs the physics world the navigator holds -- and
+        the only other reader is the damage indicator, which has no fight to
+        point at yet either.
+        """
+        nav = self._nav
+        if nav is None:
+            return (np.zeros(3), np.array([0.0, 0.0, -1.0]))
+        return (np.asarray(nav.camera_position()[:3], dtype='d'), gaze(nav))
+
+    def _shoot(self) -> None:                   # pragma: no cover - GL
+        """Send the player's shot down the middle of the view.
+
+        From the camera rather than from the weapon model's muzzle: what a
+        player aims with is the reticule, and a trace that left the barrel
+        would miss what the crosshair was on -- which reads as the game
+        cheating rather than as realism.
+        """
+        world = self.physicsWorld()
+        weapon = self.weapons.by_key(self.player.selected)
+        me = self.arena.combatant(game.PLAYER_ID)
+        if me is not None and not me.alive:
+            # **The trigger is what ends a death.**  A countdown that brought
+            # a player back while they were reading the scoreboard would put
+            # them in a corridor they were not looking at, so the timer is
+            # only the shortest a death may be.
+            self.rules.ask_to_respawn(game.PLAYER_ID)
+            return
+        if world is None or weapon is None or me is None:
+            return
+        origin, direction = self._aim()
+        # What it landed on is not read here: the shot emits events, and the
+        # one loop in `_presentMatch` answers them for the player's shots and
+        # a bot's alike.  `shoot` rather than `combat.fire`, because whether
+        # this weapon traces or throws is the weapon's business and not this
+        # method's.
+        game.shoot(world, self.arena, game.PLAYER_ID, weapon,
+                   origin=origin, direction=direction,
+                   spread=weapon.spread_at(
+                       self.player.spread_fraction(hudclock())),
+                   surfaces=self._collision, flight=self.flight)
+        # The one piece of feedback that comes from the thing in the player's
+        # hands rather than from the world, so it arrives even for a shot into
+        # the sky that meets nothing at all.
+        self.hand.fired(hudclock())
+
+    def _presentMatch(self, events: Any) -> None:  # pragma: no cover - GL
+        """Turn what the match just said into what the player sees.
+
+        The single loop §11 asks for: the rules emit and this consumes, so a
+        bot's shot and the player's own reach the screen by the same road, and
+        the messages, the hit mark, the damage indicator and the death notice
+        are four readings of one stream rather than four places that reach
+        into the rules.
+        """
+        for line in game.messages(events, self.arena):
+            self.hud.post(line)
+        camera, forward = self._aim()
+        self._presenter.show(events, camera=camera, forward=forward,
+                             now=hudclock(),
+                             platform=self.getViewPlatform())
+
+    def _audioEngine(self) -> Any:              # pragma: no cover - GL
+        """This window's audio engine, opened on the first sound it makes.
+
+        Asked for lazily rather than held, because asking is what opens a
+        device and starts an audio thread: a capture run and a map walked
+        through in silence should pay for neither.
+        """
+        from OpenGLContext.audio import scene as audioscene
+        return audioscene.engine_for(self)
 
     def _sampleWeapons(self) -> None:           # pragma: no cover - GL
         """Read the weapon commands out of this frame's input."""
@@ -660,12 +1041,22 @@ class TwitchContext(OverlayMixin, BaseContext):
     def physicsWorld(self) -> Any:
         """The physics world once walking has begun, else None.
 
-        A method rather than an attribute because the developer overlay's
-        physics section asks for it every frame, and the world is replaced
-        whenever a map is.
+        Through the navigator's **character**, which is what actually holds
+        it: a view platform owns a capsule and the capsule owns the world.
+        Asking the platform directly answers None, and nothing complains —
+        every caller reads None as "walking has not started yet", so the bots
+        never think, no shot is ever traced and the developer overlay quietly
+        drops its Physics section.
+
+        A method rather than an attribute because the world is replaced
+        whenever a map is, and a provider holding the first would report on it
+        for ever.
         """
         nav = self._nav
-        return getattr(nav, 'world', None) if nav is not None else None
+        if nav is None:
+            return None
+        character = getattr(nav, 'character', None)
+        return getattr(character, 'world', None)
 
     def bindScreenKeys(self, context: Any = None) -> None:
         """Bind the function keys that open a screen or take a shot.
@@ -713,16 +1104,145 @@ class TwitchContext(OverlayMixin, BaseContext):
             return
         if hand.select(self.weapons.by_key(self.player.selected)):
             self.triggerRedraw(1)
+        # Posed from the same clock the HUD reads, and here rather than when
+        # the shot was taken: a kick that decays has to be written every frame
+        # or it stops wherever the last shot left it.
+        hand.settle(hudclock())
         aim_at_camera(self.viewpointAttachment(), self.getViewPlatform())
+
+    def _stepMatch(self, dt: float) -> None:    # pragma: no cover - GL
+        """Advance the match one frame, and show what came of it.
+
+        Two halves, and the line between them is [§11](../PROJECT-PLAN.md)'s
+        seam: :class:`~twitchoglc.rules.Rules` plays the tick and this shows
+        it.  Everything above the seam is testable without a window, which is
+        the whole reason it is not written out here -- nothing in this loop can
+        be reached by a test, so a rule living in it is a rule only a person
+        playing the game can check.
+
+        The player's position is *published* rather than read by the rules,
+        which is what keeps the arena free of the camera: everything else in
+        it moves because a command said so.
+        """
+        world = self.physicsWorld()
+        if world is None:
+            return
+        nav = self._nav
+        if nav is not None:
+            self.rules.publish(game.PLAYER_ID, nav.camera_position())
+        tick = self.rules.advance(
+            world, dt, self.weapons.by_key(self.player.selected),
+            seed=int(self._started * 1000) % 100000, surfaces=self._collision)
+        self._cameBack(tick.respawned)
+        self._watchDeath(tick.events, dt)
+        self._shovePlayer()
+        game.move_bodies(self.arena, self.botBodies)
+        game.move_items(self.rules.pickups, self.itemBodies, hudclock())
+        game.move_projectiles(self.flight, self.projectileBodies)
+        self.effects.trail(self.flight.position[:len(self.flight)], dt)
+        self._presentMatch(tick.events)
+
+    def _watchDeath(self, events: Any, dt: float) -> None:  # pragma: no cover - GL
+        """Take the view away while the player is dead, and give it back.
+
+        The camera is the piece of a death that had no owner: the view stayed
+        exactly where it was killed, still steered by the mouse, which reads
+        as the death *notice* being wrong rather than as a death.  See
+        :mod:`twitchoglc.deathcam`.
+        """
+        for event in events:
+            if isinstance(event, arena.Death) and event.target == game.PLAYER_ID:
+                me = self.arena.combatant(game.PLAYER_ID)
+                killer = self.arena.combatant(event.by)
+                nav = self._nav
+                self.deathCamera.begin(
+                    nav.camera_position() if nav is not None else np.zeros(3),
+                    me.position if me is not None else np.zeros(3),
+                    yaw=float(getattr(nav, 'yaw', 0.0)),
+                    killer=None if killer is None or killer is me
+                    else np.asarray(killer.position, dtype='d') + game.EYE_OFFSET)
+        self.deathCamera.advance(dt)
+
+    def _cameBack(self, respawned: Any) -> None:  # pragma: no cover - GL
+        """Move the camera to wherever a respawn has just put the player.
+
+        **The camera, not merely the record.**  The player's body is published
+        from the camera every tick, so a respawn the camera is not told about
+        is overwritten on the very next frame and puts them back exactly where
+        they were killed -- which reads as being fragged doing nothing at all.
+        """
+        feet = respawned.get(game.PLAYER_ID)
+        if feet is None:
+            return
+        self.deathCamera.end()
+        if self._nav is not None:
+            self._nav.bind_eye(tuple(feet + game.EYE_OFFSET))
+
+    def _shovePlayer(self) -> None:
+        """Give the player whatever a burst pushed them with.
+
+        **Through the character controller's own impulse**, which is what a
+        jump pad uses, so a rocket at the feet and a pad in the floor throw a
+        player by the same machinery -- and a rocket jump is therefore as
+        reliable as a jump pad is.
+
+        Taken from the rules and spent here rather than applied by them: the
+        arena says how hard somebody was shoved and knows nothing about a
+        capsule, and this is the only thing in the game that owns one.
+        """
+        push = blast.spend(self.arena, game.PLAYER_ID)
+        if push is not None and self._nav is not None:
+            self._nav.apply_impulse(push)
 
     def _updateHUD(self) -> None:               # pragma: no cover - GL
         hud = getattr(self, 'hud', None)
         if hud is None or not hud.visible:
             return
         platform = self.getViewPlatform()
-        hud.update(self.player, now=time.time(), viewport=self.getViewPort(),
+        hud.update(self.player, now=hudclock(), viewport=self.getViewPort(),
                    field_of_view=getattr(platform, 'fieldOfView',
                                          hud_default_fov()))
+        me = self.arena.combatant(game.PLAYER_ID)
+        if me is not None:
+            # From the match rather than from the player's own record: frags
+            # are something the *arena* keeps, and a second copy on the player
+            # would be a second answer to one question.
+            hud.score(me.frags, limit=int(self.arena.fragLimit))
+        if self.deathCamera is not None:
+            hud.dying(self.deathCamera.wash())
+        hud.looking_at(self._targetName())
+
+    def _targetName(self) -> str:               # pragma: no cover - GL
+        """Whoever is under the crosshair right now, or ''.
+
+        Through the same trace a shot takes, so the name is the one a shot
+        would give: a name over somebody a shot would miss is worse than no
+        name at all, and it is a wall that answers nobody rather than this
+        having a rule of its own about cover.
+        """
+        world = self.physicsWorld()
+        me = self.arena.combatant(game.PLAYER_ID)
+        if world is None or me is None or not me.alive:
+            return ''
+        origin, direction = self._aim()
+        found = self.arena.combatant(
+            combat.who_is_at(world, self.arena, game.PLAYER_ID,
+                             origin, direction))
+        return '' if found is None else str(found.name)
+
+    def _showScores(self, event: Any = None) -> None:   # pragma: no cover - key
+        """Put the whole board up while the key is held."""
+        hud = getattr(self, 'hud', None)
+        if hud is not None:
+            hud.scoreboard(game.scoreboard_lines(self.arena))
+            self.triggerRedraw(1)
+
+    def _hideScores(self, event: Any = None) -> None:   # pragma: no cover - key
+        """Take it down again when the key is let go."""
+        hud = getattr(self, 'hud', None)
+        if hud is not None:
+            hud.hide_scoreboard()
+            self.triggerRedraw(1)
 
     def _settings(self, event: Any) -> None:    # pragma: no cover - GL
         """Open the rendering settings over the map (F10).
@@ -750,12 +1270,32 @@ class TwitchContext(OverlayMixin, BaseContext):
             % (loaded.name, loaded.family, loaded.world.triangle_count,
                len(loaded.world.batches), len(loaded.atlas.pages)))
         sys.stdout.write('  %s\n' % (jumppads.describe(loaded.push_volumes()),))
+        unscripted = loaded.unscripted_surfaces()
+        if unscripted:
+            # Not an error: the name is used as a texture path and the surface
+            # draws.  Said out loud because the *animation* the script
+            # described goes with it, so a still pool of lava otherwise reads
+            # as a broken animator rather than as content nobody has.
+            sys.stdout.write(
+                '  %d surfaces have no material script and so do not animate '
+                '(e.g. %s)\n' % (len(unscripted), unscripted[0]))
+        pickups = self.rules.pickups
+        if pickups is not None:
+            sys.stdout.write('  %d pickups placed\n' % (len(pickups),))
+        missing = loaded.unplaceable_pickups()
+        if missing:
+            # Also not an error (`SPEC-Q3ENTITIES §3.2.4`: the classnames are
+            # not a closed set).  Said out loud because a level whose whole
+            # weapon circuit is content this game has nothing for plays
+            # exactly like a reader that failed to find any.
+            worst = max(missing.items(), key=lambda pair: pair[1])
+            sys.stdout.write(
+                '  %d pickups are of kinds this game has nothing for '
+                '(e.g. %d x %s)\n'
+                % (sum(missing.values()), worst[1], worst[0]))
         sys.stdout.write("  'g' toggles walk / free-fly, 'f' flies, 'm' cycles "
                          "movement mode, space jumps\n")
-        sys.stdout.write("  1/2/3 choose a weapon and ctrl fires; alt+f shows "
-                         "the developer overlay, F6/F10 the key and rendering "
-                         "settings\n")
-        sys.stdout.write("  1/2/3 choose a weapon, ctrl fires; alt+f shows the "
+        sys.stdout.write("  1-5 choose a weapon, the left mouse button fires; alt+f shows the "
                          "developer overlay, F6/F10 the key and render "
                          "settings\n")
         sys.stdout.flush()
@@ -789,21 +1329,38 @@ class TwitchContext(OverlayMixin, BaseContext):
         return True
 
     def _start_physics(self) -> bool:           # pragma: no cover - GL
-        world = collision_world(self.loaded)
-        if world is None:
+        built = collision.from_map(self.loaded)
+        if built is None:
             sys.stdout.write('no solid geometry to walk on; staying in free-fly\n')
             return False
+        # Kept whole rather than unpacked: a shot asks it what the level is
+        # made of where the trace landed, and the mesh and the surface index
+        # that answers that must never be able to describe different maps.
+        self._collision = built
         eye, yaw = choose_spawn(self.loaded, self.config.spawn)
         gravity = self.loaded.gravity * SCENE_SCALE
-        self._nav = PhysicsViewPlatform(world, character_capabilities(), yaw=yaw,
-                                        gravity=gravity)
+        self._nav = PhysicsViewPlatform(built.world, character_capabilities(),
+                                        yaw=yaw, gravity=gravity)
         self._nav.bind_eye(tuple(eye))
         self._pushes = jumppads.PushSystem(self.loaded.push_volumes(gravity))
         self._liquids = self.loaded.liquid_volumes()
+        # What only a loaded map can give the rules.  Slime and lava stop
+        # being scenery here -- the volumes are the same ones the swimming
+        # uses, so what you can swim in is what can kill you -- and so does
+        # the space below the level, where a fall off the edge of a map now
+        # ends in a death rather than in a camera that never stops.
+        self.rules.spawns = [avatar.feet_of(spawn.position)
+                             for spawn in self.loaded.spawn_points()]
+        self.rules.harm = liquids.LiquidHarm(self._liquids)
+        self.rules.floor = falling.KillFloor.under(self.loaded)
+        self.rules.gravity = gravity
         if os.environ.get(DEBUG_JUMP_ENV):
             watch_jumps(self._nav)
         self._nav.apply(self)
-        self._last = time.time()
+        # A map load is seconds the player did not experience as a stall, so
+        # the clock starts here rather than carrying that gap into the first
+        # frame of play as a clamped step and a debt.
+        self._clock.reset(time.time())
         return True
 
     def getNavigationPlatform(self) -> Any:     # pragma: no cover - GL
@@ -858,13 +1415,29 @@ class TwitchContext(OverlayMixin, BaseContext):
 
     # -- frame -----------------------------------------------------------
     def OnIdle(self, *args: Any) -> int:        # pragma: no cover - needs a window
+        # A download runs on a worker and is *published* here, once a frame.
+        self._pollDownload()
+        if self.loaded is None:
+            # On the start screen: nothing to animate and nobody to walk, so
+            # the loop should go quiet -- a static menu that redrew sixty times
+            # a second would spin a laptop's fans for nothing.
+            if getattr(self, '_fetch', None) is not None:
+                return 1                        # a bar is moving
+            if self._capture is not None:
+                # A capture is settled by *drawn frames*, and with nothing
+                # asking for one it would wait for ever.
+                self.triggerRedraw(1)
+                return 1
+            return 0
         # Surfaces animate whether or not the player is walking: a conveyor belt
         # and a pool of lava do not stop because nobody is moving.
-        animated = self._animate()
+        with self.tracePhase('animate'):
+            animated = self._animate()
         # Before the walking check: a weapon can be chosen from a free-flying
         # camera, and a player who cannot switch weapons until they land would
         # rightly call that a bug.
-        self._sampleWeapons()
+        with self.tracePhase('weapons'):
+            self._sampleWeapons()
         if not self._walking or self._nav is None:
             if self._capture is not None:
                 # A capture waits for a settled frame, and only a redraw makes
@@ -872,17 +1445,38 @@ class TwitchContext(OverlayMixin, BaseContext):
                 self.triggerRedraw(1)
                 return 1
             return 1 if animated else 0
-        now = time.time()
-        dt = min(now - self._last, 0.05)
-        self._last = now
-        update_submerged(self._nav, self._liquids)
-        self.updateNavigation(dt)
-        apply_mode(self._nav, getattr(self.contextDefinition, 'movementMode', None))
-        self._nav.update(dt)
-        self._apply_pushes(dt)
+        dt = self._clock.tick(time.time())
+        # The game update is subdivided because it is *all* of `OnIdle`, and
+        # `OnIdle` is where this game's frame time goes -- the loop trace can
+        # only say "idle" until something in here says which part of it.  The
+        # phases nest inside the backend's own, so they divide `idle` rather
+        # than adding to it; see `OpenGLContext.looptrace`.
+        with self.tracePhase('liquids'):
+            update_submerged(self._nav, self._liquids)
+            # Fog the view and muffle the mix to whatever the camera is inside.
+            # Before the navigation update so the picture and the movement agree
+            # about the same frame rather than being one apart.
+            underwater.update(self, self._liquids, self._nav.camera_position())
+        with self.tracePhase('navigation'):
+            self.updateNavigation(dt)
+            apply_mode(self._nav,
+                       getattr(self.contextDefinition, 'movementMode', None))
+        with self.tracePhase('character'):
+            self._nav.update(dt)
+            self._apply_pushes(dt)
+        with self.tracePhase('match'):
+            self._stepMatch(dt)
         if self.config.headlight:
             self.headlight.location = self._nav.camera_position()
-        self._nav.apply(self)
+        # **The death camera wins.**  While the player is dead the navigator
+        # goes on being driven -- the keys still arrive, the capsule still
+        # falls -- and what changes is who gets to say where the *view* is.
+        # Letting the navigator write it anyway is what left a corpse steering
+        # itself around the level.
+        if self.deathCamera is not None and self.deathCamera.watching:
+            self.deathCamera.apply(self.platform)
+        else:
+            self._nav.apply(self)
         self.triggerRedraw(1)
         return 1
 
@@ -946,6 +1540,11 @@ def hud_default_fov() -> float:
 
 #: Keys that open a screen or take a screenshot, and the handler each runs.
 #: Bound as ``keyboard`` key-downs; see ``TwitchContext.bindScreenKeys``.
+#: The key that shows the whole scoreboard while it is held.  Tab, because
+#: that is where every game in this genre puts it and a player will try it
+#: before they read anything.
+SCOREBOARD_KEY = '<tab>'
+
 SCREEN_KEYS = (
     ('<F2>', '_screenshot'),
     ('<F6>', '_bindings'),
@@ -1111,8 +1710,6 @@ def main(argv: Optional[List[str]] = None) -> None:
         else:
             print(download.fetch_pack(pack, options.cache_dir))
         raise SystemExit(0)
-    if not options.target:
-        build_parser().error('name a map to view, or --list-packs')
     logging.basicConfig(level=logging.DEBUG if options.verbose else logging.INFO)
     logging.getLogger('OpenGLContext.scenegraph.text').setLevel(logging.WARNING)
     apply_render_env(options)

@@ -14,8 +14,12 @@ import numpy as np
 import pytest
 
 import bspbuilder
+from OpenGLContext.move import viewplatform
 from OpenGLContext.move.viewplatformmixin import ViewPlatformMixin
-from twitchoglc import maploader, viewer
+from twitchoglc import (
+    arena, collision, deathcam, firstperson, game, hud, maploader, player,
+    projectiles, rules, viewer, weapons,
+)
 
 VENV_PYTHON = sys.executable
 
@@ -153,8 +157,7 @@ def test_the_avatar_is_the_size_the_spec_gives_a_player():
 
 def test_the_collision_world_holds_the_map_as_one_static_mesh(tmp_path):
     loaded = maploader.load(_map(tmp_path))
-    world = viewer.collision_world(loaded)
-    assert world is not None
+    world = collision.from_map(loaded).world
     assert world.body_count == 1
     assert int(world.motion_type[0]) != 2        # not kinematic; a static body
 
@@ -164,7 +167,7 @@ def test_a_map_with_nothing_solid_has_no_collision_world(tmp_path):
     loaded = maploader.load(_map(tmp_path, lumps))
     for batch in loaded.world.batches:
         batch.style = batch.style.replace(solid=False)
-    assert viewer.collision_world(loaded) is None
+    assert collision.from_map(loaded) is None
 
 
 def test_the_jump_pad_impulse_reaches_the_character(tmp_path):
@@ -172,7 +175,7 @@ def test_the_jump_pad_impulse_reaches_the_character(tmp_path):
     what `apply_impulse` does (SPEC-TRIGGER-PUSH §2.4)."""
     from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
     loaded = maploader.load(_map(tmp_path))
-    world = viewer.collision_world(loaded)
+    world = collision.from_map(loaded).world
     nav = PhysicsViewPlatform(world, viewer.character_capabilities(),
                               position=(0, 1, 0))
     nav.character.vy = -5.0
@@ -313,7 +316,7 @@ def test_the_download_choice_is_a_command_line_option():
 def _nav(tmp_path):
     from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
     loaded = maploader.load(_map(tmp_path))
-    return PhysicsViewPlatform(viewer.collision_world(loaded),
+    return PhysicsViewPlatform(collision.from_map(loaded).world,
                                viewer.character_capabilities(), position=(0, 1, 0))
 
 
@@ -491,11 +494,28 @@ def test_the_packs_can_be_listed_without_naming_a_map(capsys):
     assert 'OpenArena project' in printed
 
 
-def test_a_map_is_still_required_when_no_pack_is_being_listed(capsys):
-    with pytest.raises(SystemExit) as exit_info:
-        viewer.main([])
-    assert exit_info.value.code != 0
-    assert 'map' in capsys.readouterr().err.lower()
+def test_no_map_on_the_command_line_is_a_start_screen_rather_than_an_error(
+        monkeypatch):
+    """Launching with no arguments has to be a reasonable thing to do.
+
+    It used to be a usage error, which made the start screen unreachable from
+    the one place a player would look for it.
+    """
+    started = []
+    monkeypatch.setattr(viewer.TwitchContext, 'ContextMainLoop',
+                        classmethod(lambda cls, **named: started.append(named)))
+    viewer.main([])
+    assert started
+    assert viewer.TwitchContext._target in (None, '')
+
+
+def test_a_named_map_still_goes_straight_into_it(monkeypatch, tmp_path):
+    """The start screen is the *default*, not a step everyone has to walk past."""
+    started = []
+    monkeypatch.setattr(viewer.TwitchContext, 'ContextMainLoop',
+                        classmethod(lambda cls, **named: started.append(named)))
+    viewer.main(['some-map.bsp'])
+    assert viewer.TwitchContext._target == 'some-map.bsp'
 
 
 def test_naming_a_map_inside_a_pack_fetches_the_pack(tmp_path, monkeypatch):
@@ -799,9 +819,15 @@ def test_every_mode_can_tilt_the_view_with_ctrl_and_the_arrows():
 class _Nav:
     def __init__(self):
         self.flying = False
+        self.swimming = False
+        self.buoyancy = None
 
     def set_fly(self, flying):
         self.flying = flying
+
+    def set_swim(self, swimming, buoyancy=0.9):
+        self.swimming = swimming
+        self.buoyancy = buoyancy
 
 
 def test_entering_the_fly_mode_puts_the_character_into_noclip():
@@ -832,14 +858,29 @@ class _Headless(ViewPlatformMixin):
     """The context's input path with no window: dispatch, sampler, modes."""
 
     drawing = False
+    #: As on the real context before a level is walked in; a shot resolved
+    #: without one still lands, it just cannot name the surface it met.
+    _collision = None
+    #: Nothing in the air.  A hitscan weapon needs no batch at all.
+    flight = None
 
     def __init__(self, nav):
         self.contextDefinition = viewer.context_definition()
-        self.platform = nav
+        #: The platform the renderer draws from, which on the real context is
+        #: **not** the navigator: it is driven by the navigator each frame and
+        #: its orientation does not carry the look.  Kept distinct here so a
+        #: test can tell the two apart, which is the whole of what the aim
+        #: tests are about.
+        self.platform = viewplatform.ViewPlatform()
         self._nav = nav
 
     def getNavigationPlatform(self):
         return self._nav
+
+    def getViewPort(self):
+        return (800, 600)
+
+    physicsWorld = viewer.TwitchContext.physicsWorld
 
     def getEventManager(self, kind):
         return None
@@ -909,12 +950,54 @@ def test_walking_and_jumping_happen_in_the_same_frame(tmp_path):
 
 # -- swimming -----------------------------------------------------------------
 
-def test_swimming_moves_the_character_free_of_gravity():
-    """A swimmer that is still falling sinks to the bottom of every pool."""
+def test_the_physics_world_is_found_through_the_character(tmp_path):
+    """The one query the bots, the shooting and the overlay all go through.
+
+    A view platform does not hold the world — its *character* does — so asking
+    the platform for one silently answered None.  Nothing raised: the bots
+    simply never thought, no shot was ever traced, and the developer overlay
+    quietly dropped its Physics section.  A wrong answer that everything
+    downstream treats as "not ready yet" is the kind that hides for a long
+    time, which is why this is tested rather than eyeballed.
+    """
+    nav = _nav(tmp_path)
+    context = _Headless(nav)
+    assert context.physicsWorld() is nav.character.world
+
+
+def test_no_physics_world_before_walking_begins(tmp_path):
+    context = _Headless(_nav(tmp_path))
+    context._nav = None
+    assert context.physicsWorld() is None
+
+
+def _mode(name):
+    return [m for m in viewer.movement_modes() if m.name == name][0]
+
+
+def test_swimming_puts_the_character_in_the_water_rather_than_in_the_air():
+    """Swimming is not flying, and the difference is a wall you can leave by.
+
+    A swim implemented as noclip lets a player out of a pool through its side;
+    a swimmer collides with the world and is held up by buoyancy instead.
+    """
     nav = _Nav()
-    swim = [m for m in viewer.movement_modes() if m.name == 'swim'][0]
-    viewer.apply_mode(nav, swim)
-    assert nav.flying
+    viewer.apply_mode(nav, _mode('swim'))
+    assert nav.swimming
+    assert not nav.flying
+
+
+def test_the_swim_mode_carries_its_buoyancy_to_the_character():
+    nav = _Nav()
+    viewer.apply_mode(nav, _mode('swim'))
+    assert nav.buoyancy == pytest.approx(_mode('swim').buoyancy)
+
+
+def test_leaving_the_water_takes_the_character_out_of_swimming():
+    nav = _Nav()
+    viewer.apply_mode(nav, _mode('swim'))
+    viewer.apply_mode(nav, _mode('walk'))
+    assert not nav.swimming
 
 
 def test_being_in_a_liquid_volume_puts_the_avatar_in_the_swim_mode(tmp_path):
@@ -959,7 +1042,7 @@ def test_a_companion_key_naming_no_registered_pack_is_ignored(tmp_path, monkeypa
     (maps_root / 'maps').mkdir(parents=True)
     (maps_root / 'maps' / 'oa_dm1.bsp').write_bytes(b'IBSP')
     import dataclasses
-    pack = dataclasses.replace(viewer.download.OPENARENA_MAPS,
+    pack = dataclasses.replace(viewer.download.pack_for_key('openarena-maps'),
                                companions=('nonsense',))
     monkeypatch.setattr(viewer.download, 'parse_pack_target',
                         lambda target: (pack, target.split(':')[1]))
@@ -1214,3 +1297,567 @@ def test_a_capture_leaves_the_hud_out_unless_it_is_asked_for():
     assert visible(['m.bsp', '--capture', 'out.png']) is False
     assert visible(['m.bsp', '--capture', 'out.png', '--hud']) is True
     assert visible(['m.bsp', '--no-hud']) is False
+
+
+class TestDyingAndComingBack:
+    """Being killed has to be something the player *experiences*.
+
+    The scoreboard said "Bot 1 fragged you" while the player went on standing
+    in the same place shooting, which reads as the message being wrong rather
+    than as a death: nothing about the world changed.  Three things follow from
+    the rules deciding somebody died -- the gun stops answering, the camera
+    stops being published as a body to shoot at, and coming back puts the
+    player somewhere new.
+    """
+
+    def context(self, tmp_path, monkeypatch):
+        """A viewer's match wiring with a real character and no window."""
+        from OpenGLContext.move.viewplatform import ViewPlatform
+        nav = _nav(tmp_path)
+        context = _Headless(nav)
+        # The physics platform drives a plain view platform, which is what the
+        # window renders from and what a shot is aimed along.
+        context.platform = ViewPlatform(position=nav.camera_position())
+        context.config = viewer.build_parser().parse_args(['map.bsp'])
+        context.weapons = weapons.default_table()
+        context.player = player.PlayerState()
+        context.player.selected = context.weapons.weapons[0].key
+        context.arena = arena.Arena(weapons=context.weapons, fragLimit=15,
+                                    timeLimit=10.0)
+        context.arena.add(game.PLAYER_ID, position=np.zeros(3), name='You')
+        context.loaded = None
+        context.minds = {}
+        context.botBodies = {}
+        context.hud = None
+        # What plays the tick.  The viewer holds one of these and the rules
+        # inside it are tested against a constructed world in test_rules; what
+        # is checked here is that this context is wired to one.
+        context.rules = rules.Rules(context.arena, minds={},
+                                    flight=projectiles.Projectiles(),
+                                    spawns=[np.array([4.0, 2.0, 4.0])])
+        context.deathCamera = deathcam.DeathCamera()
+        # A hand with nothing in it: what a context has before a model loads,
+        # and enough to take the recoil a shot writes to it.
+        context.hand = firstperson.WeaponHand(context.weapons)
+        for name in ('_shoot', '_aim', '_cameBack', '_watchDeath'):
+            setattr(context, name,
+                    getattr(viewer.TwitchContext, name).__get__(context))
+        fired = []
+        monkeypatch.setattr(viewer.game, 'shoot',
+                            lambda *a, **k: fired.append(a) or None)
+        return context, fired
+
+    def kill(self, context):
+        context.arena.damage(game.PLAYER_ID, 1000.0, by='bot1')
+        assert not context.arena.combatant(game.PLAYER_ID).alive
+
+    def test_a_dead_player_cannot_shoot(self, tmp_path, monkeypatch):
+        context, fired = self.context(tmp_path, monkeypatch)
+        self.kill(context)
+        context._shoot()
+        assert fired == []
+
+    def test_pulling_the_trigger_while_dead_asks_to_come_back(self, tmp_path,
+                                                              monkeypatch):
+        """The trigger is what ends a death; the timer is only its floor."""
+        context, _fired = self.context(tmp_path, monkeypatch)
+        self.kill(context)
+        assert context.rules.waiting_to_come_back(game.PLAYER_ID)
+        context._shoot()
+        assert not context.rules.waiting_to_come_back(game.PLAYER_ID)
+
+    def test_dying_takes_the_view_away_from_the_navigator(self, tmp_path,
+                                                          monkeypatch):
+        """The camera was the piece of a death with no owner: it stayed where
+        it was killed, still steered by the mouse, which reads as the notice
+        being wrong rather than as a death."""
+        context, _fired = self.context(tmp_path, monkeypatch)
+        self.kill(context)
+        context._watchDeath(context.arena.drain(), dt=0.0)
+        assert context.deathCamera.watching
+
+    def test_the_view_falls_towards_the_floor(self, tmp_path, monkeypatch):
+        context, _fired = self.context(tmp_path, monkeypatch)
+        was = float(context._nav.camera_position()[1])
+        self.kill(context)
+        context._watchDeath(context.arena.drain(), dt=0.0)
+        context.deathCamera.advance(deathcam.DROP_SECONDS * 2)
+        assert float(context.deathCamera.position()[1]) < was
+
+    def test_coming_back_gives_the_view_to_the_navigator_again(self, tmp_path,
+                                                               monkeypatch):
+        context, _fired = self.context(tmp_path, monkeypatch)
+        self.kill(context)
+        context._watchDeath(context.arena.drain(), dt=0.0)
+        context.arena.advance(10.0)
+        context.rules.ask_to_respawn(game.PLAYER_ID)
+        context._cameBack(context.rules.respawn_due())
+        assert not context.deathCamera.watching
+
+    def test_a_death_with_nobody_to_blame_still_takes_the_view(self, tmp_path,
+                                                               monkeypatch):
+        """The lava, a long fall: there is nothing to look at, and dying is
+        still dying."""
+        context, _fired = self.context(tmp_path, monkeypatch)
+        context.arena.kill(game.PLAYER_ID, cause='lava')
+        context._watchDeath(context.arena.drain(), dt=0.0)
+        assert context.deathCamera.watching
+
+    def test_a_living_player_can(self, tmp_path, monkeypatch):
+        context, fired = self.context(tmp_path, monkeypatch)
+        context._shoot()
+        assert fired
+
+    def test_a_dead_player_is_not_published_into_the_match(self, tmp_path,
+                                                           monkeypatch):
+        """While dead there is no body to shoot at, and the camera is not it."""
+        context, _fired = self.context(tmp_path, monkeypatch)
+        self.kill(context)
+        before = np.array(context.arena.combatant(game.PLAYER_ID).position)
+        context.rules.publish(game.PLAYER_ID, (9.0, 9.0, 9.0))
+        assert np.allclose(
+            context.arena.combatant(game.PLAYER_ID).position, before)
+
+    def test_a_living_player_is(self, tmp_path, monkeypatch):
+        context, _fired = self.context(tmp_path, monkeypatch)
+        before = np.array(context.arena.combatant(game.PLAYER_ID).position)
+        context.rules.publish(game.PLAYER_ID, (9.0, 9.0, 9.0))
+        assert not np.allclose(
+            context.arena.combatant(game.PLAYER_ID).position, before)
+
+    def test_respawning_moves_the_camera_rather_than_only_the_record(
+            self, tmp_path, monkeypatch):
+        """The camera is where the player *is*.
+
+        The arena's respawn is overwritten a frame later by the tick that
+        publishes the camera into the match, so a respawn nothing told the
+        camera about puts the player straight back where they were shot.  The
+        rules decide *where*; what is checked here is that this context does
+        something with the answer.
+        """
+        context, _fired = self.context(tmp_path, monkeypatch)
+        self.kill(context)
+        was = np.array(context._nav.camera_position()[:3])
+        context.arena.advance(10.0)
+        # The player comes back when they *ask*; see `Rules.ask_to_respawn`.
+        context.rules.ask_to_respawn(game.PLAYER_ID)
+        context._cameBack(context.rules.respawn_due())
+        assert context.arena.combatant(game.PLAYER_ID).alive
+        assert not np.allclose(context._nav.camera_position()[:3], was)
+
+
+class _MessageSink:
+    """Just enough HUD for the weapon commands: somewhere to post a line."""
+
+    def __init__(self):
+        self.lines = []
+
+    def post(self, text, *args, **named):
+        self.lines.append(text)
+
+
+class _WheelRecorder(_Recorder):
+    """A recorder that also keeps the *functions* a wheel notch would reach."""
+
+    def __init__(self):
+        super().__init__()
+        self.wheel = {}
+        self._wheelHandlers = []
+
+    def addEventHandler(self, kind, **named):
+        super().addEventHandler(kind, **named)
+        if kind == 'mousebutton':
+            self.wheel.setdefault(
+                (named.get('button'), named.get('state')), []
+            ).append(named.get('function'))
+
+    def notch(self, button):
+        """Deliver one wheel notch the way GLFW's scroll callback does.
+
+        A notch is a press *and* a release (see
+        :meth:`OpenGLContext.events.glfwevents.GLFWEventHandler._emitWheel`),
+        so both states are offered and only the ones bound to them run.
+        """
+        for state in (1, 0):
+            for function in self.wheel.get((button, state), ()):
+                function(None)
+
+
+class TestTheWeaponWheel:
+    """One notch of the wheel is one weapon.
+
+    A wheel notch arrives as a press *and* a release, so anything bound to
+    both — or bound twice — steps twice for one movement of the finger, which
+    reads as a wheel that skips a weapon.
+    """
+
+    def context(self):
+        recorder = _WheelRecorder()
+        recorder.weapons = weapons.default_table()
+        recorder.player = player.PlayerState.carrying(recorder.weapons)
+        recorder.weaponBindings = viewer.controls.WeaponBindings()
+        recorder.hud = _MessageSink()
+        for name in ('_bindWeaponKeys', '_wheelWeapon', '_runCommands'):
+            setattr(recorder, name,
+                    getattr(viewer.TwitchContext, name).__get__(recorder))
+        recorder._bindWeaponKeys()
+        return recorder
+
+    def held(self, recorder):
+        return str(recorder.player.selected)
+
+    def test_one_notch_up_moves_one_weapon(self):
+        recorder = self.context()
+        keys = recorder.weapons.keys()
+        before = self.held(recorder)
+        recorder.notch(viewer.WHEEL_UP)
+        assert self.held(recorder) == keys[(keys.index(before) + 1) % len(keys)]
+
+    def test_one_notch_down_moves_one_weapon(self):
+        recorder = self.context()
+        keys = recorder.weapons.keys()
+        before = self.held(recorder)
+        recorder.notch(viewer.WHEEL_DOWN)
+        assert self.held(recorder) == keys[(keys.index(before) - 1) % len(keys)]
+
+    def test_a_notch_is_bound_once_and_only_on_the_press(self):
+        """Bound to the release as well, every notch would count twice."""
+        recorder = self.context()
+        for button in (viewer.WHEEL_UP, viewer.WHEEL_DOWN):
+            assert len(recorder.wheel.get((button, 1), [])) == 1
+            assert not recorder.wheel.get((button, 0))
+
+    def test_a_full_turn_of_the_wheel_comes_back_to_where_it_started(self):
+        recorder = self.context()
+        before = self.held(recorder)
+        for _notch in range(len(recorder.weapons.keys())):
+            recorder.notch(viewer.WHEEL_UP)
+        assert self.held(recorder) == before
+
+
+class TestTheScoreboardKey:
+    """The board is held down, not toggled.
+
+    It covers the middle of the screen, so a board somebody left up by
+    accident is a board they get shot behind.
+    """
+
+    def context(self):
+        recorder = _WheelRecorder()
+        recorder.weapons = weapons.default_table()
+        recorder.player = player.PlayerState.starting(recorder.weapons)
+        recorder.weaponBindings = viewer.controls.WeaponBindings()
+        recorder.arena = arena.Arena(weapons=recorder.weapons, fragLimit=15,
+                                     timeLimit=10.0)
+        recorder.arena.add(game.PLAYER_ID, name='You')
+        recorder.arena.add('bot1', bot=True, name='Bot 1')
+        recorder.hud = hud.GameHUD(recorder.weapons)
+        for name in ('_bindWeaponKeys', '_wheelWeapon', '_runCommands',
+                     '_showScores', '_hideScores'):
+            setattr(recorder, name,
+                    getattr(viewer.TwitchContext, name).__get__(recorder))
+        recorder._bindWeaponKeys()
+        return recorder
+
+    def bound(self, recorder, state):
+        return [name for kind, name, at in recorder.bindings
+                if kind == 'keyboard' and at == state]
+
+    def test_it_is_bound_to_both_the_press_and_the_release(self):
+        recorder = self.context()
+        assert viewer.SCOREBOARD_KEY in self.bound(recorder, 1)
+        assert viewer.SCOREBOARD_KEY in self.bound(recorder, 0)
+
+    def test_holding_it_puts_the_board_up(self):
+        recorder = self.context()
+        recorder._showScores()
+        assert recorder.hud.standings.visible
+        assert len(recorder.hud.standings.children) == 3   # heading and two
+
+    def test_letting_go_takes_it_down(self):
+        recorder = self.context()
+        recorder._showScores()
+        recorder._hideScores()
+        assert not recorder.hud.standings.visible
+
+    def test_a_run_with_no_hud_is_harmless(self):
+        """A capture run has none and must still be able to press keys."""
+        recorder = self.context()
+        recorder.hud = None
+        recorder._showScores()
+        recorder._hideScores()
+
+
+class TestTheMatchWiringStaysInStep:
+    """What draws a fight must be what a fight is emitted into.
+
+    The match is built once at start-up (so the menu has something) and again
+    when a level is loaded, and each build makes a fresh arena, a fresh set of
+    effect emitters and a fresh projectile batch. Anything that captured the
+    *first* set and was not rebuilt with the second is then looking at objects
+    nothing writes to any more: the effects go on being born into emitters that
+    are not in the scene, so they are never stepped and never drawn, and from
+    inside the game the weapons appear to do nothing at all.
+    """
+
+    def context(self):
+        """The match wiring built twice, as a launch does.
+
+        The weapon table and the audio engine are supplied rather than built:
+        what is under test is which objects the presenter ends up holding, and
+        loading a first-person model to find that out would be a test that
+        failed for two reasons.
+        """
+        made = _Headless(None)
+        made.config = viewer.build_parser().parse_args(['map.bsp'])
+        made.loaded = None
+        made.weapons = weapons.default_table()
+        made._audioEngine = lambda: None
+        for name in ('_buildMatch', '_bindPresenter'):
+            setattr(made, name,
+                    getattr(viewer.TwitchContext, name).__get__(made))
+        made._buildMatch()          # what OnInit does before a level exists
+        made.hud = _MessageSink()
+        made._bindPresenter()       # what _startGame does once there is a HUD
+        made._buildMatch()          # what loading a level does
+        return made
+
+    def test_the_presenter_reads_the_match_that_is_being_played(self):
+        made = self.context()
+        assert made._presenter.match is made.arena
+
+    def test_the_effects_it_draws_into_are_the_ones_in_the_scene(self):
+        made = self.context()
+        assert made._presenter.effects is made.effects
+
+    def test_the_sounds_it_plays_are_for_the_match_being_played(self):
+        made = self.context()
+        assert made._presenter.sounds.match is made.arena
+
+    def test_the_bots_think_about_the_match_being_played(self):
+        made = self.context()
+        assert set(made.minds) == {one.id for one in made.arena.bots()}
+
+    def test_a_burst_reaches_an_emitter_that_is_in_the_scene(self):
+        """The end of the chain, and the thing a player actually notices."""
+        made = self.context()
+        made.arena.impact(point=(1, 0, 0), normal=(0, 1, 0), surface='stone')
+        made._presenter.show(made.arena.drain(), camera=(0, 0, 0),
+                             forward=(0, 0, -1))
+        drawn = {id(child) for child in made.effects.group.children}
+        alive = [emitter for emitter in made.effects.emitters.values()
+                 if emitter.pool.live]
+        assert alive
+        assert all(id(emitter) in drawn for emitter in alive)
+
+
+class TestTheMouseFiresInTheGame:
+    """A click on the left button has to reach a shot, through the real path.
+
+    The unit tests say the binding names the button and the sampler records
+    it; this says the two meet — that a press delivered as the backend
+    delivers it, sampled the way the frame loop samples it, spends a round and
+    takes a shot.
+    """
+
+    def context(self, monkeypatch):
+        from OpenGLContext.events.inputstate import InputState
+        made = _Headless(None)
+        made.config = viewer.build_parser().parse_args(['map.bsp'])
+        made.weapons = weapons.default_table()
+        made.player = player.PlayerState.carrying(made.weapons)
+        made.player.selected = made.weapons.weapons[0].key
+        made.weaponBindings = viewer.controls.WeaponBindings()
+        made.hud = _MessageSink()
+        made._inputState = InputState()
+        made.getInputState = lambda: made._inputState
+        fired = []
+        for name in ('_sampleWeapons', '_runCommands'):
+            setattr(made, name,
+                    getattr(viewer.TwitchContext, name).__get__(made))
+        made._shoot = lambda: fired.append(1)
+        return made, fired
+
+    def press(self, made, down=1, button=viewer.controls.LEFT_BUTTON):
+        from OpenGLContext.events.mouseevents import MouseButtonEvent
+        event = MouseButtonEvent()
+        event.button = button
+        event.state = down
+        made._inputState.process(event)
+
+    def test_a_held_button_takes_a_shot(self, monkeypatch):
+        made, fired = self.context(monkeypatch)
+        self.press(made)
+        made._sampleWeapons()
+        assert fired
+
+    def test_it_spends_a_round(self, monkeypatch):
+        made, _fired = self.context(monkeypatch)
+        weapon = made.weapons.by_key(made.player.selected)
+        before = made.player.ammo_for(weapon)
+        self.press(made)
+        made._sampleWeapons()
+        assert made.player.ammo_for(weapon) < before
+
+    def test_nothing_is_fired_before_the_button_goes_down(self, monkeypatch):
+        made, fired = self.context(monkeypatch)
+        made._sampleWeapons()
+        assert not fired
+
+    def test_letting_go_stops_it(self, monkeypatch):
+        made, fired = self.context(monkeypatch)
+        self.press(made)
+        made._sampleWeapons()
+        self.press(made, down=0)
+        del fired[:]
+        made._sampleWeapons()
+        assert not fired
+
+
+class TestAShotGoesWhereTheCameraLooks:
+    """The reticule is in the middle of the screen, so a shot leaves along it.
+
+    There are two ways to ask a view platform which way it is looking and they
+    are not interchangeable: **the platform's angles rotate the world, not the
+    camera**, so a heading built from the inverse of its orientation agrees
+    with the gaze only while nothing is turned, and mirrors it as soon as
+    something is. That is a shot that goes left when the player turns right,
+    and up when they look down — and it looks correct in the one case anybody
+    checks first, straight ahead.
+
+    `viewer.gaze` is the verified one: `test_the_gaze_rule_agrees_with_the_walk_direction`
+    checks it against `_world_dir`, which is checked against the map-angle
+    spec. So a shot must agree with `gaze`.
+    """
+
+    def platform(self, tmp_path, yaw=0.0, pitch=0.0):
+        """The navigator the viewer actually aims from."""
+        made = _nav(tmp_path)
+        made.yaw, made.pitch = yaw, pitch
+        return made
+
+    def fired(self, nav):
+        """The direction the *context* would fire, given this navigator.
+
+        Through the context's own aim rather than a helper, because the bug
+        was which object the context asked: the view platform the renderer
+        draws from does not carry the look at all, so a shot taken from it
+        went the same way whichever way the player turned.
+        """
+        context = _Headless(nav)
+        context._nav = nav
+        return np.asarray(viewer.TwitchContext._aim(context)[1], dtype='d')
+
+    def origin(self, nav):
+        context = _Headless(nav)
+        context._nav = nav
+        return np.asarray(viewer.TwitchContext._aim(context)[0], dtype='d')
+
+    def test_straight_ahead_it_agrees(self, tmp_path):
+        made = self.platform(tmp_path)
+        assert self.fired(made) == pytest.approx(viewer.gaze(made), abs=1e-6)
+
+    def test_turned_left_it_still_agrees(self, tmp_path):
+        made = self.platform(tmp_path, yaw=0.7)
+        assert self.fired(made) == pytest.approx(viewer.gaze(made), abs=1e-6)
+
+    def test_turned_right_it_still_agrees(self, tmp_path):
+        made = self.platform(tmp_path, yaw=-0.7)
+        assert self.fired(made) == pytest.approx(viewer.gaze(made), abs=1e-6)
+
+    def test_a_pitched_shot_goes_the_way_the_camera_looks(self, tmp_path):
+        """The grenade that went up when the player looked down.
+
+        Which sign of ``pitch`` looks down is not asserted -- the platform's
+        angles turn the world, so the sign says nothing on its own. What is
+        asserted is that the shot goes the same way the gaze does, for both.
+        """
+        for pitch in (-0.6, 0.6):
+            made = self.platform(tmp_path, pitch=pitch)
+            looking = float(viewer.gaze(made)[1])
+            assert abs(looking) > 0.1, 'the fixture is not pitched'
+            assert float(self.fired(made)[1]) * looking > 0.0
+
+    def test_looking_down_with_the_keys_shoots_downward(self, tmp_path):
+        """Through the look binding, which is how a player pitches the view."""
+        made = self.platform(tmp_path)
+        for _frame in range(5):
+            _look(made, '<down>')
+        looking = float(viewer.gaze(made)[1])
+        assert looking < 0.0, 'the look-down key did not lower the gaze'
+        assert float(self.fired(made)[1]) < 0.0
+
+    def test_turned_and_pitched_together_it_agrees(self, tmp_path):
+        made = self.platform(tmp_path, yaw=1.1, pitch=-0.4)
+        assert self.fired(made) == pytest.approx(viewer.gaze(made), abs=1e-6)
+
+    def test_it_is_a_unit_heading(self, tmp_path):
+        made = self.platform(tmp_path, yaw=1.1, pitch=-0.4)
+        assert float(np.linalg.norm(self.fired(made))) == pytest.approx(1.0)
+
+    def test_the_shot_leaves_from_where_the_camera_is(self, tmp_path):
+        """From the navigator too: the same object that knows where it looks."""
+        made = self.platform(tmp_path, yaw=1.1)
+        assert self.origin(made) == pytest.approx(
+            np.asarray(made.camera_position()[:3], dtype='d'), abs=1e-6)
+
+    def test_with_no_navigator_it_aims_straight_ahead(self, tmp_path):
+        """A viewer that has not started walking still answers something sane."""
+        class _NotWalkingYet:
+            _nav = None
+
+        origin, direction = viewer.TwitchContext._aim(_NotWalkingYet())
+        assert np.asarray(direction) == pytest.approx((0.0, 0.0, -1.0))
+        assert np.asarray(origin) == pytest.approx((0.0, 0.0, 0.0))
+
+
+class TestTheShotIsUnderTheCrosshair:
+    """The one test above this that could not be argued with.
+
+    Everything else here checks the aim against `viewer.gaze`, and `gaze`
+    against `_world_dir`: three rules that agree with each other and could all
+    be wrong the same way, which is what a shot that pans the wrong way *is*.
+
+    So this checks the aim against something that is not a rule at all — the
+    two matrices the renderer builds the frame from. A point along the aim is
+    put through them exactly as a vertex is, and the answer has to be the
+    middle of the screen, because that is where the crosshair is drawn. There
+    is no convention left to get backwards: if this passes, what the player
+    sees under the crosshair is what the shot hits.
+
+    The matrices are pure arithmetic (`ViewPlatform.modelMatrix` and
+    `.viewMatrix`), so this needs no window; the same measurement taken from
+    inside the running game agrees with it.
+    """
+
+    #: Metres down the aim to put the mark.  Far enough that any error in the
+    #: heading is a large screen offset rather than a rounding difference.
+    RANGE = 30.0
+
+    def screen_position(self, nav):
+        """Where the shot's mark lands on screen, in normalised device space.
+
+        (0, 0) is the middle -- the crosshair -- and (±1, ±1) the edges.
+        """
+        platform = viewplatform.ViewPlatform()
+        # Driven the way the game drives it, so the frame measured here is the
+        # frame the player is shown.
+        platform.setPosition(nav.camera_position())
+        platform.setOrientation(nav.camera_orientation())
+        context = _Headless(nav)
+        context._nav = nav
+        origin, direction = viewer.TwitchContext._aim(context)
+        mark = np.append(np.asarray(origin, dtype='d')
+                         + np.asarray(direction, dtype='d') * self.RANGE, 1.0)
+        clip = np.dot(mark, np.dot(np.asarray(platform.modelMatrix()),
+                                   np.asarray(platform.viewMatrix())))
+        assert clip[3] > 0.0, 'the shot went behind the camera'
+        return clip[:2] / clip[3]
+
+    @pytest.mark.parametrize('yaw', [0.0, 0.7, -0.7, 2.4, -2.4])
+    @pytest.mark.parametrize('pitch', [0.0, 0.5, -0.5])
+    def test_it_lands_in_the_middle_of_the_screen(self, tmp_path, yaw, pitch):
+        made = _nav(tmp_path)
+        made.yaw, made.pitch = yaw, pitch
+        assert self.screen_position(made) == pytest.approx((0.0, 0.0),
+                                                           abs=1e-6)

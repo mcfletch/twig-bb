@@ -241,3 +241,31 @@ def test_undrawn_surfaces_are_not_reported_as_missing_textures(tmp_path):
     from twitchoglc import q2bsp
     lumps = bspbuilder.v38_quad(flags=q2bsp.SURF_NODRAW)
     assert maploader.load(_q2(tmp_path, lumps)).missing_textures() == []
+
+
+class TestTheCostOfAskingTwice:
+    """What a loaded map reports about itself does not change while it is loaded.
+
+    The developer overlay asks every frame — it is a live display, and that is
+    what live means — so a question answered by walking every surface and
+    resolving every texture name is a millisecond of every frame spent
+    recomputing a number that cannot have moved.  A map is immutable once
+    loaded, so the answer is worked out once.
+    """
+
+    def test_the_missing_textures_are_worked_out_once(self, monkeypatch,
+                                                      quake3_map):
+        loaded = maploader.load(quake3_map)
+        calls = []
+        original = loaded.library.resolve
+        monkeypatch.setattr(loaded.library, 'resolve',
+                            lambda name: (calls.append(name), original(name))[1])
+        loaded.missing_textures()
+        first = len(calls)
+        loaded.missing_textures()
+        assert first > 0
+        assert len(calls) == first
+
+    def test_it_still_answers_the_same_thing(self, quake3_map):
+        loaded = maploader.load(quake3_map)
+        assert loaded.missing_textures() == loaded.missing_textures()

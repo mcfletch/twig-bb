@@ -78,6 +78,8 @@ class Material:
     transparent: bool = False
     lightmapped: bool = True
     liquid: bool = False
+    #: Which liquid this material's surfaces bound (``SPEC-Q3SHADER §2.2``).
+    liquidKind: str = ''
     surfaceparms: Set[str] = field(default_factory=set)
     #: What this material does over time (``SPEC-Q3SHADER §2.4``).
     animation: surfaceanim.SurfaceAnimation = field(
@@ -95,6 +97,7 @@ class Material:
             lightmapped=self.lightmapped and not self.transparent,
             solid=self.solid,
             liquid=self.liquid,
+            liquidKind=self.liquidKind,
             animation=self.animation,
             # The two flags the style has always declared finally mean
             # something: one says the image slides, the other that the surface
@@ -137,8 +140,13 @@ def style_for(materials: Dict[str, Material], texture_name: str) -> SurfaceStyle
         # Undrawn but still solid: a clip brush is invisible *and* blocks
         # movement, so dropping the collision along with the drawing would open
         # a hole in every map that uses one.
-        return SurfaceStyle(name=texture_name, draw=False, lightmapped=False)
-    return SurfaceStyle(name=texture_name)
+        return SurfaceStyle(name=texture_name, draw=False, lightmapped=False,
+                            scripted=False)
+    # Marked unscripted so it can be *reported*.  A map naming a base-game
+    # shader nobody has -- `textures/liquids/protolava`, say -- draws a still,
+    # untextured surface, and without saying so the viewer looks broken rather
+    # than under-supplied.
+    return SurfaceStyle(name=texture_name, scripted=False)
 
 
 def load_scripts(roots: Sequence[str]) -> Dict[str, Material]:
@@ -199,7 +207,12 @@ class _Body:
         self.material = Material(name=name.lower())
         self.stage_images: List[str] = []
         self.editor_image = ''
-        self.blends: List[Tuple[str, str]] = []
+        #: Each stage's blend, by stage index.  **By index and not as a
+        #: list**, because which stage blends is the whole question: a
+        #: material draws its stages in order, one over another, so whether
+        #: the *surface* is see-through is decided by the first of them and
+        #: not by any of them.
+        self.blends: Dict[int, Tuple[str, str]] = {}
         self.samples_lightmap = False
         #: Animation directives, gathered as they are met.  Stage directives
         #: are taken from the *first drawable* stage only: one PBR material
@@ -210,8 +223,13 @@ class _Body:
         self.rgbgen: Optional[surfaceanim.ColorGen] = None
         self.alphagen: Optional[surfaceanim.AlphaGen] = None
         self.animmap: Optional[surfaceanim.AnimMap] = None
-        self.animated_stage = -1
+        #: The stage whose image the material draws, and therefore the only
+        #: stage whose animation means anything here.  -1 until one is seen.
+        self.image_stage = -1
         self.stage_index = -1
+        #: The index the first stage was given, so "did the first stage blend"
+        #: can be asked without assuming where the counting started.
+        self.first_stage = 0
 
 
 def _parse_body(name: str, tokens: List[Tuple[str, int]], index: int):
@@ -319,6 +337,8 @@ def _surfaceparm(material: Material, value: str) -> None:
         # the rule the other family words explicitly -- what stops a player is
         # solid, playerclip and window, and a liquid is none of them).
         material.liquid = True
+        # Which one, which the version 38 side has no way to say from a face.
+        material.liquidKind = value
         material.solid = False
     if value == PARM_TRANS or value in LIQUID_PARMS:
         material.transparent = True
@@ -336,16 +356,18 @@ def _stage_directive(body: _Body, keyword: str, arguments: List[str]) -> None:
         if lowered == LIGHTMAP_TOKEN:
             body.samples_lightmap = True        # §2.3.2
         elif lowered != WHITE_IMAGE_TOKEN:
+            _claim_image(body)
             body.stage_images.append(token)
     elif keyword == 'animmap' and len(arguments) > 1:
         # §2.3: a rate then frame names; the first frame stands in, and §2.4.5
         # says what the rest of them do.
+        _claim_image(body)
         body.stage_images.append(arguments[1])
         _claim_stage(body)
         if body.animmap is None:
             body.animmap = surfaceanim.parse_animmap(arguments)
     elif keyword == 'blendfunc' and arguments:
-        body.blends.append(_blend(arguments))
+        body.blends[body.stage_index] = _blend(arguments)
     elif keyword == 'alphafunc':
         body.material.masked = True
     # §2.3: tcGen, depthFunc, depthWrite and detail are parsed and ignored.
@@ -355,16 +377,32 @@ def _stage_directive(body: _Body, keyword: str, arguments: List[str]) -> None:
 ANIMATION_KEYWORDS = ('tcmod', 'rgbgen', 'alphagen')
 
 
+def _claim_image(body: _Body) -> None:
+    """Note this stage as the one the material draws, if none has been.
+
+    ``§2.3.1``: the drawable image is the *first* stage's map, so the first
+    stage to offer one is the stage this viewer puts on screen -- and the only
+    one whose animation it can honour.
+    """
+    if body.image_stage < 0:
+        body.image_stage = body.stage_index
+
+
 def _claim_stage(body: _Body) -> bool:
     """Whether this stage is the one whose animation is taken.
 
-    The first stage to carry an animation directive claims them all, so a
-    material's movement comes from one stage rather than from a blend of
-    several -- which is what a single PBR material can actually draw.
+    **The stage that is drawn**, which is the first with an image of its own
+    (``§2.3.1``) -- not the first that happens to animate.  A viewer drawing
+    one PBR material draws that one stage, so a `tcMod` on a later stage
+    describes a layer it never puts on screen, and applying it to the base
+    moves the wrong thing.
+
+    That is not a small difference.  A lit panel with a faint glow scrolling
+    across it on an additive third stage had the *panel* racing past at 0.7
+    texture widths a second, because the third stage's scroll was the first
+    animation anyone declared and it claimed the material.
     """
-    if body.animated_stage < 0:
-        body.animated_stage = body.stage_index
-    return body.animated_stage == body.stage_index
+    return body.stage_index == body.image_stage
 
 
 def _animation_directive(body: _Body, keyword: str, arguments: List[str]) -> None:
@@ -404,8 +442,16 @@ def _finish(body: _Body) -> Material:
     # material's own name.
     material.image = (body.stage_images[0] if body.stage_images
                       else body.editor_image or material.name)
-    if any(blend != OPAQUE_BLEND for blend in body.blends):
-        material.transparent = True             # §2.3
+    # §2.3: the stages are drawn in order, each over the one before, so the
+    # **first** decides whether the surface is see-through.  A first stage with
+    # no blend is an opaque surface and everything after it -- an environment
+    # reflection, an additive glow, the lightmap -- is detail painted on top.
+    # Reading *any* stage's blend as transparency made every lit floor in the
+    # game a sheet of glass with the room below showing through it.
+    first = min(body.blends) if body.blends else None
+    if first is not None and first == body.first_stage:
+        if body.blends[first] != OPAQUE_BLEND:
+            material.transparent = True
     if material.masked:
         material.transparent = False            # a cut-out is not blending
     material.lightmapped = (material.lightmapped and body.samples_lightmap

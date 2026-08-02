@@ -264,18 +264,58 @@ def v46_brush(brushside: int, n_brushsides: int, texture: int) -> bytes:
     return struct.pack('<iii', brushside, n_brushsides, texture)
 
 
-def v46_water(size: float = 64.0, depth: float = 32.0) -> Dict[str, bytes]:
+def v46_brushside(plane: int, texture: int = 0) -> bytes:
+    """SPEC-BSP46 §4.8 — 8 bytes."""
+    return struct.pack('<ii', plane, texture)
+
+
+def v46_box_brush(mins, maxs, texture: int = 0,
+                  first_plane: int = 0) -> Tuple[bytes, bytes, bytes]:
+    """A box brush as ``(brush, brushsides, planes)``.
+
+    Six axis-aligned planes, each facing *out* of the box, which is how a
+    brush states its own extent — and the only way to find out how deep a
+    pool actually is, since the leaf holding it reaches much further.
+    """
+    planes = b''
+    sides = b''
+    for axis in range(3):
+        planes += v46_plane(_axis_normal(axis, +1), float(maxs[axis]))
+        planes += v46_plane(_axis_normal(axis, -1), float(-mins[axis]))
+        sides += v46_brushside(first_plane + axis * 2, texture)
+        sides += v46_brushside(first_plane + axis * 2 + 1, texture)
+    return (v46_brush(0, 6, texture), sides, planes)
+
+
+def _axis_normal(axis: int, sign: int):
+    normal = [0.0, 0.0, 0.0]
+    normal[axis] = float(sign)
+    return normal
+
+
+def v46_water(size: float = 64.0, depth: float = 32.0,
+              brush_maxs=None) -> Dict[str, bytes]:
     """A map whose one leaf holds a brush textured with a liquid shader.
 
     Version 46 keeps no contents word on a leaf (SPEC-BSP46 §4.4.1), so the
     liquid is only findable through the brush and the texture it names.
+
+    ``brush_maxs`` makes the *brush* smaller than the leaf that holds it, which
+    is the ordinary case in a real map — a pool in a room — and the one that
+    tells a volume read from the brush apart from one read from the leaf.
     """
     lumps = v46_quad(size=size, texture='textures/base/wall')
     lumps['textures'] = (v46_texture('textures/base/wall')
                          + v46_texture('textures/liquids/water'))
-    lumps['brushes'] = v46_brush(0, 0, 1)
+    mins = (0, 0, -int(depth))
+    maxs = brush_maxs if brush_maxs is not None else (int(size), int(size), 0)
+    brush, sides, planes = v46_box_brush(mins, maxs, texture=1)
+    lumps['brushes'] = brush
+    lumps['brushsides'] = sides
+    lumps['planes'] = planes
     lumps['leafbrushes'] = struct.pack('<i', 0)
-    lumps['leafs'] = v46_leaf(cluster=0, mins=(0, 0, -int(depth)),
-                              maxs=(int(size), int(size), 0),
+    # The leaf reaches well above the water, as a room's leaf does.
+    lumps['leafs'] = v46_leaf(cluster=0, mins=mins,
+                              maxs=(int(size), int(size), int(size)),
                               leafbrush=0, n_leafbrushes=1)
     return lumps

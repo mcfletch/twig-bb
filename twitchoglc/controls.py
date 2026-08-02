@@ -26,6 +26,7 @@ from typing import Any, List, NamedTuple, Optional, Sequence, Tuple
 
 from vrml import field, node
 
+from OpenGLContext.events.mouseevents import button_name
 from OpenGLContext.move.modes import KeyBinding
 
 __all__ = [
@@ -42,6 +43,13 @@ PREVIOUS_WEAPON = 'weapon.previous'
 
 #: Number keys weapons are offered on, in order.
 SLOT_KEYS = ('1', '2', '3', '4', '5', '6', '7', '8', '9')
+
+#: The mouse button that fires.  **The left one, because in this genre that is
+#: the trigger** -- it is the binding every player already has in their hand,
+#: and a game that answered only a modifier key reads as a game where firing
+#: does nothing at all: no shot, no sound, no ammunition going down, and
+#: nothing to diagnose from inside it.
+LEFT_BUTTON = 0
 
 
 def slot_command(slot: int) -> str:
@@ -81,8 +89,11 @@ class WeaponBindings(node.Node):
     def defaultBindings(self) -> Sequence[KeyBinding]:
         """The keys these commands start on."""
         made = [
+            # The mouse first, because that is what a player reaches for; the
+            # modifier keys are kept because some hold one by habit, and
+            # because a key is what a keyboard-only setup has.
             KeyBinding(command=FIRE, label=_('Fire'),
-                       keys=['<control>', '<ctrl>']),
+                       keys=[button_name(LEFT_BUTTON), '<control>', '<ctrl>']),
             KeyBinding(command=NEXT_WEAPON, label=_('Next weapon'),
                        keys=[']']),
             KeyBinding(command=PREVIOUS_WEAPON, label=_('Previous weapon'),
@@ -182,10 +193,12 @@ def apply_commands(commands: Sequence[str], firing: bool, player: Any,
                    table: Any, now: float) -> List[Event]:
     """Run this frame's commands against the player, and say what happened.
 
-    The rules are deliberately thin: this is the stand-in for §7, which owns
-    what a shot actually *does*.  What is real here is the accounting the HUD
-    shows -- which weapon is in hand, ammunition going down, the fire rate the
-    weapon's table entry declares, and the cone of fire opening as it is used.
+    **The accounting only.**  Which weapon is in hand, ammunition going down,
+    the fire rate the weapon's table entry declares, and the cone of fire
+    opening as it is used.  What a shot then *does* -- the trace or the
+    projectile, the damage, the burst -- is :mod:`twitchoglc.game`'s ``shoot``,
+    reached through the ``fire`` event this returns.  The split is what lets
+    the whole of the input path be tested with no world to shoot at.
 
     Nothing here draws or plays anything.  It returns events and the caller
     decides what to do with them.

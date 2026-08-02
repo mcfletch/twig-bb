@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 import pytest
 
 from OpenGLContext.scenegraph.basenodes import Transform
@@ -340,3 +342,76 @@ class TestSeeingTheWeaponAtAll:
         spec.loader.exec_module(module)
         DEFAULT_FILL = module.DEFAULT_FILL
         assert 0 < DEFAULT_FILL <= 0.15
+
+
+class TestTheGunMovesWhenItFires:
+    """A weapon that does not move when it fires reads as a weapon that did not.
+
+    It is the one piece of feedback that comes from the thing the player is
+    holding rather than from the world, so it arrives even when the shot goes
+    into the sky and hits nothing at all.
+    """
+
+    def hand(self, key='pistol'):
+        table = weapons.default_table()
+        made = firstperson.WeaponHand(table)
+        made.select(table.by_key(key))
+        return made, table.by_key(key)
+
+    def where(self, made):
+        return np.asarray(made.group.translation, dtype='d')
+
+    def test_at_rest_the_hand_sits_where_the_camera_is(self):
+        made, _weapon = self.hand()
+        made.settle(now=10.0)
+        assert self.where(made) == pytest.approx((0.0, 0.0, 0.0), abs=1e-9)
+
+    def test_firing_kicks_it_back_towards_the_player(self):
+        """+Z in view space is behind the eye, which is where a recoil goes."""
+        made, _weapon = self.hand()
+        made.fired(now=10.0)
+        made.settle(now=10.0)
+        assert float(self.where(made)[2]) > 0.0
+
+    def test_and_tips_the_muzzle_up(self):
+        made, _weapon = self.hand()
+        made.fired(now=10.0)
+        made.settle(now=10.0)
+        assert float(made.group.rotation[3]) != 0.0
+
+    def test_it_comes_back_to_rest(self):
+        made, weapon = self.hand()
+        made.fired(now=10.0)
+        made.settle(now=10.0 + float(weapon.recoilRecovery) + 0.01)
+        assert self.where(made) == pytest.approx((0.0, 0.0, 0.0), abs=1e-9)
+
+    def test_it_is_already_returning_half_way_through(self):
+        made, weapon = self.hand()
+        made.fired(now=10.0)
+        made.settle(now=10.0)
+        peak = float(self.where(made)[2])
+        made.settle(now=10.0 + float(weapon.recoilRecovery) * 0.5)
+        assert 0.0 < float(self.where(made)[2]) < peak
+
+    def test_a_second_shot_kicks_again(self):
+        made, weapon = self.hand()
+        made.fired(now=10.0)
+        made.settle(now=10.0 + float(weapon.recoilRecovery) * 0.8)
+        faded = float(self.where(made)[2])
+        made.fired(now=10.5)
+        made.settle(now=10.5)
+        assert float(self.where(made)[2]) > faded
+
+    def test_a_heavier_weapon_kicks_harder(self):
+        """The table is the design: how much a weapon kicks is one of its numbers."""
+        table = weapons.default_table()
+        assert float(table.by_key('rocket').recoilKick) \
+            > float(table.by_key('pistol').recoilKick)
+
+    def test_switching_weapon_does_not_leave_the_kick_behind(self):
+        made, _weapon = self.hand()
+        table = weapons.default_table()
+        made.fired(now=10.0)
+        made.select(table.by_key('shotgun'))
+        made.settle(now=10.0)
+        assert self.where(made) == pytest.approx((0.0, 0.0, 0.0), abs=1e-9)

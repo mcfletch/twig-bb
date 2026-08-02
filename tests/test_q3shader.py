@@ -291,3 +291,169 @@ def test_a_liquid_surfaceparm_marks_the_material_as_a_liquid(parm):
 def test_an_ordinary_material_is_not_a_liquid():
     text = 'textures/base/wall\n{\n{\nmap textures/base/wall.tga\n}\n}\n'
     assert not q3shader.parse(text)['textures/base/wall'].style().liquid
+
+
+# -- which stage decides whether a surface is see-through ---------------------
+#
+# `SPEC-Q3SHADER §2.3`: a material draws its stages in order, each over the one
+# before.  Whether the *surface* is transparent is therefore decided by its
+# **first** stage: a first stage with no blend is an opaque surface, and the
+# blended stages after it are detail drawn on top -- a reflection, a glow, the
+# lightmap.  Reading any stage's blend as "the surface is see-through" makes
+# every lit floor in the game a sheet of glass.
+
+MULTI_STAGE_FLOOR = """
+textures/proto2/marble02b_floor
+{
+    {
+        map textures/proto2/marble02b_floor.tga
+        rgbgen identity
+    }
+    {
+        map textures/effects/tinfx.tga
+        tcgen environment
+        rgbgen vertex
+    }
+    {
+        map textures/proto2/marble02b_floor.tga
+        blendfunc add
+        rgbgen identity
+    }
+    {
+        map $lightmap
+        blendfunc filter
+        rgbgen identity
+    }
+}
+"""
+
+
+def test_a_floor_with_blended_detail_stages_is_still_a_floor():
+    """The bug that made solid floors show the room below them.
+
+    This is a real material from the shipped content, and every one of its
+    later stages blends: an environment reflection, an additive pass and the
+    lightmap.  The first stage does not, so the surface is opaque.
+    """
+    style = q3shader.parse(MULTI_STAGE_FLOOR)[
+        'textures/proto2/marble02b_floor'].style()
+    assert style.opacity == 1.0
+
+
+def test_a_first_stage_that_blends_is_transparent():
+    """A window is a window: the base layer itself is what you see through."""
+    text = """
+textures/glass/pane
+{
+    {
+        map textures/glass/pane.tga
+        blendfunc blend
+    }
+}
+"""
+    assert q3shader.parse(text)['textures/glass/pane'].style().opacity < 1.0
+
+
+def test_an_explicitly_opaque_first_stage_is_opaque():
+    text = """
+textures/base/wall
+{
+    {
+        map textures/base/wall.tga
+        blendfunc gl_one gl_zero
+    }
+    {
+        map $lightmap
+        blendfunc filter
+    }
+}
+"""
+    assert q3shader.parse(text)['textures/base/wall'].style().opacity == 1.0
+
+
+def test_a_material_with_no_stages_at_all_is_opaque():
+    text = """
+textures/base/plain
+{
+    surfaceparm nolightmap
+}
+"""
+    assert q3shader.parse(text)['textures/base/plain'].style().opacity == 1.0
+
+
+def test_the_lightmap_stage_still_lights_a_multi_stage_floor():
+    """It was being dropped with the transparency, so these floors went flat."""
+    style = q3shader.parse(MULTI_STAGE_FLOOR)[
+        'textures/proto2/marble02b_floor'].style()
+    assert style.lightmapped
+
+
+# -- which stage the animation is taken from ---------------------------------
+
+SCROLLING_GLOW = """
+textures/evil8_trim/e8trimlight2_red
+{
+    {
+        map textures/evil8_trim/e8trimlight2_red.tga
+    }
+    {
+        map $lightmap
+        blendfunc filter
+        tcGen lightmap
+    }
+    {
+        map textures/evil8_trim/e8trimlight2_red.blend.tga
+        blendfunc add
+        tcMod scroll -0.7 0
+    }
+}
+"""
+
+
+def test_animation_comes_from_the_stage_that_is_actually_drawn():
+    """The bug that made a lit panel slide past at speed.
+
+    A real material from the shipped content: a static light panel, the
+    lightmap over it, and a faint glow scrolling across on an additive third
+    stage.  This viewer draws **one** stage — the first with an image — so the
+    scroll belongs to a layer it does not draw.  Taking it anyway applied a
+    third stage's motion to the base texture, and the whole panel raced across
+    at 0.7 texture widths a second.
+    """
+    style = q3shader.parse(SCROLLING_GLOW)[
+        'textures/evil8_trim/e8trimlight2_red'].style()
+    assert not style.animation.animated
+
+
+def test_animation_on_the_drawn_stage_is_kept():
+    """The other half: a surface that really does move must still move."""
+    text = """
+textures/liquids/lava
+{
+    {
+        map textures/liquids/lava.tga
+        tcMod scroll 0.1 0.1
+    }
+    {
+        map $lightmap
+        blendfunc filter
+    }
+}
+"""
+    style = q3shader.parse(text)['textures/liquids/lava'].style()
+    assert style.animation.animated
+    assert style.animation.tcmods
+
+
+def test_a_frame_cycle_on_the_drawn_stage_is_kept():
+    text = """
+textures/sfx/flame
+{
+    {
+        animMap 10 textures/sfx/flame1.tga textures/sfx/flame2.tga
+        blendfunc add
+    }
+}
+"""
+    style = q3shader.parse(text)['textures/sfx/flame'].style()
+    assert style.animation.animmap is not None

@@ -10,11 +10,14 @@ first-person model in it, driven by the same modules the viewer uses.
 
 Keys::
 
-    1 2 3               choose a weapon (2 and 3 have to be picked up first)
+    1 - 5               choose a weapon (all but the first have to be
+                        picked up: p gives you the next one)
     [ ] / mouse wheel   previous / next weapon held
-    ctrl                fire -- ammunition goes down, the reticule opens
+    left mouse / ctrl   fire -- ammunition goes down, the reticule opens
     p                   pick the next weapon up, so the bar fills in
-    h                   take damage; the health meter changes colour
+    h                   take damage, from a different side each time: the
+                        meter flashes and reads low, and the screen edge the
+                        hit came from washes red
     j / k               heal / take armour
     Alt + f             the developer overlay
     F6 / F10            key bindings / rendering settings
@@ -65,7 +68,7 @@ from OpenGLContext.ui.overlay import OverlayMixin               # noqa: E402
 from . import controls, weapons as weapontable                  # noqa: E402
 from . import debug as twitchdebug                              # noqa: E402
 from .firstperson import WeaponHand, aim_at_camera               # noqa: E402
-from .hud import GameHUD                                        # noqa: E402
+from .hud import GameHUD, now as hudclock                       # noqa: E402
 from .player import PlayerState                                 # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -76,6 +79,12 @@ BaseContext: Any = testingcontext.getInteractive()
 #: a few seconds, because what is being looked at is the HUD.
 ROOM = 8.0
 ROOM_HEIGHT = 3.5
+
+#: Radians the demo's hits walk round the player between one `h` and the next.
+#: Not a whole turn divided evenly: a step that landed on the same four edges
+#: for ever would never show the wash sliding between two of them, which is the
+#: behaviour worth looking at.
+HURT_STEP = 2.0 * math.pi / 7.0
 
 #: Where the eye starts, and how close a thing may be and still be drawn.  The
 #: near plane matters here: a weapon held at arm's length is *inside* the
@@ -140,6 +149,8 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
     addEventHandler: Any
     triggerRedraw: Any
     sg: Any
+    #: Which way the next demo hit comes from; see :data:`HURT_STEP`.
+    _bearing: float = 0.0
 
     def OnInit(self) -> None:
         # This demo asks for a frame every idle -- the reticule closes and
@@ -181,7 +192,7 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
             self.debugOverlay.visible = True
         self._handlers: List[Any] = []
         self._bindKeys()
-        self.hud.post('WELCOME -- ctrl fires, p picks up, 1/2/3 chooses')
+        self.hud.post('WELCOME -- the mouse fires, p picks up, 1-5 chooses')
         self._report()
 
     # -- input ------------------------------------------------------------
@@ -228,13 +239,25 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
         self.triggerRedraw(1)
 
     def _hurt(self, event: Any = None) -> None:
-        self.player.take_damage(25)
+        """Take a hit from somewhere new each time.
+
+        From a *direction*, because the directional wash is the part of being
+        shot that a player acts on and a demo that always hit from the front
+        would never show it moving.
+        """
+        taken = self.player.take_damage(25)
+        self._bearing = (self._bearing + HURT_STEP) % (2.0 * math.pi)
+        self.hud.damage.hurt(bearing=self._bearing - math.pi,
+                             intensity=taken / 34.0, now=hudclock())
         if not self.player.alive:
-            self.hud.post('YOU DIED -- j heals')
+            self.hud.died('Killed by the demo', respawn_in=0.0)
         self.triggerRedraw(1)
 
     def _heal(self, event: Any = None) -> None:
+        was_dead = not self.player.alive
         self.player.heal(25)
+        if was_dead and self.player.alive:
+            self.hud.revived()
         self.triggerRedraw(1)
 
     def _armour(self, event: Any = None) -> None:
@@ -257,7 +280,7 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
 
     def _run(self, commands: Sequence[str], firing: bool) -> None:
         for event in controls.apply_commands(commands, firing, self.player,
-                                             self.weapons, time.time()):
+                                             self.weapons, hudclock()):
             if event.text:
                 self.hud.post(event.text)
         self.triggerRedraw(1)
@@ -288,7 +311,7 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
 
     def renderShaderOverlay(self, pass_: Any) -> None:
         platform = self.getViewPlatform()
-        self.hud.update(self.player, now=time.time(),
+        self.hud.update(self.player, now=hudclock(),
                         viewport=self.getViewPort(),
                         field_of_view=math.radians(
                             float(getattr(platform, 'frustum', (90,))[0])))
@@ -310,7 +333,7 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
         return [
             ('model', str(weapon.model) if weapon is not None else '-'),
             ('held', len(self.player.weapons)),
-            ('spread', self.player.spread_fraction(time.time())),
+            ('spread', self.player.spread_fraction(hudclock())),
         ]
 
     def _report(self) -> None:

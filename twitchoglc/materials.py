@@ -27,6 +27,7 @@ import numpy as np
 
 from OpenGLContext.scenegraph.pbrmaterial import PBRMaterial, PBRTexture
 
+from .contentsearch import ContentSearch
 from .surfaces import SurfaceStyle
 
 log = logging.getLogger(__name__)
@@ -85,7 +86,7 @@ class MaterialLibrary:
         self._textures: Dict[Tuple[str, bool], PBRTexture] = {}
         self._materials: Dict[Tuple[Any, ...], PBRMaterial] = {}
         self._lightmaps: Dict[int, PBRTexture] = {}
-        self._listings: Dict[Tuple[str, str], Optional[Dict[str, str]]] = {}
+        self._files = ContentSearch(self.roots)
 
     # -- name resolution -------------------------------------------------
     def resolve(self, name: str) -> Optional[str]:
@@ -140,74 +141,23 @@ class MaterialLibrary:
                 warn: bool = False) -> Optional[str]:
         """First existing file for ``relative`` + each extension, in each root.
 
-        An exact match always wins; only when every extension has missed does
-        the case-insensitive lookup of :meth:`_case_insensitive` run, so a tree
-        whose names match exactly costs no directory scans at all.
+        The search itself is :class:`~twitchoglc.contentsearch.ContentSearch`,
+        shared with every other kind of asset a map names.  What is added here
+        is the report of an image that *is* present in a format this viewer
+        cannot decode, which is a different thing from an absent one and is
+        worth telling the user apart.
         """
-        for root in self.roots:
-            for extension in extensions:
-                path = _safe_join(root, relative + extension)
-                if path and os.path.isfile(path):
-                    return path
-            found = self._case_insensitive(root, relative, extensions)
-            if found:
-                return found
-            if warn:
-                self._warn_undecoded(root, relative)
-        return None
+        found = self._files.find(relative, extensions)
+        if found is None and warn:
+            self._warn_undecoded(relative)
+        return found
 
-    def _case_insensitive(self, root: str, relative: str,
-                          extensions: Sequence[str]) -> Optional[str]:
-        """The file whose name differs from ``relative`` only in case.
-
-        Quake content is authored as though the filesystem ignored case — the
-        Quake III shader manual asks for lowercase names, and maps and scripts
-        do not always comply — so on a case-sensitive filesystem an exact-case
-        lookup silently loses real textures.  Each directory is listed once and
-        remembered.
-        """
-        directory, _, stem = relative.rpartition('/')
-        listing = self._listing(root, directory)
-        if listing is None:
-            return None
-        for extension in extensions:
-            match = listing.get((stem + extension).lower())
-            if match:
-                return match
-        return None
-
-    def _listing(self, root: str, directory: str) -> Optional[Dict[str, str]]:
-        """``{lower-case filename: full path}`` for one directory, listed once.
-
-        The directory itself may also be differently cased, so each segment of
-        the path is resolved the same way.
-        """
-        key = (root, directory)
-        if key in self._listings:
-            return self._listings[key]
-        path: Optional[str] = root
-        for segment in directory.split('/') if directory else []:
-            path = _child_directory(path, segment)
-            if path is None:
-                break
-        listing: Optional[Dict[str, str]] = None
-        if path is not None and os.path.isdir(path):
-            try:
-                listing = {name.lower(): os.path.join(path, name)
-                           for name in os.listdir(path)}
-            except OSError:                     # unreadable directory
-                listing = None
-        self._listings[key] = listing
-        return listing
-
-    def _warn_undecoded(self, root: str, relative: str) -> None:
+    def _warn_undecoded(self, relative: str) -> None:
         """Report an image that exists in a format this viewer cannot decode."""
-        for extension in UNDECODED_EXTENSIONS:
-            path = _safe_join(root, relative + extension)
-            if path and os.path.isfile(path):
-                log.warning('%s%s needs a palette this viewer does not carry; '
-                            'the surface will be untextured', relative, extension)
-                return
+        path = self._files.find(relative, UNDECODED_EXTENSIONS)
+        if path is not None:
+            log.warning('%s needs a palette this viewer does not carry; '
+                        'the surface will be untextured', path)
 
     # -- images ----------------------------------------------------------
     def image(self, name: str) -> Any:
@@ -317,41 +267,6 @@ def _alpha_mode(style: SurfaceStyle) -> str:
     if style.transparent:
         return 'BLEND'
     return 'OPAQUE'
-
-
-def _safe_join(root: str, relative: str) -> Optional[str]:
-    """Join a content-supplied path to a root, refusing to escape it.
-
-    Map content is untrusted: a texture name is attacker-controlled for any map
-    from the internet, so a name containing `..` or an absolute path must not
-    read outside the content root.
-    """
-    if os.path.isabs(relative):
-        return None
-    path = os.path.normpath(os.path.join(root, relative))
-    if path != root and not path.startswith(root + os.sep):
-        return None
-    return path
-
-
-def _child_directory(parent: Optional[str], name: str) -> Optional[str]:
-    """The named subdirectory of ``parent``, matching case-insensitively."""
-    if parent is None:
-        return None
-    exact = os.path.join(parent, name)
-    if os.path.isdir(exact):
-        return exact
-    try:
-        entries = os.listdir(parent)
-    except OSError:
-        return None
-    lowered = name.lower()
-    for entry in entries:
-        if entry.lower() == lowered:
-            candidate = os.path.join(parent, entry)
-            if os.path.isdir(candidate):
-                return candidate
-    return None
 
 
 def _open_image(path: Optional[str]) -> Any:

@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -98,16 +99,39 @@ class LoadedMap:
         return sorted({batch.style.name for batch in self.world.batches
                        if batch.style.draw and not batch.style.sky})
 
-    def missing_textures(self) -> List[str]:
+    def unscripted_surfaces(self) -> List[str]:
+        """Drawn surfaces this map names that no material script defines.
+
+        Not an error (``SPEC-Q3SHADER §3.2``): the name is used as a texture
+        path and the surface draws.  It is worth *reporting* because everything
+        else the script would have said is gone with it -- most visibly the
+        animation, so a pool of lava that should churn sits perfectly still and
+        the animator gets the blame for content the user does not have.
+        """
+        return sorted({batch.style.name for batch in self.world.batches
+                       if batch.style.draw and not batch.style.sky
+                       and not batch.style.scripted})
+
+    @cached_property
+    def _missing_textures(self) -> List[str]:
         """The texture names whose image could not be found.
 
         Most maps name only the textures they add and take the rest from the
         game's base content, which is not shipped with the map.  Without this
         an absent content tree is indistinguishable from a broken loader: the
         map renders, in grey.
+
+        Worked out once: a loaded map does not change, and the developer
+        overlay asks every frame.  Resolving a few hundred texture names
+        against the content tree is most of a millisecond, which is a real
+        part of a frame to spend on a number that cannot have moved.
         """
         return [name for name in self.texture_names()
                 if self.library.resolve(name) is None]
+
+    def missing_textures(self) -> List[str]:
+        """The texture names whose image could not be found."""
+        return self._missing_textures
 
     def collision_mesh(self) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """One static trimesh of the map's solid surfaces, in scene space."""
@@ -125,10 +149,36 @@ class LoadedMap:
         return (np.asarray(record['mins'], dtype='d'),
                 np.asarray(record['maxs'], dtype='d'))
 
+    def pickups(self, table: Any = None) -> Any:
+        """Everything the map placed for players to collect.
+
+        ``SPEC-Q3ENTITIES §3``.  A classname this game has nothing to give for
+        is skipped rather than being an error (`§3.2.4`), and
+        :func:`~twitchoglc.items.unknown_classnames` is how to find out what
+        was skipped -- which matters, because a level whose whole weapon
+        circuit is content nobody has plays exactly like a broken reader.
+        """
+        from . import items
+        return items.from_entities(self.entities, table)
+
+    def unplaceable_pickups(self) -> Any:
+        """Pickup classnames this game has nothing for, and how many of each."""
+        from . import items
+        return items.unknown_classnames(self.entities)
+
     def liquid_volumes(self) -> Any:
         """The map's water, slime and lava as boxes to swim in."""
         from . import liquids
         return liquids.from_map(self)
+
+    def speakers(self) -> Any:
+        """The map's ambient sounds, as one group to put in the scene.
+
+        ``SPEC-Q3ENTITIES §1``.  Empty for the 21 of 50 shipped maps that place
+        none, and for any map loaded without the content its sounds live in.
+        """
+        from . import speakers
+        return speakers.from_map(self)
 
     def push_volumes(self, scene_gravity: Optional[float] = None
                      ) -> List[jumppads.PushVolume]:

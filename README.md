@@ -5,6 +5,7 @@ Load a `.bsp` map and walk around inside it, rendered through
 render pass on the OpenGL core profile, with the map's own baked lighting.
 
 ```bash
+twitch-viewer                                 # the start screen: pick a level
 twitch-viewer arena/maps/ctf-curvy.bsp        # a map you already have
 twitch-viewer some-map.pk3                    # an archive: unpacked for you
 twitch-viewer https://example.com/map.pk3     # a URL: fetched and cached
@@ -59,15 +60,17 @@ base texture replacements to allow most Quake 3/OpenArena maps to load.
 | `q` / `e` | turn left / right |
 | ctrl + up / down | look up / down |
 | shift | run (held) |
-| space | jump; rise, while flying |
-| `c` | sink, while flying |
+| space | jump; rise, while flying or swimming |
+| `c` | sink, while flying or swimming |
+| mouse | look — **including while swimming**, where forward also means where you look |
 | `f` | fly (noclip) on/off |
 | `m` | cycle movement mode: mouse-look, walk, fly |
 | `g` | walk (physics) / free-fly camera |
-| `1` `2` `3` | choose a weapon |
+| `1`–`5` | choose a weapon |
 | `[` `]`, mouse wheel | previous / next weapon held |
-| ctrl | fire (held) |
-| alt + `f` | developer overlay — frame rate, draw counts, where you are |
+| left mouse button, or ctrl | fire (held) — down the middle of the reticule, wherever you are looking; **and what brings you back when you are dead** |
+| tab | the scoreboard (held) — everybody's frags and deaths |
+| alt + `f` | developer overlay — frame rate, loop timing, draw counts, where you are |
 | `F2` | save a screenshot — `twitch-<date>-<time>.png`, in the directory you launched from |
 | alt + `s` | the engine's own screenshot key — `twitch-viewer-screen-0001.png`, same place |
 | `F6` | key bindings — rebind any command, over the map |
@@ -81,7 +84,8 @@ way the mapper aimed it. Gravity and collision come from the
 character controller in `OpenGLContext.move`; jump pads set the capsule's
 velocity outright through the physics trigger system. Water, slime and lava are
 volumes rather than floors: you fall in, and being under the surface imposes the
-swim mode until you are out again.
+swim mode, fogs the view and muffles the mix until you are out again — see
+[Water, slime and lava](#water-slime-and-lava).
 
 Quake 3 jump pads are **aimed**: a `trigger_push` there names a destination
 entity rather than a direction, and every one of the 236 pads in the OpenArena
@@ -127,9 +131,11 @@ is spent along the ground rather than along the horizon.
 Two layers of screen furniture, and they are deliberately different things.
 
 **The game HUD** (`--hud`, on by default) is what a player sees: an aiming
-reticule in the middle, health and armour bottom-left, the weapon and its
-ammunition bottom-right, the weapons you are carrying along the bottom, and
-transient messages along the top. It is drawn *under* any screen that is open
+reticule in the middle with the name of whoever is under it, health and armour
+bottom-left, the weapon and its ammunition bottom-right, your frags against the
+match's limit top-right, the weapons you are carrying along the bottom, and
+transient messages along the top. Holding **tab** puts the whole scoreboard over
+the middle. It is drawn *under* any screen that is open
 and it never takes an event, so a click goes through it to the map — which is
 what makes it a HUD rather than a panel. `--no-hud` turns it off, and a
 `--capture` run has no HUD at all: a reference image is of the map, and a health
@@ -141,6 +147,27 @@ and its cone of fire, and firing opens that cone — so the reticule widens by
 exactly the angle a shot might now land within, projected through the renderer's
 own frustum. The colours on the meters are thresholds rather than a gradient,
 because what a player reads at speed is a state and not a number.
+
+**The HUD reacts rather than merely updating.** A meter whose number slid
+silently down in a corner nobody is looking at is not feedback, so losing health
+or armour flashes the meter that lost it — losing only, because a pickup is
+something you did on purpose and already know about. Being hit washes the screen
+edge the hit came from, and dying washes the whole screen red, drops the camera
+to the floor and puts up a notice naming what killed you — counting down while
+you have to wait, and then saying *fire to respawn*, because a still world with
+no gun and no explanation cannot be told from a hang.
+
+**The developer overlay has a `Combat` section** for the three numbers a fight
+hides: how much of the projectile budget is in the air, how many particles the
+effects are holding, and what the effects setting actually is. A rocket that
+never arrives and a full budget look identical from inside the game.
+
+Its **`Map` section reports what a level has that this game cannot answer**, and
+each row exists because its absence is invisible from inside the game and looks
+exactly like a bug: surfaces no material script defines (so their animation is
+gone), speakers that found no sound, liquid volumes, where the floor of the
+world is, how many pickups were placed, and how many pickups are of kinds
+nothing here has anything to give for.
 
 **The developer overlay** (alt + `f`) is everything a player should never see:
 frame rate and frame time, the renderer's features and what the last frame cost
@@ -155,6 +182,70 @@ The movement mode used to be named in the top-left corner of the map. It is on
 the developer overlay now: a player does not want to be told the name of the
 camera mode, and a developer wants that plus a dozen things it never showed.
 
+**When the frame rate looks fine and the game does not, read the `Loop`
+section**, not the `Frame` one. The frame rate times the inside of a draw and
+publishes a median, so it cannot see a hitch that happens anywhere else — and
+in this game the *entire* update (physics, navigation, the match, the animated
+surfaces) runs from `OnIdle`, which is outside the draw. `loop fps` is
+wall-clock iterations per second, which is the rate your hands feel; when it
+sits far below `fps`, the phase rows underneath say where the time went and
+`last stall` names the worst one outright, as `match 54ms`.
+
+This game's update is subdivided so those rows mean something: `animate`,
+`weapons`, `liquids`, `navigation`, `character` and `match` nest inside the
+engine's `idle`, so they *divide* it rather than adding to it. Without them
+every stall reads as `idle`, which is true and useless — `OnIdle` is the whole
+game.
+
+The `Player` section says what that costs the world. The simulation's timestep
+is clamped at 50 ms so a slow frame cannot move a character through a wall,
+which means a stalling game does not freeze — it runs in **slow motion**, and
+`behind` says so: `5% speed, 0.9s lost` is a world advancing at a twentieth of
+real time with almost a second of it discarded since the map loaded. To get the
+breakdown on stdout rather than watching for it:
+
+```console
+$ OPENGLCONTEXT_STALL_MS=40 twitch-viewer some-map.pk3 --map some-map.bsp --bots 4
+WARNING OpenGLContext.looptrace:main loop stalled 67ms: match 54ms, render 12ms,
+  character 1ms, animate 0ms, draw 0ms, idle 0ms, navigation 0ms, liquids 0ms,
+  weapons 0ms, cascade 0ms, poll 0ms, wait 0ms, repeats 0ms
+```
+
+That is a real reading from a four-bot match, and it is what the frame rate
+cannot say: the renderer is holding 11–12 ms a frame — about 85 fps — while
+`_stepMatch` spends four times that, so the loop runs at 15–20 iterations a
+second and the world, clamped, runs slower still.
+
+**To find out what inside `match` is costing that, record a trace.** A phase
+name is as far as the log line can go; the stack that would say more has
+already unwound by the time the frame ends. `OPENGLCONTEXT_STALL_TRACE` samples
+the main thread *during* the slow frames and writes a file, one record per slow
+period:
+
+```console
+$ OPENGLCONTEXT_STALL_TRACE=/tmp/stalls.jsonl twitch-viewer some-map.pk3 --bots 4
+$ python -m OpenGLContext.stalltrace /tmp/stalls.jsonl
+17 slow periods, 5.1s of them
+
+2026-08-01T00:59:10  0.8s, 18 iterations (9 slow)
+  worst 158.0ms, mean 44.5ms, was running at 17.8ms
+  phases: match 32.6ms, render 11.0ms, character 0.6ms, ...
+  where 28 samples were, by function:
+        self    cum  function
+       53.6%  53.6%  collide.py _closest_point_on_triangle
+       10.7%  75.0%  collide.py capsule_triangle
+```
+
+Each record also carries every section of the developer overlay as it was when
+the slow period began — the map, the bot count, what was in flight — so a trace
+is a whole account of the moment rather than a stack with no situation around
+it. **Read it with the reader, not by eye**: the file is JSON lines, and the
+per-function tally at the top is the answer while the stacks below it are the
+evidence.
+
+See [docs/hud.html](../openglcontext/docs/hud.html) for the whole section and
+`twitchoglc/frameclock.py` for the timestep accounting.
+
 The widgets themselves are OpenGLContext's
 ([docs/hud.html](../openglcontext/docs/hud.html)), because a crosshair and a bar
 meter are the same in every game; what is here is what the numbers *mean*.
@@ -166,16 +257,60 @@ first-person weapon in your hands — the fastest way to see any of the above, a
 it needs no map and no downloads:
 
 ```console
-twitch-hud-demo          # 1/2/3 choose, p picks up, ctrl fires, h hurts
+twitch-hud-demo          # 1-5 choose, p picks up, the mouse fires, h hurts
 ```
 
 The weapon table is **declared data**: fire rate, cone of fire, ammunition type
-and cost, the reticule and the model are fields, so retuning the game is editing
-that table rather than editing code. What is deliberately *not* finished here is
-[§7](PROJECT-PLAN.md): a shot spends ammunition, opens the cone and obeys the
-weapon's fire rate, but nothing is hit and nothing is damaged yet.
+and cost, the reticule, the sound, the model and *what it throws* are fields, so
+retuning the game is editing that table rather than editing code. Every number
+is ours, so the table is the only place this game's design is written down —
+which is why it is documented here rather than left to be read out of the code
+that consumes it.
 
-**You carry every weapon in the table from the start.** Not a design decision:
+| Field | Units | What it decides |
+|---|---|---|
+| `key`, `title`, `slot` | — | how the game names it, how the HUD shows it, which number key selects it |
+| `ammoType` | a name | which pile it eats from; two weapons naming the same one share it |
+| `ammoPerShot` | rounds | what one pull of the trigger costs |
+| `startingAmmo` | rounds | how much of that pile a player begins with |
+| `fireInterval` | seconds | the shortest gap between shots |
+| `damage` | health | what one **hitscan** trace takes off; ignored for a projectile weapon, whose damage is the projectile's |
+| `pellets` | count | traces or projectiles one shot sends — a shotgun's eight |
+| `projectile` | a key, or empty | **empty is hitscan.** Otherwise the entry of the projectile table it throws |
+| `restSpread`, `maxSpread` | degrees of cone half-angle | how wide the shot can land, at rest and firing continuously |
+| `crosshair` | a node | the reticule drawn while it is held; it opens by the spread above |
+| `fireSound` | a key | which entry of the sound table it is heard as |
+| `recoilKick` | metres | how far back the weapon in hand is thrown by a shot |
+| `recoilRise` | degrees | how far its muzzle lifts with the same shot |
+| `recoilRecovery` | seconds | how long the two above take to settle back to nothing |
+| `model`, `modelScale`, `modelOffset`, `modelYaw/Pitch/Roll` | metres, degrees | the first-person model and where it sits in the hand |
+
+What each weapon **throws** is a separate table, because those are the
+projectile's numbers rather than the weapon's — a rocket falls, bounces, bursts
+and pushes the same way whichever launcher threw it:
+
+| Field | Units | What it decides |
+|---|---|---|
+| `speed` | m/s | how fast it leaves |
+| `gravity` | m/s² downward | **zero is a rocket**; anything else arcs |
+| `radius` | metres | how near a surface it has to pass to touch it |
+| `fuse` | seconds | when it goes off in the air; zero never does |
+| `lifetime` | seconds | when an unspent one is given up on |
+| `bounce` | 0–1 | how much speed a bounce keeps; **zero detonates on contact** |
+| `damage` | health | a direct hit |
+| `splashDamage`, `splashRadius` | health, metres | the burst at its centre, and how far it reaches |
+| `splashFalloff` | exponent | the curve from centre to edge; 1 is linear, above 1 concentrates it |
+| `knockback` | m/s | how hard it shoves, at the centre |
+| `selfDamage` | 0–1 | the share of splash the shooter takes from their own burst |
+
+A rocket and a grenade differ in **three** of those numbers — gravity, bounce
+and fuse — and in nothing else: two weapons needing two code paths would mean
+the table was not carrying the design.
+
+**You carry every weapon in the table from the start**, with each weapon's own
+`startingAmmo` — eight rockets against a hundred and twenty rifle cells, because
+sixty of everything makes a rocket launcher a rifle with a bigger bang. Not a design
+decision:
 nothing in a map hands a player a weapon yet — item entities are
 [§6](PROJECT-PLAN.md) — and a player who spawned with one would have number keys
 that could never do anything, which reads as a broken key rather than as a
@@ -188,7 +323,9 @@ its shot leaves from, none of which is the model. Each weapon has its **own**
 model, though — a weapon you switch to that looks identical to the last one
 reads as a key that did nothing. They are CC0 firearms from 3dmodelscc0's
 [Guns & Explosives pack](https://3dmodelscc0.itch.io/free-cc0-guns-explosives-pack)
-— a Luger, a pump shotgun and an AK-47 — trimmed for the repository by
+— a Luger, a pump shotgun, an AK-47, and (standing in for the two launchers,
+which the pack has none of) a sniper rifle and a pipe bomb — trimmed for the
+repository by
 [`tools/prepare_weapon.py`](tools/prepare_weapon.py), which resamples or strips
 the 2048px maps that make each source model 8–10 MB. Every piece of geometry,
 its author and a link to their page are in
@@ -217,7 +354,13 @@ holding one, which is how the offsets above are dialled in.
 | `--core-textures ask\|always\|never` | offer the replacement texture pack when a map is missing core textures (default: ask) |
 | `--no-physics` | free-fly only, no gravity or collision |
 | `--hud` / `--no-hud` | draw the game HUD (off during a `--capture`) |
+| `--effects full\|reduced\|off` | how much impact and blood to draw (default `full`); presentation only, it cannot change play |
 | `--headlight` | a lamp at the camera, for maps with no baked lighting |
+
+Set `OPENGLCONTEXT_DEBUG_WHEEL=1` to have every scroll report the offset it was
+given and how many notches it made of it. Platforms disagree about what one
+click of a wheel comes to — X11 says 1.0 and GLFW's Wayland backend says 1.5 —
+and this is how to see which yours is.
 
 Set `TWITCH_DEBUG_JUMP=1` to have every jump press say what the capsule thought
 at the time — whether it fired, and if not whether it was airborne, crouching or
@@ -395,6 +538,7 @@ numbered fact in one of the specifications under [`specs/`](specs/):
 | `SPEC-BSP46` | the `IBSP` v46 container | no copyleft source: a published format reference, this project's own earlier BSD reader, and sample bytes |
 | `SPEC-Q3SHADER` | Quake 3 `.shader` material scripts | no copyleft source: the published shader manual and shipped map content |
 | `SPEC-Q3PUSH` | version 46 aimed jump pads | no copyleft source: entity data observed in the 50 shipped OpenArena maps, plus projectile physics |
+| `SPEC-Q3ENTITIES` | version 46 game entities: placed sounds (§1) and the pickups a map places (§3) | no copyleft source: every classname and key read out of the entity lumps of 67 shipped maps, with the counts recorded |
 
 Two further specifications, `SPEC-LTMP` and `SPEC-RSCRIPT`, were written and
 implemented for Alien Arena and then retired with the code that read them; see
@@ -424,17 +568,31 @@ pytest -m "not gl"          # skip the tests that open a window
 pytest -m "not slow"        # skip whole-map loads and timing checks
 ```
 
-Tests that need a sample map skip themselves when it is absent. The GL tests run
-the viewer in a subprocess and check that a frame was rendered.
+Tests that need a sample map skip themselves when it is absent. The GL tests
+either run the viewer in a subprocess and check that a frame was rendered, or —
+for the combat effects — put the nodes in a scene, render, and check that pixels
+changed where pixels should have. They are deliberately shallow: a reference
+image of a particle system is a reference image of a random number generator.
+
+The timing budgets (the projectile batch) skip themselves when something is
+tracing, because a wall-clock budget measured under `--cov` is a measurement of
+the coverage tracer — and again when **the machine is busy**, which they detect
+by first measuring the same code at a twentieth of the scale. Three hundred
+projectiles cost 12.5 ms of work on a quiet box and 31.5 ms for the identical
+code with another suite running: cores, caches and memory bandwidth are shared,
+so a fixed millisecond bound would fail for a reason nothing here can fix.
+Loosening it instead would leave a number that no longer means "fits in a
+frame", which is the only thing it is for. **Run one suite at a time** if you
+want those numbers to mean anything.
 
 ## Where this is going
 
 [PROJECT-PLAN.md](PROJECT-PLAN.md) is the route from a map you can walk to a map
 you can play in: characters and bots, weapons, sound, the HUD and debug overlay,
 animated fire and water surfaces, a start screen, the acknowledgements a project
-built on freely-licensed content owes, and eventually multiplayer. Nothing in it
-is built yet; it records the design, the order, and which sources may and may not
-be read.
+built on freely-licensed content owes, and eventually multiplayer. It records
+the design, the order, and which sources may and may not be read, and it marks
+each phase with what is done and what is not.
 
 The game that plan describes has a working title of its own — **Twitchy Binners**.
 `twitchoglc` stays what it is: the map-loading and rendering library the game is
@@ -481,6 +639,13 @@ parser reads **1387 materials, of which 498 animate** — 226 rotations, 173
 scrolls, 130 stretches, 113 moves, 106 colour waves, 70 alpha waves, 66 wave
 deforms, 66 turbulences and 48 frame cycles.
 
+**Which stage decides whether a surface is see-through matters more than it
+sounds.** A material draws its stages in order, each over the one before, so
+the *first* is what a player looks through — everything after it is detail
+painted on top: an environment reflection, an additive glow, the lightmap.
+Deciding from any stage made every lit floor in the game a sheet of glass with
+the room below showing through, and dropped its lightmap along with it.
+
 Two things are deliberately left out, both because a viewer drawing **one** PBR
 material per surface cannot express them: several animated stages composited
 over each other (`SPEC-Q3SHADER E.1`, `E.3`), and `deformVertexes autosprite`,
@@ -489,6 +654,403 @@ which is a camera-facing billboard rather than a property of the surface.
 A `--capture` run pins the animation clock so a reference image is the same
 every time; without that a visual-regression gate is useless for exactly the
 maps this feature is for.
+
+## Water, slime and lava
+
+They are **volumes**, not floors. Liquid surfaces are left out of the collision
+mesh, so you fall in; the volumes come from the BSP leaves, and the eye being
+inside one is what decides you are swimming. Across the fifty OpenArena levels
+that is **1926 pools of water, 760 of lava and 27 of slime** in 29 maps.
+
+Being under one changes three things.
+
+**You swim, and swimming is not flying.** A swimmer collides with the world —
+a pool has a bottom, a wall and a ceiling — and is pulled by whatever fraction
+of gravity `SwimMode.buoyancy` does not cancel. Drag bleeds that away, so you
+sink at a steady speed instead of accelerating; a swim that was simply noclip
+let you leave a pool through its side, and one at falling speed made a pool
+read as a hole in the floor. A stroke builds and coasts rather than switching
+on and off.
+
+**The controls do not change when you go under.** The mouse still steers — a
+scheme that fell back to the turn keys the moment your feet left the floor
+would take your aim away exactly where you need it — and *forward* means where
+you are looking, up and down included, which is what swimming is. Strafing
+stays level, because sidling should not sink you, and space and `c` still rise
+and dive for holding depth while looking elsewhere.
+
+**The volume is the water, not the room it is in.** Standing ankle-deep used to
+fog the whole view, because the volume was the BSP *leaf* holding the pool and a
+leaf reaches up to the ceiling. It comes from the liquid brush's own planes now
+— across the fifty levels that turned 2713 leaf-boxes into 130 brush-boxes.
+
+**The view fogs to the liquid's own colour**, through OpenGLContext's `Fog`
+node. Water is a dim blue-green you can see a room's width through; slime is
+thicker; lava is close and opaque, because you cannot see through molten rock
+and a player who has fallen into it should be in no doubt which of the three it
+is. The colour is a warning, not decoration.
+
+It is a fog and deliberately not a tint over the screen: the weapon in your
+hands stays clear while the far wall does not, which is what being inside a
+medium looks like. A flat tint would colour both alike and read as a pane of
+glass.
+
+**The sound muffles**, through the whole-mix low-pass in the audio engine — 75%
+under water, more under slime and lava, and never total, because silence reads
+as the sound having broken.
+
+**Two of them hurt.** Standing in slime or lava costs health, in a bite every
+0.4 s rather than as a trickle — a number sliding down by one is not a warning
+and being taken a chunk at a time is. Lava takes 32 health a second and slime
+12; water takes none, which is a decision recorded in the same table
+(`twitchoglc.liquids.HARM`) rather than a hole in it. The numbers are ours, and
+what they are chosen around is that lava should be a mistake you may just
+survive crossing.
+
+A death in one carries the liquid's name as its cause, so the line you read is
+"You burned up in the lava" rather than a bare "You died", and the arena's own
+rule — dying to the map costs a frag — applies without anything having to
+invent a killer to put on the scoreboard.
+
+The colours, ranges and muffles are this game's own numbers
+([`twitchoglc/underwater.py`](twitchoglc/underwater.py)); no specification says
+how far you can see through slime.
+
+## Sound
+
+A map's own ambience plays: wind over a courtyard, a furnace, water, the hum of
+a light. **29 of the 50 OpenArena levels place at least one speaker and 381 in
+all**, so this is a large part of what makes a level sound like itself, and it
+arrives without anything being switched on.
+
+Each `target_speaker` entity becomes an `AudioEmitter` at its origin, and the
+render pass does the rest: it finds audible nodes while it is gathering the
+frame, and **the camera is the listener**. The engine is OpenGLContext's
+([docs/audio.html](../openglcontext/docs/audio.html)), on glTF's
+`KHR_audio_emitter` model.
+
+The entity's keys are specified in
+[`SPEC-Q3ENTITIES §1`](specs/SPEC-Q3ENTITIES.md), measured from the shipped
+content rather than looked up:
+
+| Key | Becomes |
+|---|---|
+| `noise` | the sound, resolved against the content packs — the extension it carries is advisory, and a leading `/` is the same path |
+| `origin` | where it is, through the same map→scene transform a spawn point uses |
+| `spawnflags` bit 1 | whether it loops (336 of the 381 do) |
+| `wait`, `random` | seconds between repeats of a one-shot, and the spread on that |
+
+**Three things are deliberately not acted on**, and each is a case where doing
+something would be worse than nothing. A speaker with a `targetname` is fired by
+an event, and there is nothing here to fire it, so playing it as ambience would
+turn a sound that should answer something into a constant — 28 are left out on
+that ground. `spawnflags` bits 4 and 8 occur in real maps and mean nothing this
+project has established, so the *bits* are ignored while the entity still plays.
+And `angle` is not read as a cone however plausible that is; the spec records it
+as unknown, so the code does not invent a reading.
+
+A `noise` that resolves to nothing is a **silence and one warning, never a
+failed load** — most installs have a map's geometry and not the base game's
+sound. Across the 50 levels that costs exactly one speaker (a lava hum in `fan`
+that is simply absent from the content). The developer overlay's Map section
+counts the speakers that found a sound, which is the number that answers "why is
+it silent"; its Audio section says what the engine is doing about them.
+
+**No sound device is a normal machine, and so is no `miniaudio`.** Either one
+gives one warning and a silent run, never an error and never a refusal to start.
+Install the optional backend with:
+
+```bash
+pip install 'twitchoglc[audio]'
+```
+
+## Fighting
+
+`--bots N` puts opponents in the map and the scoreboard starts moving.
+
+```bash
+twitch-viewer openarena:oa_dm1 --bots 3 --difficulty hard
+twitch-viewer openarena:oa_dm1 --bots 1 --difficulty near-passive   # a companion
+```
+
+**The left mouse button fires** — held, so it keeps firing at the weapon's own
+rate — and `ctrl` does the same for anyone who would rather use the keyboard.
+Both are declared bindings on the F6 page, because a mouse button is an input
+with a name like any other. Three of the weapons are **hitscan**: the shot leaves the camera
+down the middle of the reticule, meets the first thing in its way, and takes
+that weapon's damage off whatever it met. A wall stops it, which is what makes
+cover mean something. A shotgun sends eight traces scattered over the cone the
+crosshair is drawing, so the reticule tells the truth about where a shot may
+land.
+
+The other two **throw something**. A rocket flies flat and fast and bursts on
+contact; a grenade arcs, bounces, and goes off on a fuse. Both are stepped as
+one batch of numbers rather than as physics bodies, and both are **swept** —
+each tick casts from where the projectile was to where it wants to be, so a
+rocket cannot be on one side of a wall and then the other having touched
+nothing.
+
+### Bursts, knockback and rocket jumps
+
+A burst hurts everybody it can *see*: the damage falls off from the centre by
+the projectile's declared curve, and a ray cast from the burst to each person
+means a rocket round a corner does not kill. Only those inside the radius are
+tested against geometry at all — a cast for everybody in the match would cost
+more the busier the fight got.
+
+It also **shoves** what it hurts, and it shoves the person who fired it. That is
+the feature and not an oversight: a rocket at your own feet throws you, which is
+a rocket jump, and the self-damage (`selfDamage`, half a rocket's splash) is
+what makes taking one a decision rather than free movement. `selfDamage` scales
+the damage and *not* the shove — you are thrown exactly as hard as anybody else
+standing there, or your own rocket would lift you less than a plain jump does. The shove goes into
+the same character-controller impulse a jump pad uses, so a rocket jump is
+exactly as reliable as a jump pad.
+
+### What you get back
+
+Four things answer a shot, and each answers a different question:
+
+- **The reticule's hit mark** — *did I hit them*. Only for a hit on a person and
+  only for your own shot; a mark for a wall would make it a lie.
+- **An impact effect** where the shot landed, chosen by what it met: metal
+  sparks, everything else puffs. A hit on a person is its own bright, brief
+  burst, sized to be read across a room at speed, because that is the job it is
+  doing.
+- **A sound** — the weapon firing, an impact on the level, and an impact on a
+  person, which are three different questions and so three different sounds; a
+  death and a burst have their own, and the burst is the loudest thing the game
+  makes. **Your own weapon is not positional and everybody else's is**: a
+  gunshot placed where it was fired from is how you find somebody you cannot
+  see. A burst is placed even when it is your own, because a burst happens
+  *somewhere* and that is the whole of what anybody needs to know about it.
+- **A directional damage wash** when you are hit, at the screen edge you would
+  turn towards. How much you lost is already on the meter; where it came from is
+  the part you cannot see and have to act on.
+- **The gun kicking**, which is the one piece of feedback that comes from what
+  is in your hands rather than from the world, so it arrives even for a shot
+  into the sky that meets nothing at all. It is thrown back and its muzzle
+  lifts, and both settle over `recoilRecovery` seconds; the three numbers are
+  the weapon's own, so a rocket launcher shoves harder and for longer than a
+  pistol. Raising a weapon clears any kick left on it — something just brought
+  up is not still recoiling.
+
+- **The name of whoever is under the crosshair**, drawn just below it. It comes
+  from the *same trace a shot takes*, so it names somebody only when a shot
+  would actually reach them: a wall between you answers nobody, which is also
+  what stops it being a way to find people through geometry.
+
+### Dying
+
+Death takes the camera away. It falls to near the floor, where a body would be,
+and turns to look at whoever did it — the one thing you want to know in that
+second and the one thing you cannot otherwise get. The world goes on being drawn
+behind a red wash, because watching the fight continue without you is most of
+what a death is; the wash is well short of a curtain for the same reason.
+
+**The trigger is what brings you back.** The countdown is a floor rather than a
+trigger — it is the shortest a death can be — and once it has run out the notice
+stops counting and says *fire to respawn*. A death that ended on the timer alone
+would put you back in a corridor you were not looking at, usually while you were
+reading the scoreboard. Pressing fire early is remembered rather than swallowed,
+so a trigger pulled the instant you die brings you back the moment the wait is
+over.
+
+Coming back gives you the **starting loadout** and nothing else: whatever you
+had picked up is lost, which is what makes the things a map places worth walking
+to. Armour does not come back either.
+
+Deaths and the end of the match are announced over the middle of the screen;
+individual hits are not, because a line per bullet is a wall of text.
+
+### Where you spawn
+
+A respawn goes to one of the points **far from everybody currently alive**,
+picked at random among them. Two opposite failures are being avoided. Always
+choosing the same point puts the whole match on one square, standing inside one
+another and shot again before the screen has settled. But always choosing the
+*furthest* point is just as predictable: a player who stands still can wait at
+the far end of the level and shoot each arrival as it appears. What is measured
+is the distance to the **nearest** living combatant — a point far from the crowd
+but touching one opponent is the worst place in the level to arrive — and
+anything within `SPAWN_SPREAD` of the best is as good as the best.
+
+The opening of a match is chosen the same way, so two matches on one level do
+not begin identically.
+
+### Picking things up
+
+A level is a **circuit**, and the things placed around it are what give it a
+shape: health where the fighting is thickest, armour behind a jump you have to
+commit to, a rocket launcher somewhere everybody walks past. Every one of the 67
+sample maps places at least one — 3561 in all, an average of 53 a map — so a
+viewer that ignores them ignores most of what the author placed, and a match is
+a fixed loadout spent once.
+
+Walk into one and you take it. On `ztn3dm1` that is 44 things — eleven armour
+shards, seven small medikits, three rifles, a rocket launcher, a body armour and
+a mega health among them — with the nearest 4 m from a spawn point. What each is
+worth *here* is a declared table (`twitchoglc.items`), and the join to the map is
+the classname the level was authored with, so the amounts are tunable without
+touching the reader:
+
+| What a map placed | What it gives here |
+|---|---|
+| `item_health_small`, `item_health`, `item_health_large`, `item_health_mega` | 5, 25, 50 or 100 health |
+| `item_armor_shard`, `item_armor_combat`, `item_armor_body` | 5, 50 or 100 armour |
+| `ammo_bullets`, `ammo_shells`, `ammo_cells`, `ammo_rockets`, `ammo_grenades` | that pool, refilled |
+| `weapon_shotgun`, `weapon_rocketlauncher`, `weapon_grenadelauncher` | the weapon, **with ammunition in it** |
+| `weapon_railgun`, `weapon_lightning`, `weapon_plasmagun`, `weapon_chaingun` | the rifle: no counterpart exists here, and the nearest one keeps the level's circuit intact |
+
+An item nobody can use **stays on the floor** — walking over a medikit at full
+health does not destroy it for everybody else — and one that is taken comes back
+after its own interval, which the map may override with a `wait` key. Timed
+powerups (quad, haste, invisibility) are content this game does not have; they
+are skipped and *counted*, and the count is on the load report and in the
+developer overlay, because a level whose whole weapon circuit is content nobody
+has plays exactly like a reader that failed.
+
+Where all of this comes from is [`SPEC-Q3ENTITIES §3`](specs/SPEC-Q3ENTITIES.md),
+which is explicit about which parts are observed in map files and which parts
+are ours.
+
+#### What they look like
+
+The four health pickups are drawn as a **medikit**: a cross floating inside a
+glass bubble, half a metre across, turning on the spot so it does not read as
+part of the wall. It is ours, it is BSD, and it is credited in
+[`twitchoglc/assets/items/CREDITS.md`](twitchoglc/assets/items/CREDITS.md) —
+which is the rule for all art here, and is enforced by a test.
+
+**All four are the same model in four different colours**, and the colour is
+the whole signal: you decide whether to cross a room for a pickup from the
+other side of it, and at that range the shape is a smudge while the hue is not.
+So they are four hues far apart rather than four brightnesses of one — white
+for the 5, **red** for the 25, blue for the 50 and gold for the mega. Red is
+the middling one rather than the best one on purpose: a red cross means
+"health" to everybody, and that meaning is worth most spent on the pickup a map
+places most often.
+
+The colour is the `colour` field of the `ItemKind`, applied to the model when
+it loads, so a fifth variant is a row in the table and no new geometry.
+Everything else about the material — the bubble's transparency, its metallic
+and roughness, its sheen — is the model's own, which is what keeps the glass
+looking like glass in all four. A kind that names no model, which is every
+armour, ammunition and weapon pickup for now, is still drawn as a coloured box:
+a level's circuit has to be playable before everything in it has been modelled,
+the same reason the bots are capsules.
+
+Placement is data too — `model`, `modelScale` and `modelOffset` are fields of
+the `ItemKind` — so putting different art on a pickup is a table edit and never
+a code change. `tools/clean_model.py` is the Blender script that tidies the
+source `.blend` and exports the `.glb`; what it fixed in this one is recorded
+beside the model.
+
+### Knowing whether you are winning
+
+Your frags sit in the top-right corner against the match's limit, all the time,
+because that is a question you have continuously and nobody holds a key to
+answer one of those. Holding **tab** puts the whole board up — everybody's frags
+and deaths — which is a comparison and is read between fights. It is a held key
+rather than a toggle: it covers the middle of the screen, and a board left up by
+accident is a board you get shot behind.
+
+### Falling out of the level
+
+Nothing in a map stops a fall. Step off the edge of one built as an island and
+there is nothing below to land on and nothing above to come back to — the camera
+never stops and no message is ever printed, which reads as the game having hung.
+A floor a hundred metres below the map's own bounds ends it as a named death,
+for opponents as much as for you.
+
+`--effects full|reduced|off` decides how much of the impact and blood is drawn.
+It **filters presentation and cannot change play** — the events it reads are
+emitted whether anything is drawing them or not — which is what makes it safe
+for two players to set differently.
+
+**The sounds are ours, and they are arithmetic rather than files.** Every one is
+synthesised through OpenGLContext's `audio.synth` from numbers declared in
+`twitchoglc.combatsound`, so the game ships with a full complement of sound, no
+audio files, and nothing to check under
+[CLEAN-ROOM](../CLEAN-ROOM.md). A voice may name a file instead, which is how
+commissioned or CC0 content would replace a synthesised stand-in: a table edit.
+A sound that will not resolve is a silent shot and never a crash.
+
+### The difficulties
+
+| | Reacts in | Aim error | Aim closes | Leads a target | Avoids its own blast | Fights |
+|---|---|---|---|---|---|---|
+| `near-passive` | 1.5 s | 25° | 0.15 | 0.0 | 0.0 | **no** |
+| `easy` | 1.0 s | 14° | 0.25 | 0.15 | 0.2 | yes |
+| `medium` | 0.55 s | 7° | 0.45 | 0.5 | 0.6 | yes |
+| `hard` | 0.3 s | 3° | 0.7 | 0.8 | 0.85 | yes |
+| `nightmare` | 0.15 s | 1° | 0.95 | 1.0 | 1.0 | yes |
+
+Every one of these is a skill rather than an exemption. **How fast the aim
+closes** is the share of the way to the target a bot's aim travels per decision:
+one whose aim arrived the instant it decided would be a bot nobody could dodge,
+because strafing across it is answered before the step has landed. **Leading** is
+aiming ahead of somebody crossing you: a slow projectile fired where a target
+*is* arrives where they *were*, and a bot works out how fast they are moving by
+watching them do it rather than by reading the rules. **Avoiding its own blast**
+is how far a bot keeps before it will fire a splash weapon — the projectile's
+own radius plus a margin, scaled by this number, so a bigger burst is kept
+further away. A careless bot will happily rocket a wall two feet from its own
+face, which is exactly what the bottom of the ladder should do.
+
+A bot also will not throw something it cannot reach you with. A grenade falls at
+fourteen metres a second squared and a bot aims straight down the line to its
+target, so past about eight metres a flat throw is in the floor before it
+arrives; the limit comes from the projectile's own speed, gravity, fuse and
+lifetime, so retuning the table moves it.
+
+`near-passive` is both a real setting — company while you look around a level —
+and the fixture navigation is checked against, because a bot that walks and does
+not shoot is how movement is verified without combat in the way.
+
+**The senses never scale, and that is the rule the whole range rests on.** No
+seeing through walls, no knowing where you are without having perceived you, no
+hidden damage. Every difficulty uses the same line-of-sight ray cast your own
+shots use; only the reaction, the aim and the decisions change. A bot that
+cheats is not difficult, it is annoying, and once one hidden advantage is
+allowed there is no reason to believe the next rung is skill rather than another
+exemption.
+
+The ladder is verified by playing whole matches **headlessly** and asserting the
+ordering holds — over four 45-second matches per pairing, nightmare beat easy
+64–0, hard beat medium 41–6, and medium against medium finished 8–7. The
+harness never asserts *how* a bot won, so a bot made hard by a hidden multiplier
+would pass it; that has to be caught by reading the code, which is why the
+perception is one function every difficulty calls.
+
+**Opponents walk in the same capsule you do** — the same move-and-slide, the
+same step height, the same slopes, the same ground snap — so anywhere you can go
+one can follow, and one that is placed inside geometry is dug back out of it.
+The only difference is the pace, which is slower than yours: a bot that could
+run exactly as fast as you can would be impossible to escape and dull to chase.
+Being blown about goes through the controller's own impulse, so a rocket at a
+bot's feet throws it exactly as a rocket at yours throws you.
+
+Every bot looks around at most ten times a second rather than every frame, and
+the ten are spread so a room full of them do not all look on the same one.
+Looking is the expensive half of an opponent — each asks line of sight of
+everybody else, which is quadratic in the count — and at eight opponents that
+was past a whole frame on its own. It is invisible because the interval is
+shorter than the fastest reaction on the ladder: a bot answers a sighting no
+sooner than its `reactionTime`, so delaying the sighting itself by less than
+that changes nothing anybody can feel. Slowing a *sense* down far enough to
+matter would be a difficulty change by the back door, which is the one thing
+this ladder is built to prevent.
+
+A fresh opponent does not start in the same state as every other one: which way
+it happens to be looking when it arrives, how long before it first commits, and
+which way it wanders when it has nothing to fight are all spread. Neither of the
+first two is a difficulty — a hard bot is not one that arrives facing you — and
+both are what a person entering a room does differently every time.
+
+Opponents are drawn as capsules. That is the designed stand-in and not an
+oversight: fighting had to be buildable before there was any art, and
+[§5](PROJECT-PLAN.md) is where the art goes.
 
 ## What is not implemented
 
@@ -500,30 +1062,46 @@ Recorded as decisions rather than oversights:
   jump pad is one of these: a rising plate, not a push volume.
 - **`func_conveyor` and the current content bits** (`SPEC-TRIGGER-PUSH §9.5`) —
   a movement-solver feature rather than a pad.
-- **Buoyancy.** Swimming works — liquid surfaces are left out of the collision
-  mesh so you fall in, the volumes are read from the BSP leaves, and entering
-  one imposes `SwimMode` — but a swimmer is simply free of gravity rather than
-  floating. `SwimMode.buoyancy` describes the fraction of gravity that should
-  push back up; carrying it needs the character controller to grow a notion of
-  partial gravity, which it has not.
-- **Underwater tint, fog and muffled sound.** The liquid volumes are read and
-  the test for being inside one is already made every frame, and the audio
-  engine has the whole-mix low-pass the muffle needs
-  (`OpenGLContext.audio.engine.muffle`, 0 clear to 1 underwater). Connecting the
-  two — and tinting the view — is not done.
-- **Sound.** OpenGLContext has a spatial audio engine
-  ([docs/audio.html](../openglcontext/docs/audio.html)) on glTF's
-  `KHR_audio_emitter` model, and the viewer opens no device because nothing in a
-  map yet emits. `target_speaker` entities, weapon and impact sounds and the
-  content resolution for them are §4's remaining half.
-- **Damage.** Slime and lava are swum through exactly as water is. There *is* a
-  health and armour model now (`twitchoglc/player.py`, drawn by the HUD), but
-  nothing in the world reduces it: liquids do not hurt, and a shot hits nothing.
-  Both are [§7](PROJECT-PLAN.md).
-- **Weapons that do anything.** Firing spends ammunition, obeys the weapon's
-  fire rate and opens its cone of fire, all of which the HUD shows; no ray is
-  cast, no projectile travels and nothing takes damage. The models are CC0
-  stand-ins named by the table as data (see *The HUD* above).
+- **Footstep and pickup sounds.** Weapons, impacts, bursts and deaths all make
+  a noise (see [Fighting](#fighting)); walking and picking something up do not.
+  Footsteps want a step event the character controller does not yet emit; a
+  pickup now says so on the HUD and is silent, which is the half that is left.
+- **Decals.** An impact leaves a burst of particles and no lasting mark.
+  Deliberate: the burst delivers most of the readability, and a decal system is
+  real work — projection onto the geometry, a budget, a fade — so it waits until
+  playing says it is wanted rather than being assumed.
+- **First-person animation.** The weapon in your hands recoils — thrown back
+  and its muzzle lifted, settling over the weapon's own recovery — but does not
+  sway or reload; it is a model on a transform. The clips arrive with
+  [§5](PROJECT-PLAN.md)'s commission.
+- **A name over an opponent's head.** Who you are pointing at is named under
+  the crosshair (see [What you get back](#what-you-get-back)), which answers
+  the question a fight asks. A world-space plate over each body is not built:
+  `OpenGLContext.scenegraph.billboard.Billboard` says of itself that it is a
+  stub, and its `transform` does nothing, so a plate would need the billboarding
+  implemented in the engine first — and it is worth deciding at the same time
+  whether names should be visible through walls, because always-on ones give
+  positions away and change how the game plays.
+- **Shoot-to-trigger doors.** `func_door`, `func_button` and the
+  `target`/`targetname` links are not read, so map geometry that looks like a
+  door does nothing when shot. It is the same missing machinery a map's
+  triggered speakers want, and the entity facts belong in `SPEC-Q3ENTITIES`
+  beside the pickups before any code is written.
+- **Timed powerups.** `item_quad`, `item_haste`, `item_invis` and the rest are
+  read, recognised as pickups and deliberately not answered — there is no
+  counterpart here to give. They are counted rather than dropped in silence.
+- **Path-finding.** There *is* a navmesh
+  ([`OpenGLContext.nav`](../openglcontext/OpenGLContext/nav/navmesh.py)) — it
+  builds 1220 connected cells on `oa_dm1` in 0.03 s and does A* with a
+  string-pulled path — but no spawn point resolves to a cell on a real level
+  yet, so the bots are deliberately still walking headings rather than routes.
+  They no longer *stick* on geometry, because they walk in the player's own
+  capsule and slide along a wall met at an angle; what they still cannot do is
+  route around one. [§3b T2](PROJECT-PLAN.md) says where it stops.
+- **Stepping up lurches the view forward.** Measured at 45.8 cm in the frame
+  that mounts an 18-unit step, where 12.7 cm was due. Known, measured and
+  recorded as [§3b B1](PROJECT-PLAN.md); the measurement is
+  `omi_physics/tests/test_character_step_pace.py`, marked `xfail`.
 - **Visibility culling.** Neither family's visibility lump is decompressed; the
   whole map is drawn and the frustum does the culling.
 - **Multi-style lightmaps.** Only the always-on style-0 block is read, which

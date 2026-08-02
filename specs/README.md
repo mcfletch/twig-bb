@@ -12,6 +12,7 @@ knowledge came through, and each one records where its own facts came from.
 | [SPEC-TRIGGER-PUSH.md](SPEC-TRIGGER-PUSH.md) | push volumes, monster jumps, world gravity, and `func_door` |
 | [SPEC-Q3SHADER.md](SPEC-Q3SHADER.md) | Quake 3 `.shader` material scripts, including the animation family (§2.4, added 2026-07-27 from the same published manual) |
 | [SPEC-Q3PUSH.md](SPEC-Q3PUSH.md) | v46 jump pads, which are aimed at a destination rather than pointed |
+| [SPEC-Q3ENTITIES.md](SPEC-Q3ENTITIES.md) | v46 game entities — `target_speaker` (§1) and the pickups a map places (§3); the rest as they are built |
 
 Two of them — `SPEC-BSP38` and `SPEC-TRIGGER-PUSH` — were written under the
 clean-room procedure in [CLEAN-ROOM.md](CLEAN-ROOM.md): a Reader who wrote no
@@ -24,6 +25,16 @@ earlier BSD code, and the bytes of sample files.
 fact could not be established from a permitted source, it says so and marks the
 implementation's answer as a **choice** rather than dressing it up as the
 original's behaviour. Its §3 lists what is still unknown.
+
+`SPEC-Q3ENTITIES` follows that pattern and adds a marker legend, so `[OBSERVED]`,
+`[DERIVED]`, `[CHOICE]` and `[UNKNOWN]` can be told apart at a glance. It is the
+document that **grows**: a section is written when an entity is implemented.
+`§3` (the pickups, added 2026-07-29) is the largest so far and is a good example
+of the method — every classname and key in it was read out of the entity lump of
+one of 67 shipped map files, the counts say how many of them carry each, and
+what the content does not establish is marked `[UNKNOWN]` rather than guessed.
+Its §3.3.2 and §3.6.2 are two such gaps that an implementation has to decide for
+itself, and the code that decides them says so.
 
 ### Retired specifications
 

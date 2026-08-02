@@ -18,15 +18,12 @@ same way in each, because it is the same weapon.
 
 from __future__ import annotations
 
-import logging
 import math
 from typing import Any, Dict, Optional
 
 from OpenGLContext.scenegraph.basenodes import Transform
 
-from . import weapons as weapontable
-
-log = logging.getLogger(__name__)
+from . import art
 
 __all__ = ['WeaponHand', 'weapon_transform', 'aim_at_camera', 'view_rig']
 
@@ -90,7 +87,7 @@ def view_rig(hand: 'WeaponHand') -> Transform:
     """Everything that travels with the camera.  Today that is the weapon.
 
     A separate function because *what* rides the view is a game's decision and
-    grows -- §7's muzzle flash and §5's arms hang here too -- while the
+    grows -- a muzzle flash and §5's arms hang here too -- while the
     machinery that puts it where the camera is does not.
 
     **There is deliberately no light in here.**  A map places no dynamic lights
@@ -123,21 +120,17 @@ class WeaponHand(object):
         #: The key of the weapon held; empty for none, which is what a hand
         #: starts out holding.
         self._current: str = ''
+        #: The weapon in hand, kept because the recoil is *its* numbers.
+        self._weapon: Any = None
+        #: When it last fired, on the caller's clock; None before any shot.
+        self._fired_at: Optional[float] = None
 
     def model_for(self, weapon: Any) -> Optional[Any]:
         """The scenegraph subtree for a weapon's model, loaded on first use."""
-        path = weapontable.model_path(weapon)
-        if path in self._loaded:
-            return self._loaded[path]
-        loaded = None
-        try:
-            from OpenGLContext.loaders.gltf import load_gltf
-            loaded = load_gltf(path).group
-        except Exception:                       # noqa: BLE001 - a demo, not a game
-            log.warning('could not load the weapon model %s', path,
-                        exc_info=True)
-        self._loaded[path] = loaded
-        return loaded
+        name = str(weapon.model)
+        if name not in self._loaded:
+            self._loaded[name] = art.load(name)
+        return self._loaded[name]
 
     @staticmethod
     def _tip(holder: Transform) -> Transform:
@@ -147,12 +140,56 @@ class WeaponHand(object):
             node = node.children[0]
         return node
 
+    def fired(self, now: float) -> None:
+        """Say a shot has just been taken, so the weapon kicks.
+
+        Recorded rather than applied, because where the weapon *is* is a
+        function of the clock: nothing has to tick, and the answer is the same
+        whether it is asked once a frame or ten times -- the same rule the cone
+        of fire follows.
+        """
+        self._fired_at = float(now)
+
+    def settle(self, now: float) -> None:
+        """Put the hand where the recoil has got to by ``now``.
+
+        Back towards the eye and tipped up, decaying linearly to nothing over
+        the weapon's own ``recoilRecovery``.  Written onto the group rather
+        than the holder inside it, so the kick composes with wherever the table
+        says this weapon sits in the hand rather than replacing it.
+        """
+        share = self._recoil(now)
+        weapon = self._weapon
+        if share <= 0.0 or weapon is None:
+            self.group.translation = (0.0, 0.0, 0.0)
+            self.group.rotation = (1.0, 0.0, 0.0, 0.0)
+            return
+        self.group.translation = (0.0, 0.0, float(weapon.recoilKick) * share)
+        self.group.rotation = (
+            1.0, 0.0, 0.0, math.radians(float(weapon.recoilRise)) * share)
+
+    def _recoil(self, now: float) -> float:
+        """How much of the kick is left, from 1 at the shot down to 0."""
+        weapon = self._weapon
+        if self._fired_at is None or weapon is None:
+            return 0.0
+        recovery = float(weapon.recoilRecovery)
+        if recovery <= 0.0:
+            return 0.0
+        left = 1.0 - (float(now) - self._fired_at) / recovery
+        return left if left > 0.0 else 0.0
+
     def select(self, weapon: Any) -> bool:
         """Put a weapon in the hand.  False if it was already the one held."""
         key = str(weapon.key) if weapon is not None else ''
         if key == self._current:
             return False
         self._current = key
+        # A weapon taken out is not still recoiling when the next one comes up.
+        self._weapon = weapon
+        self._fired_at = None
+        self.group.translation = (0.0, 0.0, 0.0)
+        self.group.rotation = (1.0, 0.0, 0.0, 0.0)
         if weapon is None:
             self.group.children = []
             return True

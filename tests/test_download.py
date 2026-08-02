@@ -205,8 +205,8 @@ def test_the_core_texture_pack_has_a_known_home():
     """Stock Quake 3 content is not redistributable, but the community's
     high-resolution replacement pack is, and it covers the `textures/base*`
     and `textures/gothic*` sets most maps build on."""
-    assert download.QUAKE3_CORE.url.startswith('https://')
-    assert download.QUAKE3_CORE.url.endswith('.zip')
+    assert download.pack_for_key('quake3-core').url.startswith('https://')
+    assert download.pack_for_key('quake3-core').url.endswith('.zip')
 
 
 def test_the_pack_lives_in_its_own_named_shared_directory(tmp_path, monkeypatch):
@@ -217,7 +217,7 @@ def test_the_pack_lives_in_its_own_named_shared_directory(tmp_path, monkeypatch)
     archive.write_bytes(_archive({'textures/base_wall/a.tga': b'x'}))
     monkeypatch.setattr(download.resolver, 'fetch_to_cache',
                         lambda url, cache_dir=None, max_bytes=None: str(archive))
-    root = download.fetch_pack(download.QUAKE3_CORE, str(tmp_path))
+    root = download.fetch_pack(download.pack_for_key('quake3-core'), str(tmp_path))
     assert os.path.basename(root) == 'xcsv_hires'
     assert download.CONTENT_SUBDIR in root
     assert download.CACHE_SUBDIR not in root         # not among the map trees
@@ -226,7 +226,7 @@ def test_the_pack_lives_in_its_own_named_shared_directory(tmp_path, monkeypatch)
 def test_the_pack_is_not_downloaded_when_it_is_already_unpacked(tmp_path, monkeypatch):
     """Once per user, not once per run: an unpacked tree short-circuits both
     the prompt and the fetch."""
-    root = download.pack_root(download.QUAKE3_CORE, str(tmp_path))
+    root = download.pack_root(download.pack_for_key('quake3-core'), str(tmp_path))
     assert root is None                      # nothing cached yet
     unpacked = os.path.join(str(tmp_path), os.path.basename(root or '') or '')
     del unpacked
@@ -238,11 +238,11 @@ def test_the_pack_is_not_downloaded_when_it_is_already_unpacked(tmp_path, monkey
     archive.write_bytes(_archive({'textures/base_wall/a.tga': b'x'}))
     monkeypatch.setattr(download.resolver, 'fetch_to_cache',
                         lambda url, cache_dir=None, max_bytes=None: str(archive))
-    first = download.fetch_pack(download.QUAKE3_CORE, str(tmp_path))
+    first = download.fetch_pack(download.pack_for_key('quake3-core'), str(tmp_path))
     assert os.path.isfile(os.path.join(first, 'textures', 'base_wall', 'a.tga'))
-    assert download.pack_root(download.QUAKE3_CORE, str(tmp_path)) == first
+    assert download.pack_root(download.pack_for_key('quake3-core'), str(tmp_path)) == first
     monkeypatch.setattr(download.resolver, 'fetch_to_cache', fail)
-    assert download.fetch_pack(download.QUAKE3_CORE, str(tmp_path)) == first
+    assert download.fetch_pack(download.pack_for_key('quake3-core'), str(tmp_path)) == first
 
 
 def test_the_pack_unpacks_even_though_it_holds_no_map(tmp_path, monkeypatch):
@@ -251,7 +251,7 @@ def test_the_pack_unpacks_even_though_it_holds_no_map(tmp_path, monkeypatch):
     archive.write_bytes(_archive({'textures/gothic_block/blocks10.jpg': b'x'}))
     monkeypatch.setattr(download.resolver, 'fetch_to_cache',
                         lambda url, cache_dir=None, max_bytes=None: str(archive))
-    root = download.fetch_pack(download.QUAKE3_CORE, str(tmp_path))
+    root = download.fetch_pack(download.pack_for_key('quake3-core'), str(tmp_path))
     assert os.path.isfile(os.path.join(root, 'textures', 'gothic_block',
                                        'blocks10.jpg'))
 
@@ -281,7 +281,8 @@ def test_the_openarena_maps_pack_is_registered():
     pack = download.pack_for_key('openarena-maps')
     assert pack is not None
     assert 'openarena' in pack.url
-    assert pack.archive == 'tar.bz2'
+    # 'tar' whatever it is compressed with: the reader detects that.
+    assert pack.archive == 'tar'
     assert 'maps' in pack.title.lower()
 
 
@@ -361,7 +362,7 @@ def _write(path, data):
 
 def test_a_pack_alias_names_a_map_in_that_pack():
     assert download.parse_pack_target('openarena:aggressor') == (
-        download.OPENARENA_MAPS, 'aggressor')
+        download.pack_for_key('openarena-maps'), 'aggressor')
 
 
 def test_the_full_pack_key_also_names_a_map():
@@ -415,7 +416,7 @@ def test_listing_the_maps_a_pack_holds(tmp_path):
 def test_the_openarena_maps_pack_names_the_texture_pack_it_needs():
     """The maps ship geometry and lightmaps only; the art is a separate,
     much larger download, so a maps-only fetch renders untextured."""
-    assert 'openarena-textures' in download.OPENARENA_MAPS.companions
+    assert 'openarena-textures' in download.pack_for_key('openarena-maps').companions
 
 
 def test_the_openarena_texture_pack_is_registered_and_honest_about_its_size():
@@ -426,7 +427,7 @@ def test_the_openarena_texture_pack_is_registered_and_honest_about_its_size():
 
 
 def test_the_quake3_pack_needs_nothing_else():
-    assert download.QUAKE3_CORE.companions == ()
+    assert download.pack_for_key('quake3-core').companions == ()
 
 
 def test_a_packs_companions_resolve_to_registered_packs():
@@ -495,7 +496,7 @@ def test_a_pack_larger_than_the_resolvers_default_cap_is_still_fetched(tmp_path,
         return str(path)
 
     monkeypatch.setattr(download.resolver, 'fetch_to_cache', _fetch)
-    big = download.OPENARENA_TEXTURES
+    big = download.pack_for_key('openarena-textures')
     download.fetch_pack(big, str(tmp_path / 'cache'))
     assert seen['max_bytes'] > big.approximate_bytes
 
@@ -516,11 +517,12 @@ def test_the_openarena_base_data_pack_is_registered():
     no file without them however much art is on disk."""
     pack = download.pack_for_key('openarena-data')
     assert pack is not None
-    assert pack.archive == 'tar.bz2'
+    # 'tar' whatever it is compressed with: the reader detects that.
+    assert pack.archive == 'tar'
 
 
 def test_the_maps_pack_needs_both_the_art_and_the_scripts():
-    assert set(download.OPENARENA_MAPS.companions) == {
+    assert set(download.pack_for_key('openarena-maps').companions) == {
         'openarena-textures', 'openarena-data'}
 
 

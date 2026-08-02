@@ -15,11 +15,13 @@ whose author cannot be named from this file does not belong here.
 | **Licence** | **CC0 1.0 Universal** — <https://creativecommons.org/publicdomain/zero/1.0/> |
 | **Fetched** | 2026-07-27 |
 
-| File | Original | Used as | Triangles | Textures |
-|---|---|---|---|---|
-| `luger-pistol.glb` | Luger | the pistol | 4 970 | its own, resampled to 512px |
-| `pump-shotgun.glb` | Shotgun | the shotgun | 1 740 | **none** — see below |
-| `assault-rifle.glb` | AK-47 | the rifle | 4 801 | **none** — see below |
+| File | Original | Used as | Textures |
+|---|---|---|---|
+| `luger-pistol.glb` | Luger | the pistol | its own, resampled to 512px |
+| `pump-shotgun.glb` | Shotgun | the shotgun | **none** — see below |
+| `assault-rifle.glb` | AK-47 | the rifle | **none** — see below |
+| `rocket-launcher.glb` | Sniper | the rocket launcher | **none** — see below |
+| `pipe-bomb.glb` | Pipe_Bomb | the grenade launcher | its own, resampled to 512px |
 
 The pack is CC0 and asks for nothing, but its author asked to be linked, and
 that is the entry above. Everything in it is worth knowing about: 19 models,
@@ -35,8 +37,17 @@ trims one, and prints what it did so the numbers can be recorded here:
 ```console
 python tools/prepare_weapon.py Luger.glb   luger-pistol.glb  --textures 512
 python tools/prepare_weapon.py Shotgun.glb pump-shotgun.glb  --strip-textures
-python tools/prepare_weapon.py AK47.glb    assault-rifle.glb --strip-textures
+python tools/prepare_weapon.py AK47.glb      assault-rifle.glb   --strip-textures
+python tools/prepare_weapon.py Sniper.glb    rocket-launcher.glb --strip-textures
+python tools/prepare_weapon.py Pipe_Bomb.glb pipe-bomb.glb       --textures 512
 ```
+
+**There is no rocket launcher in the pack**, so the sniper rifle stands in for
+one: it is the only long-barrelled silhouette in it, and what a first-person
+weapon has to do at this stage is *read as a different weapon from the last
+one*. The pipe bomb is a thrown explosive and stands in for the grenade
+launcher on the same basis. Both are a table edit away from the commissioned
+art when it arrives.
 
 Geometry is never touched — mesh, normals and UVs come through unchanged — so
 re-running this with better maps later is a re-run and not a re-model.

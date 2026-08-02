@@ -40,6 +40,15 @@ def key(state, name, down=1):
     state.process(event)
 
 
+def button(state, index, down=1):
+    """Feed one mouse-button transition, as the event system spells it."""
+    from OpenGLContext.events.mouseevents import MouseButtonEvent
+    event = MouseButtonEvent()
+    event.button = index
+    event.state = down
+    state.process(event)
+
+
 @pytest.fixture
 def bindings():
     return controls.WeaponBindings()
@@ -212,3 +221,44 @@ class TestWhatTheCommandsDo:
         controls.apply_commands([controls.PREVIOUS_WEAPON], False, player,
                                 table, now=0.0)
         assert player.selected == 'pistol'
+
+
+class TestTheTriggerIsTheMouseButton:
+    """In a first-person game the left mouse button fires.
+
+    Not a preference: it is the one binding every player of the genre already
+    has in their hand, and a game that answered only `ctrl` reads as a game
+    where firing does nothing at all — no shot, no sound, no ammunition going
+    down, nothing to diagnose from inside it.
+    """
+
+    def bindings(self):
+        return controls.WeaponBindings()
+
+    def test_the_left_mouse_button_fires(self):
+        state = InputState()
+        button(state, controls.LEFT_BUTTON)
+        assert self.bindings().firing(state)
+
+    def test_letting_go_stops_firing(self):
+        state = InputState()
+        button(state, controls.LEFT_BUTTON)
+        button(state, controls.LEFT_BUTTON, down=0)
+        assert not self.bindings().firing(state)
+
+    def test_control_still_fires_as_well(self):
+        """The old binding is kept: some players hold a modifier by habit."""
+        state = InputState()
+        key(state, '<control>')
+        assert self.bindings().firing(state)
+
+    def test_the_right_button_does_not_fire(self):
+        state = InputState()
+        button(state, controls.LEFT_BUTTON + 1)
+        assert not self.bindings().firing(state)
+
+    def test_the_binding_page_can_show_it(self):
+        """It is a declared binding like any other, not a special case."""
+        from OpenGLContext.events import mouseevents
+        keys = self.bindings().keys_for(controls.FIRE)
+        assert mouseevents.button_name(controls.LEFT_BUTTON) in keys

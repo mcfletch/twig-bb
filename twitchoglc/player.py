@@ -12,9 +12,10 @@ scenegraph in it.
 shot and the cone of fire are fields of :mod:`twitchoglc.weapons`, which is the
 game's design document; what is here is how much of each the player has left.
 
-Firing, damage and hit detection proper are §7.  What this carries of them is
-the bookkeeping the HUD has to show: ammunition going down, health and armour
-coming off, and how far the current weapon's cone has opened.
+What a shot *does* is :mod:`twitchoglc.combat` and
+:mod:`twitchoglc.projectiles`; what this carries is the bookkeeping the HUD has
+to show and the rules read: ammunition going down, health and armour coming
+off, and how far the current weapon's cone has opened.
 """
 
 from __future__ import annotations
@@ -40,8 +41,9 @@ class PlayerState:
     AMMO_MAXIMUM = 999
 
     #: Armour absorbs this share of incoming damage while there is any left.
-    #: Ours, not anybody else's: §7 owns the tuning, and this is the value the
-    #: HUD is built against until it says otherwise.
+    #: Ours, not anybody else's, and chosen so that a full set of armour is
+    #: worth roughly another half a life -- enough to be worth a detour without
+    #: making it a second health bar.
     ARMOUR_SHARE = 0.6
 
     #: Seconds for a fully-open cone of fire to close again.
@@ -78,18 +80,23 @@ class PlayerState:
         """A player as they spawn: full health, the first weapon, some ammunition.
 
         The first weapon is whichever sits on slot 1, so a variant that retunes
-        the table changes what a player spawns with by editing the table.
+        the table changes what a player spawns with by editing the table — and
+        how much ammunition comes with it is that weapon's own
+        ``startingAmmo``, for the same reason: a number written here instead
+        would be a second place to change and the first one nobody would
+        remember.
         """
         first = table.by_slot(1) or (table.weapons[0] if table.weapons else None)
         state = cls()
         if first is not None:
             state.weapons = [str(first.key)]
             state.selected = str(first.key)
-            state.ammo = {str(first.ammoType): 50}
+            state.ammo = {str(first.ammoType):
+                          min(cls.AMMO_MAXIMUM, int(first.startingAmmo))}
         return state
 
     @classmethod
-    def carrying(cls, table: Any, ammunition: int = 60) -> 'PlayerState':
+    def carrying(cls, table: Any, ammunition: Optional[int] = None) -> 'PlayerState':
         """A player holding **everything** in the table, with ammunition for it.
 
         The stand-in loadout, and it exists because of a gap rather than a
@@ -99,12 +106,56 @@ class PlayerState:
         key rather than as a feature that has not arrived.  Everything held is
         the honest stand-in until items exist, at which point
         :meth:`starting` is what a match wants.
+
+        How much of each comes from the weapon's own ``startingAmmo``, because
+        eight rockets and ninety rifle rounds are the same *amount of game*
+        and a flat number for both is a rocket launcher with no cost.  Passing
+        ``ammunition`` overrides every weapon's, which is what a test wanting
+        one number wants.
+
+        Two weapons sharing an ``ammoType`` share one pile: the larger of
+        their numbers wins rather than the two adding up, so putting a second
+        weapon on an existing pool does not quietly double it.
         """
         state = cls.starting(table)
+        state.ammo = {}
         for weapon in table.weapons:
             state.give(str(weapon.key))
-            state.give_ammo(str(weapon.ammoType), ammunition)
+            wanted = (int(weapon.startingAmmo) if ammunition is None
+                      else int(ammunition))
+            kind = str(weapon.ammoType)
+            state.ammo[kind] = min(cls.AMMO_MAXIMUM,
+                                   max(state.ammo.get(kind, 0), wanted))
         return state
+
+    def restore(self, table: Any) -> None:
+        """Put this record back to how a player spawns, **in place**.
+
+        In place rather than by handing out a new one, because everything that
+        holds a player's state holds *this object* -- the HUD reads it, the
+        input path writes it, the rules damage it -- and swapping it on a
+        respawn leaves every one of them looking at a corpse.  That is what a
+        HUD frozen at nought health from the first death onwards looks like
+        from the inside.
+
+        **Back to the starting loadout, not to everything.**  Dying costs you
+        what you had picked up, which is what makes the things a map places
+        worth walking to -- and a player who respawned holding every weapon in
+        the game would have no reason ever to leave the room they died in.  It
+        is also what makes the level a circuit rather than a room: see
+        :mod:`twitchoglc.items`.
+        """
+        fresh = self.starting(table)
+        self.health, self.max_health = fresh.health, fresh.max_health
+        # Armour is not restored: it is picked up, and coming back wearing what
+        # you died in would make a set of armour a permanent upgrade.
+        self.armour = 0
+        self.ammo = dict(fresh.ammo)
+        self.weapons = list(fresh.weapons)
+        self.selected = fresh.selected
+        self.last_shot = None
+        self._spread = 0.0
+        self._fired_at = None
 
     @property
     def alive(self) -> bool:
@@ -112,7 +163,7 @@ class PlayerState:
 
     # -- damage -----------------------------------------------------------
     def take_damage(self, amount: float) -> int:
-        """Apply damage, armour first.  Returns how much reached the health.
+        """Apply damage, armour first.  Returns how much health it actually cost.
 
         Armour absorbs a share of each hit and is spent doing it, which is what
         makes picking it up worth a detour without making it a second health
@@ -123,8 +174,12 @@ class PlayerState:
         if self.armour > 0:
             absorbed = min(float(self.armour), amount * self.ARMOUR_SHARE)
             self.armour = int(round(self.armour - absorbed))
-        taken = int(round(amount - absorbed))
-        self.health = max(0, self.health - taken)
+        wanted = int(round(amount - absorbed))
+        # What *landed*, not what was aimed: 500 damage at a target with 40
+        # health left is 40, and a hit that reported 500 would put that number
+        # on a HUD and in a damage log.
+        taken = min(self.health, wanted)
+        self.health -= taken
         return taken
 
     def heal(self, amount: float) -> None:

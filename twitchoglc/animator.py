@@ -261,12 +261,3 @@ def _applyTransformMask(material: Any) -> None:
     """
     mask = int(getattr(material, 'texCoordMask', 0) or 0)
     material.texCoordMask = mask | (BASE_COLOR_BIT << TRANSFORM_SHIFT)
-
-
-def animator_for(batches: Sequence[Tuple[SurfaceStyle, Any, Any]],
-                 resolve: Optional[Resolver] = None) -> SurfaceAnimator:
-    """An animator for every batch of a built scene that moves."""
-    driver = SurfaceAnimator()
-    for style, material, mesh in batches:
-        driver.add(style, material, mesh=mesh, resolve=resolve)
-    return driver

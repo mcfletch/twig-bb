@@ -83,6 +83,23 @@ class SurfaceStyle:
     solid: bool = True
     #: True where the surface bounds a liquid volume -- water, slime or lava.
     liquid: bool = False
+    #: True where a material script *defined* this surface.  A version 46 name
+    #: with no definition is not an error (``SPEC-Q3SHADER §3.2``) — it is used
+    #: as a plain texture path — but it is also a surface that has silently
+    #: lost whatever the script said about it, including its animation.  A
+    #: still pool of lava then reads as a broken animator rather than as
+    #: content the user does not have, so this is carried in order to be
+    #: *reported*.  Always true for version 38, which has no script layer at
+    #: all and so nothing to be missing.
+    scripted: bool = True
+    #: *Which* liquid, where the family says: `water`, `slime` or `lava`,
+    #: empty otherwise.  Separate from :attr:`liquid` because the two families
+    #: know different amounts: version 46 names the liquid in the material
+    #: script (``SPEC-Q3SHADER §2.2``), while version 38 keeps the kind on the
+    #: *leaf* rather than on the face (``SPEC-BSP38 §9.4``) and a surface there
+    #: can say only that it bounds one.  A style that guessed would make every
+    #: version 38 pool the same colour and hurt the same amount.
+    liquidKind: str = ''
     #: What the surface does over time: scrolling texture coordinates, vertex
     #: deformation, a colour wave, a frame cycle.  ``SPEC-Q3SHADER §2.4``
     #: describes them; :mod:`twitchoglc.surfaceanim` evaluates them.  Both
@@ -119,6 +136,7 @@ class SurfaceStyle:
         return (self.name, self.draw, self.sky, self.opacity, self.masked,
                 self.double_sided, self.scrolling, self.warping,
                 self.lightmapped, self.emissive, self.casts_shadow, self.liquid,
+                self.liquidKind, self.scripted,
                 # Two surfaces that move differently cannot share a draw call,
                 # however alike the rest of them is.
                 self.animation)

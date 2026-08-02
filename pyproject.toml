@@ -27,12 +27,26 @@ classifiers = [
 dependencies = [
     "numpy>=2.0",
     "OpenGLContext>=2.3.0a1",
+    "omi_audio>=0.1.0",
     "omi_physics>=0.2.1",
     "pillow",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov", "ruff", "mypy"]
+# omi_audio itself is a dependency -- the sound design in twitchoglc.combatsound
+# is written against its model and its synthesiser -- and it mixes happily with
+# no backend at all.  What is optional is the backend that reaches a sound card,
+# and its absence is silence, never an error.  The reason it is optional is
+# concrete and not a preference: miniaudio publishes **no Linux ARM64 wheel**, so
+# making it hard would turn every linux/arm64 install -- increasingly the default
+# on Apple Silicon hosts -- into a source build wanting a compiler.  Re-check
+# when a wheel appears; this is a response to a packaging gap and should not
+# outlive it.  It is MIT, as is every decoder it bundles, which is why it is the
+# only audio package this project takes: the convenient wrappers (libsndfile,
+# PyAV, pydub via ffmpeg) are LGPL or worse and cannot be a dependency of a BSD
+# library.
+audio = ["omi_audio[playback]"]
 
 [project.scripts]
 twitch-viewer = "twitchoglc.viewer:main"
@@ -55,6 +69,7 @@ include = ["twitchoglc*"]
 # See twitchoglc/assets/weapons/CREDITS.md.
 [tool.setuptools.package-data]
 twitchoglc = [
+    "packs.json",
     "assets/weapons/*.glb",
     "assets/weapons/Textures/*.png",
     "assets/weapons/CREDITS.md",
@@ -67,6 +82,14 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "W", "F", "B"]
 ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# A pytest fixture shared between two test modules is imported into the second
+# one, and every test that asks for it then "redefines" that import as its own
+# parameter.  That is how pytest fixtures are shared without a conftest, and a
+# conftest is the wrong home for this one: importing it sets the GL renderer,
+# profile and backend, which must not happen for the suite that needs no window.
+"tests/test_items_gl.py" = ["F811"]
 
 [tool.mypy]
 # The numpy stubs in this environment use `type` statements, which mypy only

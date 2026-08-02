@@ -21,10 +21,12 @@ import os
 import shutil
 import tarfile
 import zipfile
-from dataclasses import dataclass
 from typing import List, Optional, Sequence, Tuple
 
 from OpenGLContext.loaders import resolver
+
+from . import catalog
+from .assetpack import AssetPack
 
 log = logging.getLogger(__name__)
 
@@ -43,105 +45,10 @@ CACHE_SUBDIR = 'twitch-maps'
 #: another tool at, or delete on purpose.
 CONTENT_SUBDIR = 'twitch-content'
 
-@dataclass(frozen=True)
-class AssetPack:
-    """An optional download that fills in content a map does not carry.
-
-    ``approximate_bytes`` and ``copyright`` exist because both are put in front
-    of the user before anything is fetched; a pack that cannot state its size
-    and its terms has no business being offered.
-    """
-
-    key: str
-    title: str
-    url: str
-    #: Which map family it helps, or None for anything.
-    family: Optional[str]
-    #: Directory name it unpacks into, under :data:`CONTENT_SUBDIR`.
-    directory: str
-    #: ``zip`` or ``tar.bz2``.
-    archive: str
-    approximate_bytes: int
-    copyright: str
-    #: A path that, when present, proves the pack is already unpacked.
-    marker: str
-    #: Keys of packs this one is incomplete without.
-    companions: Tuple[str, ...] = ()
-
-
-#: The Quake 3 community's high-resolution *replacement* for the base textures
-#: — independently produced art, made to drop in under the same names and
-#: licensed to be redistributed.  That is what makes it usable, and why there
-#: is no equivalent entry for Alien Arena: the only source of *its* base art is
-#: its own game data, licensed for use solely within its own engine, so this
-#: viewer may neither download it nor read an installed copy.  Alien Arena maps
-#: render largely untextured, permanently.  The symmetry is inviting and false;
-#: do not add a pack for it.
-QUAKE3_CORE = AssetPack(
-    key='quake3-core',
-    title='Quake 3 replacement textures',
-    url='https://files.ioquake3.org/xcsv_hires.zip',
-    family='quake3',
-    directory='xcsv_hires',
-    archive='zip',
-    approximate_bytes=186_991_912,
-    copyright='Creative Commons replacement art, ioquake3 community',
-    marker='textures',
-)
-
-#: OpenArena's art is freely licensed and complete, which is what makes it the
-#: content route this viewer can actually offer.  Its release is split: 50 maps
-#: in one small archive, the art they draw with in a much larger one, so they
-#: are two packs and a maps-only fetch renders untextured.
-#:
-#: The Debian *source* tarballs are used rather than the `.deb` packages: they
-#: are the upstream archive as published, with no packaging layer to unwrap.
-OPENARENA_MAPS = AssetPack(
-    key='openarena-maps',
-    title='OpenArena maps (50 levels)',
-    url=('https://deb.debian.org/debian/pool/main/o/openarena-maps/'
-         'openarena-maps_0.8.5split.orig.tar.bz2'),
-    family='quake3',
-    directory='openarena-maps',
-    archive='tar.bz2',
-    approximate_bytes=41_711_739,
-    copyright='OpenArena project, CC BY-SA 3.0 / GPL; Debian main',
-    marker='',
-    companions=('openarena-textures', 'openarena-data'),
-)
-
-#: The base game data: menu art, models, sounds, and -- the reason a viewer
-#: wants it -- the `.shader` scripts.  A great many surface names in these maps
-#: are shader names rather than file names (`SPEC-Q3SHADER §1.2`), and without
-#: the scripts that define them they resolve to no file however much art is on
-#: disk.
-OPENARENA_DATA = AssetPack(
-    key='openarena-data',
-    title='OpenArena base data and shader scripts',
-    url=('https://deb.debian.org/debian/pool/main/o/openarena-data/'
-         'openarena-data_0.8.5split.orig.tar.bz2'),
-    family='quake3',
-    directory='openarena-data',
-    archive='tar.bz2',
-    approximate_bytes=91_000_000,
-    copyright='OpenArena project, CC BY-SA 3.0 / GPL; Debian main',
-    marker='',
-)
-
-OPENARENA_TEXTURES = AssetPack(
-    key='openarena-textures',
-    title='OpenArena textures',
-    url=('https://deb.debian.org/debian/pool/main/o/openarena-textures/'
-         'openarena-textures_0.8.5split.orig.tar.bz2'),
-    family='quake3',
-    directory='openarena-textures',
-    archive='tar.bz2',
-    approximate_bytes=449_000_000,
-    copyright='OpenArena project, CC BY-SA 3.0 / GPL; Debian main',
-    marker='',
-)
-
-ASSET_PACKS = (QUAKE3_CORE, OPENARENA_MAPS, OPENARENA_TEXTURES, OPENARENA_DATA)
+#: Every pack this build offers, read from :mod:`twitchoglc.catalog` at import.
+#: A list rather than a literal here so a pack can be added or corrected in
+#: `packs.json` without touching Python.
+ASSET_PACKS = tuple(catalog.load())
 
 
 def pack_for_key(key: str) -> Optional[AssetPack]:
@@ -482,9 +389,9 @@ def _unpack_dir(target: str, cache_dir: Optional[str]) -> str:
 
 def _default_cache() -> str:
     """The per-user cache root the rest of OpenGLContext writes under."""
-    from OpenGLContext.browser import homedirectory
+    from OpenGLContext import userpaths
     try:
-        return os.path.join(homedirectory.appdatadirectory(), 'OpenGLContext')
+        return os.path.join(userpaths.appdatadirectory(), 'OpenGLContext')
     except OSError:                             # pragma: no cover - no home dir
         import tempfile
         return tempfile.gettempdir()

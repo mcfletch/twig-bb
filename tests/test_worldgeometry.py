@@ -164,6 +164,55 @@ def test_a_world_with_nothing_solid_has_no_collision_mesh():
     assert builder.build().collision_mesh() is None
 
 
+class TestWhichSurfaceATriangleCameFrom:
+    """A hit reports a triangle number; this is what turns it back into a surface."""
+
+    def _two_surfaces(self):
+        builder = GeometryBuilder()
+        positions, normals, uv, indices = _quad()
+        builder.add_surface(SurfaceStyle(name='stone'), -1,
+                            positions, normals, uv, uv, indices)
+        builder.add_surface(SurfaceStyle(name='metal'), -1,
+                            positions + 100, normals, uv, uv, indices)
+        return builder.build()
+
+    def test_each_triangle_names_the_surface_it_came_from(self):
+        index = self._two_surfaces().collision_surfaces()
+        assert [index.style_at(n).name for n in range(4)] == [
+            'stone', 'stone', 'metal', 'metal']
+
+    def test_the_index_covers_exactly_the_collision_mesh(self):
+        """Two walks of the batch list that can disagree eventually will."""
+        world = self._two_surfaces()
+        _points, triangles = world.collision_mesh()
+        assert len(world.collision_surfaces()) == len(triangles)
+
+    def test_a_triangle_that_is_not_in_the_mesh_has_no_surface(self):
+        """None rather than the last one: a wrong material reads as a bug in the effect."""
+        index = self._two_surfaces().collision_surfaces()
+        assert index.style_at(4) is None
+        assert index.style_at(-1) is None
+
+    def test_surfaces_left_out_of_the_collision_mesh_are_left_out_of_the_index(self):
+        builder = GeometryBuilder()
+        positions, normals, uv, indices = _quad()
+        builder.add_surface(SurfaceStyle(name='fx', solid=False), -1,
+                            positions, normals, uv, uv, indices)
+        builder.add_surface(SurfaceStyle(name='floor'), -1,
+                            positions + 100, normals, uv, uv, indices)
+        index = builder.build().collision_surfaces()
+        assert [index.style_at(n).name for n in range(2)] == ['floor', 'floor']
+
+    def test_a_world_with_nothing_solid_has_an_empty_index(self):
+        builder = GeometryBuilder()
+        positions, normals, uv, indices = _quad()
+        builder.add_surface(SurfaceStyle(name='fx', solid=False), -1,
+                            positions, normals, uv, uv, indices)
+        index = builder.build().collision_surfaces()
+        assert len(index) == 0
+        assert index.style_at(0) is None
+
+
 def test_the_triangle_count_totals_every_batch():
     builder = GeometryBuilder()
     positions, normals, uv, indices = _quad()

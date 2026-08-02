@@ -15,6 +15,7 @@ from OpenGLContext.ui.debugoverlay import DebugOverlay
 
 from twitchoglc import debug as twitchdebug
 from twitchoglc import weapons
+from twitchoglc.frameclock import FrameClock
 from twitchoglc.player import PlayerState
 
 
@@ -35,6 +36,12 @@ class FakeLoaded:
 
     def missing_textures(self):
         return ['textures/base/absent']
+
+    def unscripted_surfaces(self):
+        return []
+
+    def unplaceable_pickups(self):
+        return {}
 
 
 class FakeMode:
@@ -123,6 +130,121 @@ class TestMapSection:
         twitchdebug.install(viewer)
         assert rows(viewer, 'Map') == {}
 
+    def test_it_counts_the_speakers_that_found_a_sound(self):
+        """"Why is it silent" is answered by this number being zero."""
+        from twitchoglc.speakers import from_entities
+        from twitchoglc.entities import Entity
+
+        class Found:
+            def resolve(self, noise):
+                return '/content/' + noise
+
+        viewer = Viewer(speakers=from_entities([
+            Entity({'classname': 'target_speaker', 'origin': '0 0 0',
+                    'noise': 'sound/world/wind1.wav'}),
+        ], Found()))
+        twitchdebug.install(viewer)
+        assert rows(viewer, 'Map')['speakers'] == '1'
+
+    def test_it_counts_the_surfaces_no_script_defines(self):
+        """A still pool of lava is content nobody has, not a broken animator."""
+        class Unscripted(FakeLoaded):
+            def unscripted_surfaces(self):
+                return ['textures/liquids/protolava', 'textures/base/wall']
+
+        viewer = Viewer(loaded=Unscripted())
+        twitchdebug.install(viewer)
+        assert rows(viewer, 'Map')['unscripted surfaces'] == '2'
+
+    def test_a_fully_scripted_map_omits_the_row(self):
+        twitchdebug.install(Viewer())
+        assert 'unscripted surfaces' not in rows(Viewer(), 'Map')
+
+    def test_a_viewer_with_no_speakers_built_yet_omits_the_row(self):
+        twitchdebug.install(Viewer())
+        assert 'speakers' not in rows(Viewer(), 'Map')
+
+    def test_it_counts_the_pickups_it_has_nothing_for(self):
+        """A map whose weapon circuit is all content nobody has plays like a
+        map with no weapons in it, which reads as a broken reader."""
+        class Unanswered(FakeLoaded):
+            def unplaceable_pickups(self):
+                return {'item_quad': 3, 'weapon_bfg': 1}
+
+        viewer = Viewer(loaded=Unanswered())
+        twitchdebug.install(viewer)
+        assert rows(viewer, 'Map')['pickups not answered'] == '4'
+
+    def test_a_map_this_game_answers_entirely_omits_the_row(self):
+        twitchdebug.install(Viewer())
+        assert 'pickups not answered' not in rows(Viewer(), 'Map')
+
+    def test_it_counts_the_pickups_that_are_placed(self):
+        from twitchoglc import items, projectiles, rules
+        viewer = Viewer(rules=rules.Rules(
+            None, minds={}, flight=projectiles.Projectiles(),
+            ))
+        viewer.rules.pickups = items.Pickups([])
+        twitchdebug.install(viewer)
+        assert rows(viewer, 'Map')['items'] == '0'
+
+    def test_it_says_what_the_map_can_kill_you_with(self):
+        """Both hazards are invisible from inside the game when they are absent.
+
+        A map whose liquid brushes name a material nobody has reports no
+        volumes and its lava is scenery; a level with no floor under it is a
+        fall that never ends.
+        """
+        from twitchoglc import falling, liquids, projectiles, rules
+        viewer = Viewer(rules=rules.Rules(
+            None, minds={}, flight=projectiles.Projectiles(),
+            harm=liquids.LiquidHarm(liquids.LiquidVolumes([])),
+            floor=falling.KillFloor(-137.5)))
+        twitchdebug.install(viewer)
+        found = rows(viewer, 'Map')
+        assert found['liquid volumes'] == '0'
+        assert found['kill floor (m)'] == '-137.5'
+
+    def test_a_map_not_being_walked_in_yet_omits_both(self):
+        twitchdebug.install(Viewer())
+        found = rows(Viewer(), 'Map')
+        assert 'liquid volumes' not in found
+        assert 'kill floor (m)' not in found
+
+
+class TestWhichLiquidThePlayerIsIn:
+    """"Submerged: True" cannot tell a right liquid from a wrong one."""
+
+    def submerged_in(self, kind):
+        import numpy as np
+
+        from twitchoglc import liquids
+
+        class Swimming:
+            submerged = True
+            grounded = False
+
+            def camera_position(self):
+                return (5.0, 2.0, 5.0)
+
+        pool = liquids.LiquidVolumes([
+            liquids.LiquidVolume(mins=np.array((0, 0, 0), 'd'),
+                                 maxs=np.array((10, 5, 10), 'd'), kind=kind)])
+        viewer = Viewer(_nav=Swimming(), _liquids=pool)
+        twitchdebug.install(viewer)
+        return rows(viewer, 'Player')['submerged']
+
+    def test_the_liquid_is_named(self):
+        assert self.submerged_in('lava') == 'lava'
+
+    def test_being_under_with_no_volumes_read_still_says_so(self):
+        class Swimming:
+            submerged = True
+
+        viewer = Viewer(_nav=Swimming(), _liquids=None)
+        twitchdebug.install(viewer)
+        assert rows(viewer, 'Player')['submerged'] == 'yes'
+
 
 class TestPlayerSection:
     def test_it_names_the_movement_mode(self, viewer):
@@ -166,6 +288,35 @@ class TestPlayerSection:
         twitchdebug.install(viewer)
         assert 'submerged' not in rows(viewer, 'Player')
 
+    def test_it_reports_the_timestep_the_simulation_is_being_given(self, viewer):
+        viewer._clock = FrameClock()
+        viewer._clock.reset(0.0)
+        viewer._clock.tick(0.016)
+        twitchdebug.install(viewer)
+        found = rows(viewer, 'Player')
+        assert found['dt ms'] == '16'
+        assert 'behind' not in found
+
+    def test_a_stalling_game_says_the_world_is_running_slowly(self, viewer):
+        """The row that makes an unplayable game legible.
+
+        A clamped step means the world advances slower than the wall clock, and
+        no other number on the overlay says so -- the frame rate reports the
+        renderer, and the renderer is fine.
+        """
+        viewer._clock = FrameClock()
+        viewer._clock.reset(0.0)
+        viewer._clock.tick(1.0)
+        twitchdebug.install(viewer)
+        found = rows(viewer, 'Player')
+        assert found['real ms'] == '1000'
+        # 0.95s, not 1.0: the 50ms the simulation *did* get is not lost time.
+        assert found['behind'] == '5% speed, 0.9s lost'
+
+    def test_a_viewer_with_no_clock_yet_omits_the_rows(self, viewer):
+        twitchdebug.install(viewer)
+        assert 'dt ms' not in rows(viewer, 'Player')
+
 
 class TestPhysicsSection:
     def test_there_is_no_physics_section_before_the_world_is_built(self,
@@ -181,3 +332,53 @@ class TestPhysicsSection:
         viewer._world = World()
         twitchdebug.install(viewer)
         assert rows(viewer, 'Physics')['bodies'] == '3'
+
+
+class TestTheCombatSection:
+    """What a fight is doing that cannot be seen from inside the game.
+
+    A rocket that never arrives and a projectile budget that is full look
+    exactly the same to a player; this is the only place the difference shows.
+    """
+
+    class Context:
+        pass
+
+    def context(self):
+        from twitchoglc import arena, effects, projectiles, weapons
+        made = self.Context()
+        made.arena = arena.Arena(weapons=weapons.default_table())
+        made.arena.add('player', name='You')
+        made.flight = projectiles.Projectiles(projectiles.default_table())
+        made.effects = effects.Effects(made.arena)
+        return made
+
+    def rows(self, context):
+        return dict(twitchdebug.combat_provider(context)())
+
+    def test_it_says_how_much_of_the_budget_is_in_the_air(self):
+        from twitchoglc import projectiles
+        context = self.context()
+        context.flight.launch(
+            context.flight.table.by_key(projectiles.ROCKET),
+            origin=(0, 1, 0), direction=(1, 0, 0), owner='player')
+        assert self.rows(context)['in flight'].startswith('1 /')
+
+    def test_it_says_what_the_effects_setting_is(self):
+        from twitchoglc import effects
+        context = self.context()
+        context.effects.intensity = effects.REDUCED
+        assert self.rows(context)['effects'] == effects.REDUCED
+
+    def test_it_counts_the_particles_alive(self):
+        from twitchoglc import arena
+        context = self.context()
+        context.effects.show([arena.Impact(point=(0, 0, 0), normal=(0, 1, 0),
+                                           surface='stone')])
+        assert self.rows(context)['particles'] > 0
+
+    def test_it_reports_the_match(self):
+        assert 'combatants' in self.rows(self.context())
+
+    def test_a_context_with_no_match_reports_nothing(self):
+        assert twitchdebug.combat_provider(self.Context())() == []

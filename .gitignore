@@ -1,6 +1,7 @@
 .eric4project
 *.egg-info
 .ropeproject
+.coverage
 build
 __pycache__
 dist

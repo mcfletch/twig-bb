@@ -181,5 +181,41 @@ class TestTheStandInLoadout:
                 player.selected == str(weapon.key)
 
     def test_it_is_still_possible_to_spawn_with_one_weapon(self, table):
-        """The pickup-driven start §6 will want is unchanged."""
+        """What a match with pickups in it actually starts a player on."""
         assert len(PlayerState.starting(table).weapons) == 1
+
+    def test_the_starting_weapon_brings_its_own_ammunition(self, table):
+        """The weapon's number, not one written a second time somewhere else:
+        a spawn that handed out a flat fifty made ``startingAmmo`` a field
+        nothing read."""
+        table.by_key('pistol').startingAmmo = 23
+        assert PlayerState.starting(table).ammo['bullets'] == 23
+
+    def test_a_starting_player_has_no_armour(self, table):
+        """Armour is picked up, and a spawn wearing it is a permanent upgrade."""
+        assert PlayerState.starting(table).armour == 0
+
+
+class TestHowMuchOfEachTheyStartWith:
+    """The table says, because how many rockets is worth is a design decision.
+
+    A stand-in loadout that handed out sixty of everything made a rocket
+    launcher an assault rifle with a bigger bang, which is exactly the thing
+    the weapon table exists to stop happening by accident.
+    """
+
+    def test_the_weapon_says_how_much_it_comes_with(self, table):
+        table.by_key('pistol').startingAmmo = 7
+        assert PlayerState.carrying(table).ammo['bullets'] == 7
+
+    def test_a_launcher_comes_with_far_less_than_a_rifle(self, table):
+        player = PlayerState.carrying(table)
+        assert player.ammo_for(table.by_key('rocket')) \
+            < player.ammo_for(table.by_key('rifle'))
+
+    def test_weapons_sharing_a_pool_do_not_each_fill_it(self, table):
+        """Two weapons that eat the same rounds hold one pile between them."""
+        for weapon in table.weapons:
+            weapon.ammoType = 'shared'
+            weapon.startingAmmo = 10
+        assert PlayerState.carrying(table).ammo['shared'] == 10
