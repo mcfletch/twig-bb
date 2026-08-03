@@ -1,6 +1,6 @@
 """Driving a map's animated surfaces from one clock.
 
-The evaluation is `twitchoglc.surfaceanim`'s and is tested there; this is about
+The evaluation is `twig_bb.surfaceanim`'s and is tested there; this is about
 *applying* it -- which material field each directive lands on, what a frame of
 the clock does to it, and the unit conversion between what a `.shader` script
 writes and what the scenegraph is in.
@@ -12,8 +12,8 @@ import pytest
 from OpenGLContext.scenegraph.pbrmaterial import PBRMaterial
 from OpenGLContext.scenegraph.pbrmesh import PBRMesh
 
-from twitchoglc import animator, surfaceanim as anim, surfaces
-from twitchoglc.worldgeometry import SCENE_SCALE
+from twig_bb import animator, surfaceanim as anim, surfaces
+from twig_bb.worldgeometry import SCENE_SCALE
 
 
 def style(**named):

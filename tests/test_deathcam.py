@@ -16,7 +16,7 @@ import pytest
 
 from OpenGLContext.move.viewplatform import ViewPlatform
 
-from twitchoglc import deathcam
+from twig_bb import deathcam
 
 
 def killed(eye=(0.0, 1.6, 0.0), feet=(0.0, 0.0, 0.0), yaw=0.0, killer=None):

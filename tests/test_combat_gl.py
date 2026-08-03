@@ -31,7 +31,7 @@ import pytest                                                   # noqa: E402
 
 glfw = pytest.importorskip('glfw')
 
-from twitchoglc import arena, effects, game, projectiles, weapons  # noqa: E402
+from twig_bb import arena, effects, game, projectiles, weapons  # noqa: E402
 
 pytestmark = [pytest.mark.gl]
 

@@ -13,7 +13,7 @@ import sys
 
 import pytest
 
-from twitchoglc import hudsample
+from twig_bb import hudsample
 
 VENV_PYTHON = sys.executable
 
@@ -52,7 +52,7 @@ def test_the_demo_renders_the_hud_and_the_weapon(tmp_path):
     """The whole path: a room, a glTF weapon in hand and the HUD over both."""
     out = tmp_path / 'hud.png'
     result = subprocess.run(
-        [VENV_PYTHON, '-m', 'twitchoglc.hudsample', '--capture', str(out),
+        [VENV_PYTHON, '-m', 'twig_bb.hudsample', '--capture', str(out),
          '--frames', '6', '--capture-delay', '0.2'],
         capture_output=True, text=True, timeout=300,
         env=dict(os.environ, OPENGLCONTEXT_PROFILE='core',

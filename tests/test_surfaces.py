@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from twitchoglc import q2bsp
-from twitchoglc import surfaces
-from twitchoglc.surfaces import SurfaceStyle, style_from_quake2_flags
+from twig_bb import q2bsp
+from twig_bb import surfaces
+from twig_bb.surfaces import SurfaceStyle, style_from_quake2_flags
 
 
 def test_a_plain_surface_is_drawn_opaque_lit_and_solid():

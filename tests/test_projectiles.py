@@ -17,7 +17,7 @@ import pytest
 from omi_physics import model
 from omi_physics.world import PhysicsWorld
 
-from twitchoglc import arena, projectiles, weapons
+from twig_bb import arena, projectiles, weapons
 
 
 def world():
@@ -233,7 +233,7 @@ class TestAGrenadeThrownStraightAtSomebody:
     ranges, because they fail differently: at five metres it is an ordinary
     flight, and at one it is inside the arming distance, where a projectile is
     still ignoring the person who threw it.  Both are inside
-    :func:`twitchoglc.bots.reach`, because a grenade aimed *flat* at somebody
+    :func:`twig_bb.bots.reach`, because a grenade aimed *flat* at somebody
     ten metres away is in the floor before it gets there — which is a
     different bug with its own tests.
     """
@@ -253,7 +253,7 @@ class TestAGrenadeThrownStraightAtSomebody:
         for _ in range(2000):
             gone = flight.step(w, found, dt=dt)
             if gone:
-                from twitchoglc import blast
+                from twig_bb import blast
                 blast.answer(w, found, flight.table, gone)
                 return found, gone
             if not len(flight):

@@ -18,7 +18,7 @@ from OpenGLContext.scenegraph.material import Material
 from OpenGLContext.scenegraph.shape import Shape
 from OpenGLContext.scenegraph.transform import Transform
 
-from twitchoglc import art, items
+from twig_bb import art, items
 
 
 def painted(colour=(1.0, 1.0, 1.0)):
@@ -38,7 +38,7 @@ class TestWhereTheArtIs:
         assert os.path.exists(art.path_for(items.MEDPACK['model']))
 
     def test_the_weapons_agree_about_where_that_is(self):
-        from twitchoglc import weapons
+        from twig_bb import weapons
         assert weapons.ASSETS == art.ASSETS
 
 

@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 import bspbuilder
-from twitchoglc import q2bsp, q2geometry
+from twig_bb import q2bsp, q2geometry
 
 
 def _sized(_name: str) -> tuple:

@@ -7,7 +7,7 @@ import time
 import numpy as np
 import pytest
 
-from twitchoglc.lightmapatlas import build_atlas
+from twig_bb.lightmapatlas import build_atlas
 
 
 def _block(width: int, height: int, value: int) -> np.ndarray:

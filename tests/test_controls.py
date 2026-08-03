@@ -12,8 +12,8 @@ import pytest
 
 from OpenGLContext.events.inputstate import InputState
 
-from twitchoglc import controls, weapons
-from twitchoglc.player import PlayerState
+from twig_bb import controls, weapons
+from twig_bb.player import PlayerState
 
 
 class FakeMode:

@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from twitchoglc import weapons
-from twitchoglc.player import PlayerState
+from twig_bb import weapons
+from twig_bb.player import PlayerState
 
 
 @pytest.fixture

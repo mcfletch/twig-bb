@@ -1,10 +1,10 @@
-# twitch project plan — from map viewer to arena game
+# twig-bb project plan — from map viewer to arena game
 
 **Status legend:** ✅ **Complete** — shipped · 🟡 **Partial** — core landed, named pieces
 missing · 📋 **Planned** — designed here, not yet built · ⬜ **Todo** — wanted, not yet
 designed · 🛑 **Shelved** — deliberately not done.
 
-Today twitch loads a Quake 2 / Quake 3 map and lets you walk around inside it. This
+Today twig-bb loads a Quake 2 / Quake 3 map and lets you walk around inside it. This
 plan is the route from *a map you can walk* to *a map you can play in*: characters
 that move under their own direction, things that can be shot, sound, and the screens
 a game needs around the outside of the render loop.
@@ -21,7 +21,7 @@ These are not new; they are the workspace rules ([../CLAUDE.md](../CLAUDE.md)) r
 where they bite hardest on *this* plan, because three of the phases below are the
 places where a shortcut would be most tempting.
 
-**No engine source, ever.** twitch is BSD; the Quake engines and their descendants are
+**No engine source, ever.** twig-bb is BSD; the Quake engines and their descendants are
 GPL. Every format fact cites a numbered fact in [specs/](specs/), obtained either from
 a permitted source (published documentation, this project's own earlier BSD code, the
 bytes of shipped content) or through the Reader/Implementer wall of
@@ -41,7 +41,7 @@ other half of that bargain.
 |---|---|---|
 | [omi_physics](../omi_physics/) | anything a rigid-body world should be able to answer | ray casts and shape sweeps (§7), line-of-sight queries (§6) |
 | [OpenGLContext](../openglcontext/) | anything a *second* game would want identically | spatial audio nodes (§4), particle/effect system (§8), navmesh + path search (§6), the debug overlay (§2), HUD widget primitives (§3) |
-| twitch | anything that is a rule of *this* game | weapon behaviour, damage, bot personality, match state, entity spawning, HUD content, the start screen |
+| twig-bb | anything that is a rule of *this* game | weapon behaviour, damage, bot personality, match state, entity spawning, HUD content, the start screen |
 
 When a phase below adds to OpenGLContext, it also adds to that project's tests and its
 `docs/`, and gets a line in [../openglcontext/plans/PROJECT-PLAN.md](../openglcontext/plans/PROJECT-PLAN.md).
@@ -63,14 +63,14 @@ before it.
 
 | Foundation | Where | What the phases below take from it |
 |---|---|---|
-| ✅ Map loading, both families | [twitchoglc/maploader.py](twitchoglc/maploader.py) | geometry, entities, spawn points, liquids |
-| ✅ Entity lump parsing | [twitchoglc/entities.py](twitchoglc/entities.py) | the classnames every game object is spawned from |
-| ✅ Collision mesh + character controller | [twitchoglc/viewer.py](twitchoglc/viewer.py), [../omi_physics/](../omi_physics/) | the navmesh's input, and the bots' bodies |
-| ✅ Physics triggers | [twitchoglc/jumppads.py](twitchoglc/jumppads.py) | the pattern item pickups and damage volumes follow |
+| ✅ Map loading, both families | [twig_bb/maploader.py](twig_bb/maploader.py) | geometry, entities, spawn points, liquids |
+| ✅ Entity lump parsing | [twig_bb/entities.py](twig_bb/entities.py) | the classnames every game object is spawned from |
+| ✅ Collision mesh + character controller | [twig_bb/viewer.py](twig_bb/viewer.py), [../omi_physics/](../omi_physics/) | the navmesh's input, and the bots' bodies |
+| ✅ Physics triggers | [twig_bb/jumppads.py](twig_bb/jumppads.py) | the pattern item pickups and damage volumes follow |
 | ✅ Overlay UI: panels, dialogs, settings, key bindings | [../openglcontext/OpenGLContext/ui/](../openglcontext/OpenGLContext/ui/) | every screen in §2, §3, §9, §10 |
-| ✅ `renderShaderOverlay` hook | [twitchoglc/viewer.py:536](twitchoglc/viewer.py#L536) | the seam the HUD and debug overlay draw through |
-| ✅ Asset pack fetch/unpack/consent | [twitchoglc/download.py](twitchoglc/download.py) | §9's catalogue and progress UI |
-| ✅ Quake 3 `.shader` parsing | [twitchoglc/q3shader.py](twitchoglc/q3shader.py) | §8's animated effects — already parsed, currently discarded |
+| ✅ `renderShaderOverlay` hook | [twig_bb/viewer.py:536](twig_bb/viewer.py#L536) | the seam the HUD and debug overlay draw through |
+| ✅ Asset pack fetch/unpack/consent | [twig_bb/download.py](twig_bb/download.py) | §9's catalogue and progress UI |
+| ✅ Quake 3 `.shader` parsing | [twig_bb/q3shader.py](twig_bb/q3shader.py) | §8's animated effects — already parsed, currently discarded |
 | ✅ glTF skinning and animation | [../openglcontext/OpenGLContext/loaders/gltf/animation.py](../openglcontext/OpenGLContext/loaders/gltf/animation.py) | §5's characters |
 | ✅ Declared but unimplemented `Sound` / `AudioClip` nodes | [../pyvrml97/vrml/vrml97/basenodes.py:450](../pyvrml97/vrml/vrml97/basenodes.py#L450) | §4's audio API — already specified, needs a renderer |
 
@@ -117,7 +117,7 @@ that measured it. §4, §5, §8 and §9 all read from it.
 player never should, so that §3's HUD can be built out of game information only.
 
 **Shipped (2026-07-27).**  `OpenGLContext.ui.debugoverlay` upstream, fed by
-registered providers; `twitchoglc.debug` registers this game's.  Alt+F toggles
+registered providers; `twig_bb.debug` registers this game's.  Alt+F toggles
 it, `OPENGLCONTEXT_DISABLE_FPS_DISPLAY` decides whether it starts on screen, and
 both fixed-function frame-counter draws are gone.  Sections: Frame (windowed
 median rate, frame time, viewport), Render (features, and shapes/draws/instanced
@@ -134,8 +134,8 @@ Before this the two were mixed and neither was quite right. The frame rate is dr
 OpenGLContext's own frame counter
 ([../openglcontext/OpenGLContext/framecounter.py:95](../openglcontext/OpenGLContext/framecounter.py#L95))
 through fixed-function `glOrtho`/`glPushAttrib` calls that have no meaning in the core
-profile, and the movement mode is drawn by twitch itself in the top-left corner
-([twitchoglc/viewer.py:541](twitchoglc/viewer.py#L541)). A player wants neither; a
+profile, and the movement mode is drawn by twig-bb itself in the top-left corner
+([twig_bb/viewer.py:541](twig_bb/viewer.py#L541)). A player wants neither; a
 developer wants both, plus a dozen things neither of them shows.
 
 **Build.**
@@ -150,7 +150,7 @@ developer wants both, plus a dozen things neither of them shows.
   rather than lifetime average), draw calls / batches / triangles submitted, shadow and
   IBL state, physics body and contact counts, character controller state (grounded,
   velocity, mode).
-- twitch registers its own: map name and family, position in map coordinates *and*
+- twig-bb registers its own: map name and family, position in map coordinates *and*
   scene coordinates, current movement mode, submerged volume, spawn index, and later
   the bot and projectile counts from §6 and §7.
 - **Retire the fixed-function frame-counter render** in favour of the provider. That
@@ -165,7 +165,7 @@ provider set in, a laid-out row list out. The metrics-based layout in
 already pure geometry.
 
 **Docs.** OpenGLContext `docs/` gets the overlay and how to register a provider;
-twitch's README gains the key and loses the "the mode is named top-left" sentence.
+twig-bb's README gains the key and loses the "the mode is named top-left" sentence.
 
 ---
 
@@ -179,14 +179,14 @@ current weapon and the weapons held, pickup and frag messages, and a scoreboard.
 same batch), `Crosshair`, `BarMeter`, `Readout` and a fading `MessageQueue`,
 plus a one-pixel shadow behind every glyph and an outline around the reticule,
 because a pale HUD over a white wall is a HUD nobody can read.  Here:
-`twitchoglc.hud` (the arrangement and the thresholds), `twitchoglc.weapons` (the
+`twig_bb.hud` (the arrangement and the thresholds), `twig_bb.weapons` (the
 declared table, each weapon naming its own reticule and its cone of fire),
-`twitchoglc.player` (health, armour, ammunition, what is held — a record, per
-§11) and `twitchoglc.controls` (weapon commands declared as `KeyBinding`s and
+`twig_bb.player` (health, armour, ammunition, what is held — a record, per
+§11) and `twig_bb.controls` (weapon commands declared as `KeyBinding`s and
 presented to the F6 page beside the movement modes, with no change to that
 page).  The reticule opens by the weapon's own cone, projected through the
 renderer's frustum, so it tells the truth about where a shot may land.
-The weapon in hand is `twitchoglc.firstperson`: two nested transforms, the
+The weapon in hand is `twig_bb.firstperson`: two nested transforms, the
 outer put where the camera is each frame — from the renderer's own
 `placeViewAttachments` hook, which is the only point where the camera is
 settled and nothing has been gathered, so the weapon is pinned in view space
@@ -194,14 +194,14 @@ rather than lagging a frame and swimming.  A held weapon is part of the scene
 (map lighting, occlusion) rather than something drawn over it, which is also
 why it carries a small emissive floor: a map places no dynamic lights, and a
 fill light on the camera was measured to brighten the map more than the weapon.  The viewer and
-**`twitch-hud-demo`** both use it; the demo adds a lit room and
+**`twig-bb-hud`** both use it; the demo adds a lit room and
 `--weapon <key>` for dialling in where a weapon sits.
 
 **A player starts with one weapon** (`PlayerState.starting`) and picks the rest
 off the level, which is what makes a map a circuit rather than a room — see
 §6's items and B21. Each weapon has its own model, because switching to an
 identical one reads as a key that did nothing. The carry-everything stand-in
-(`PlayerState.carrying`) is still what `twitch-hud-demo` uses, where showing
+(`PlayerState.carrying`) is still what `twig-bb-hud` uses, where showing
 every slot is the point.
 
 **Completed 2026-07-29.** The remaining three pieces landed together: the whole
@@ -213,7 +213,7 @@ once the wait is over (B24). Hit feedback landed with §7.
 
 The art is a stand-in: 3dmodelscc0's CC0 firearms pack is the wanted upgrade,
 and what it takes to land it is recorded in
-[twitchoglc/assets/weapons/CREDITS.md](twitchoglc/assets/weapons/CREDITS.md).
+[twig_bb/assets/weapons/CREDITS.md](twig_bb/assets/weapons/CREDITS.md).
 
 **The structural point.** A HUD is *not* an overlay in the existing sense. The overlay
 stack is modal — while a panel is up, nothing reaches the map, which is exactly right
@@ -228,7 +228,7 @@ never blocks the map.
   primitive with the standard shapes and a configurable gap/thickness/colour, a bar
   meter, an icon-plus-number readout, and a transient message queue that fades. All
   drawn with the existing batched quad/glyph renderer.
-- `twitchoglc.hud` (here, because these are this game's numbers): the arrangement, what
+- `twig_bb.hud` (here, because these are this game's numbers): the arrangement, what
   each field means, and the colour thresholds — health low, armour type, ammo critical.
 - The reticule is a **weapon property**, not a global: each weapon in §7 names its
   crosshair and its spread, and a weapon whose spread grows while firing shows it.
@@ -275,12 +275,12 @@ engine (`OpenGLContext.audio`), plus
 **The map's ambience landed 2026-07-28, and the phase is closed.**
 [`SPEC-Q3ENTITIES`](specs/SPEC-Q3ENTITIES.md) was written first, measured from
 the shipped content, with a marker legend so `[OBSERVED]`, `[DERIVED]`,
-`[CHOICE]` and `[UNKNOWN]` are told apart; `twitchoglc.sounds` resolves a
-`noise` and `twitchoglc.speakers` places the emitters. **352 of the 381
+`[CHOICE]` and `[UNKNOWN]` are told apart; `twig_bb.sounds` resolves a
+`noise` and `twig_bb.speakers` places the emitters. **352 of the 381
 speakers across the 50 levels now sound**; the other 29 are the 28 triggered
 ones (§1.6, deliberately left out) and one lava hum absent from the content.
 The search machinery came out of `materials.py` into
-`twitchoglc.contentsearch`, shared by textures and sounds — and writing its
+`twig_bb.contentsearch`, shared by textures and sounds — and writing its
 tests found a **path-escape**: the case-insensitive retry walked the tree
 segment by segment and so climbed out of the content root by a route the join's
 check never saw. That is fixed, and it reached textures too.
@@ -431,7 +431,7 @@ content immediately rather than being a branch nobody runs.
   the one genuinely unfamiliar spelling — it marks a sound belonging to an entity's
   own model rather than to a path — and a viewer with no models to attach it to
   should skip it rather than guess.
-- `twitchoglc.speakers`: each entity becomes an `AudioEmitter` node under a
+- `twig_bb.speakers`: each entity becomes an `AudioEmitter` node under a
   `Transform` at its origin, with `loop` from `spawnflags` and a looping falloff
   chosen for ambience. That is the whole of the wiring; the engine needs nothing
   else. A `noise` that does not resolve is a silence and a warning, never a
@@ -534,7 +534,7 @@ everything runs on for most of this plan's life, so it gets designed, not tolera
   cost is the clip set, and a library that already carries idle/walk/run/jump/fire/pain/
   death is the thing that turns this phase into a control layer. Being CC0 they may be
   **committed** rather than fetched, on the same rule as the weapon art
-  ([assets/weapons/CREDITS.md](twitchoglc/assets/weapons/CREDITS.md)) — and, like every
+  ([assets/weapons/CREDITS.md](twig_bb/assets/weapons/CREDITS.md)) — and, like every
   other piece of geometry here, credited with a link to the author's page whether or not
   the licence demands it.
   **Practical note:** both Quaternius and itch.io serve their downloads through a
@@ -567,7 +567,7 @@ with no phase depending on it.
 
 **Build.**
 
-- `twitchoglc.characters`: a character is a scenegraph subtree plus a
+- `twig_bb.characters`: a character is a scenegraph subtree plus a
   `CharacterController` capsule plus an animation state machine. The state machine —
   idle / walk / run / jump / land / fire / pain / death, driven by the controller's own
   velocity and ground state — is the part that is genuinely shared between the player
@@ -602,7 +602,7 @@ about and a wrong hit point would be blamed on the weapon. A level's triangles
 are transformed once and kept, which took a cast on `oa_dm1` from 1.9 ms to
 0.69 ms.
 
-`twitchoglc.bots` is the mind. **A bot emits the same per-tick command record a
+`twig_bb.bots` is the mind. **A bot emits the same per-tick command record a
 key press does and writes nothing**, which is §11's first seam and is what lets
 a whole fight be run in a test. The difficulty is a declared node with typed
 fields, and the range is the axis the bot is built along: near-passive walks
@@ -616,7 +616,7 @@ it was achieved. Measured over four 45-second matches per pairing: nightmare
 beat easy 64–0, hard beat medium 41–6, medium beat easy 8–0, and medium against
 medium was 8–7.
 
-**Bots walk in the player's own capsule (2026-07-29).** `twitchoglc.walkers`
+**Bots walk in the player's own capsule (2026-07-29).** `twig_bb.walkers`
 gives each of them a `CharacterController` with the same proportions, step
 height, slopes, ground snap and impulse the player has, at a slower pace — so
 anywhere a player can go a bot can follow, a bot slides along a wall it meets at
@@ -624,7 +624,7 @@ an angle instead of stopping dead, and a burst throws one upward as well as
 sideways. Before that a bot was a position with one ray probe ahead of it, which
 is what B18's vibrating and sinking was.
 
-**Items landed with it (2026-07-29).** `twitchoglc.items` reads what a map
+**Items landed with it (2026-07-29).** `twig_bb.items` reads what a map
 places and hands it out; see B21 and `SPEC-Q3ENTITIES §3`. A bot picks things up
 exactly as a player does, because a circuit that existed for only one of the
 people in a level would not be a circuit.
@@ -660,7 +660,7 @@ dependency on content we may not read.
     local steering and dynamic avoidance so two bots in a corridor do not grind.
   - **Off-mesh links**: a jump pad is an edge in the graph whose traversal is "stand
     here and be launched", and the arc is already solved by
-    [twitchoglc/jumppads.py](twitchoglc/jumppads.py) per
+    [twig_bb/jumppads.py](twig_bb/jumppads.py) per
     [SPEC-Q3PUSH](specs/SPEC-Q3PUSH.md). Teleporters and jumpable gaps are the same
     idea. This is where a navmesh earns its keep on these maps; a mesh that stops at
     the edge of a jump pad describes a game nobody plays.
@@ -670,7 +670,7 @@ dependency on content we may not read.
   physics layer, over the existing broadphase tree: ray-vs-AABB down the tree, then
   ray-vs-triangle in the leaves. It also retires the five-ray AABB approximation the
   character controller's void check currently uses.
-- `twitchoglc.bots` (here — this *is* the game): perception (what a bot can see, gated
+- `twig_bb.bots` (here — this *is* the game): perception (what a bot can see, gated
   by the ray cast and a field of view), a behaviour tree or utility selector over the
   goals an arena bot has (fight, take cover, get the item, get the weapon, patrol), and
   aim with human-plausible error and reaction time. Bot personalities are **our own
@@ -746,7 +746,7 @@ direct hit costs and at less than a life it was not worth aiming. Death takes
 the camera and the trigger is what ends it (B24), because a countdown that
 returns a player while they are reading the scoreboard puts them somewhere they
 were not looking. And the frame loop grew a **testable seam**:
-`twitchoglc.rules.Rules` is everything that *happens* in a tick, so it can be
+`twig_bb.rules.Rules` is everything that *happens* in a tick, so it can be
 played out against a constructed world with no window — the two worst bugs this
 game has had were both a line inside `OnDraw` that no test could reach, and
 everything added since is above that line.
@@ -755,7 +755,7 @@ everything added since is above that line.
 world (an empty `target`, documented rather than conventional) and carries the
 `SurfaceStyle` it met. Getting that surface needed a fact the physics world was
 throwing away: `omi_physics.raycast.RayHit` now reports **which triangle** of a
-trimesh it struck, and `twitchoglc.collision.MapCollision` pairs the map's
+trimesh it struck, and `twig_bb.collision.MapCollision` pairs the map's
 collision mesh with a `SurfaceIndex` built from the same batches in the same
 order — a mesh and an index that could be handed around separately would one day
 describe different maps.
@@ -763,7 +763,7 @@ describe different maps.
 **Two new events, and one loop that reads them.** `Fired` (who, what, from
 where, along what) and `Impact` (where, the normal, the surface, whether it met
 a person) join `Damaged`/`Death`/`MatchOver` on `Arena.drain()`, emitted for
-bots exactly as for the player. `twitchoglc.feedback.Presenter` is the single
+bots exactly as for the player. `twig_bb.feedback.Presenter` is the single
 reader, and it fans out to the HUD, the sounds and the effects — so a bot's shot
 and the player's reach the screen by one road and nothing in the rules can reach
 a widget. A test parses `arena` and `combat` for an import of the presentation
@@ -787,17 +787,17 @@ apart with the eyes shut, since they answer three different questions. A burst
 is placed even when it is the player's own, unlike their weapon: a burst
 happens *somewhere*, and that is the whole of what anybody needs to know. Every voice is
 **synthesised** through `omi_audio.synth` from numbers declared in
-`twitchoglc.combatsound`, so the game ships with a full complement of sound and
+`twig_bb.combatsound`, so the game ships with a full complement of sound and
 no audio files and nothing to check under CLEAN-ROOM; a voice may name a file
 instead, which is how commissioned content replaces a stand-in. The player's own
 weapon is non-positional and everybody else's is placed at the muzzle.
 
-**Projectiles, and what they cost.** `twitchoglc.projectiles` steps everything
+**Projectiles, and what they cost.** `twig_bb.projectiles` steps everything
 in flight as numpy arrays, **swept** through `raycast` each tick so nothing
 tunnels; a rocket and a grenade differ in three declared numbers (gravity,
 bounce, fuse) and in no code. Measured at ~30&nbsp;µs per projectile per tick:
 0.5&nbsp;ms for the sixteen a busy match holds, 9&nbsp;ms for three hundred.
-`twitchoglc.blast` answers each detonation — falloff by a declared curve, cover
+`twig_bb.blast` answers each detonation — falloff by a declared curve, cover
 through a ray cast, the candidate set bounded by distance *first* (B11) — and
 leaves an unspent impulse on the combatant. The player's goes into the character
 controller's own `apply_impulse`, the same one a jump pad uses, which is what
@@ -885,7 +885,7 @@ direction).
 What follows is the plan as it was written, kept because it is the argument for
 the ordering and the ordering is the part that was load-bearing.
 
-**Hitscan, damage and scoring play (2026-07-28).** `twitchoglc.combat` is what a
+**Hitscan, damage and scoring play (2026-07-28).** `twig_bb.combat` is what a
 shot *does*: a trace per pellet, scattered over the spherical cap of the
 weapon's own cone — the same number the reticule is drawn from, so a shot
 scatters exactly as widely as the crosshair says — seeded, so a shot is
@@ -893,7 +893,7 @@ reproducible from its inputs. Combatants are staged into the physics world as
 **capsules**, the same shape the character controller walks in, so what can be
 hit is what can walk and there is no second idea of where somebody is.
 
-`twitchoglc.arena` is the match: id-addressed combatants, armour before health,
+`twig_bb.arena` is the match: id-addressed combatants, armour before health,
 deaths, respawns, frags (and a frag *off* for killing yourself or falling in
 the lava, since otherwise the fastest route to the top of the scoreboard is the
 lava), a scoreboard and the two limits that end it. It emits `Damaged`, `Death`
@@ -1153,7 +1153,7 @@ on deliberately:
 
 **Build.**
 
-- `twitchoglc.weapons`: a declared table — fire rate, spread, damage, splash radius and
+- `twig_bb.weapons`: a declared table — fire rate, spread, damage, splash radius and
   falloff, projectile speed, ammo type and cost, knockback, reticule, model, sounds.
   Declared as nodes with typed fields, like the movement modes, so the settings and
   binding screens can present them and a variant can retune the game by setting fields
@@ -1208,8 +1208,8 @@ a demo and 71 tests; see
 [../openglcontext/plans/PARTICLE-EFFECTS.md](../openglcontext/plans/PARTICLE-EFFECTS.md).
 On this side, the animation directives are **specified, parsed, carried and
 drawn**: `SPEC-Q3SHADER §2.4` was added from the same published manual,
-`twitchoglc.surfaceanim` evaluates every form as a pure function of scene time,
-`SurfaceStyle.animation` carries it, and `twitchoglc.animator` applies it — the
+`twig_bb.surfaceanim` evaluates every form as a pure function of scene time,
+`SurfaceStyle.animation` carries it, and `twig_bb.animator` applies it — the
 affine `tcMod`s onto the material's `uv_transform` (one uniform), `rgbGen`
 onto its base colour, `alphaGen` onto its opacity, `animMap` onto its texture,
 and `deformVertexes`/`tcMod turb` onto the vertices through a new
@@ -1234,7 +1234,7 @@ walking's collision and a vertical that is neither. A swim built on noclip let
 a player leave a pool through its wall, and one at falling speed made a pool
 read as a hole in the floor.
 
-Here: `twitchoglc.underwater` (the three liquids' colours, ranges and muffles —
+Here: `twig_bb.underwater` (the three liquids' colours, ranges and muffles —
 this game's numbers, since no specification says how far you can see through
 slime), and `LiquidVolume` gained its **kind**, because a volume that knows only
 that it is "a liquid" cannot tint the view its own colour and will not be able
@@ -1245,10 +1245,10 @@ in the other. Liquid **damage** landed with §7: see `liquids.LiquidHarm`.
 
 **Most of the work was parsed and thrown away.** `.shader` scripts are read
 today, and the material-animation directives were recognised and skipped
-([twitchoglc/q3shader.py:269](twitchoglc/q3shader.py#L269),
-[twitchoglc/q3shader.py:314](twitchoglc/q3shader.py#L314)); `SurfaceStyle` already
+([twig_bb/q3shader.py:269](twig_bb/q3shader.py#L269),
+[twig_bb/q3shader.py:314](twig_bb/q3shader.py#L314)); `SurfaceStyle` already
 carries `scrolling` and `warping` flags with nothing behind them
-([twitchoglc/surfaces.py:71](twitchoglc/surfaces.py#L71)). The facts are in
+([twig_bb/surfaces.py:71](twig_bb/surfaces.py#L71)). The facts are in
 [SPEC-Q3SHADER](specs/SPEC-Q3SHADER.md), from the published shader manual — a permitted
 source, so where the spec is thin the answer is a spec revision from that same manual,
 not a look at an engine.
@@ -1263,7 +1263,7 @@ not a look at an engine.
 - All of it driven by one scene time uniform so surfaces animate in step, and all of it
   switchable from the F10 settings screen, like every other renderer decision.
 - **Water as a volume, not just a surface.** The liquid volumes are already known
-  ([twitchoglc/liquids.py](twitchoglc/liquids.py)): being under one should tint and fog
+  ([twig_bb/liquids.py](twig_bb/liquids.py)): being under one should tint and fog
   the view, and — with §4 — muffle sound. This is a small change with a large effect on
   whether a map feels like a place.
 - **Fire as an effect, not only a surface.** Explosions, rocket trails and sparks want a
@@ -1297,7 +1297,7 @@ recorded in [specs/README.md](specs/README.md).
 ### §9 — Content catalogue, downloads and the start screen ✅
 
 **What has landed (2026-07-28).** The catalogue is a **data file**
-(`twitchoglc/packs.json`) read by `twitchoglc.catalog`, so a pack can be added,
+(`twig_bb/packs.json`) read by `twig_bb.catalog`, so a pack can be added,
 its size corrected or its URL moved without touching Python — and validation is
 strict, because an entry with a mistyped key would otherwise be accepted and
 ignored for ever. `openarena-oacmp1` is registered (measured: 59 MB, and the
@@ -1307,14 +1307,14 @@ Debian tarball is `.tar.xz`, which the reader detects for itself).
 `resolver.fetch_to_cache` read the *whole* body in one call, so a 450 MB pack
 was 450 MB of process memory before a byte reached the disk, reported nothing
 while it happened, and could not be stopped. It now streams in chunks with
-`progress` and `cancel` callbacks, and `twitchoglc.fetcher` runs that on a
+`progress` and `cancel` callbacks, and `twig_bb.fetcher` runs that on a
 worker the frame loop **polls** — one bar for the whole job, weighted by the
 sizes the user was shown, because a bar that fills and resets per pack reads as
 three failures.
 
-`twitchoglc.match` is the match a player chooses (a declared node: level, bots,
+`twig_bb.match` is the match a player chooses (a declared node: level, bots,
 difficulty, limits; saved and read back, and a difficulty a later version stops
-declaring is dropped rather than poisoning the file). `twitchoglc.menu` is the
+declaring is dropped rather than poisoning the file). `twig_bb.menu` is the
 screens — main menu, play (editing a **draft**, so Cancel is real), download
 consent with the size and licence *on the screen that asks*, and a progress
 screen with a Stop.
@@ -1340,7 +1340,7 @@ What follows is the design as it was written.
 a screen that offers what can be played, fetches what is missing, and starts a match.
 
 **What exists.** Four asset packs with sizes, licences, companions and consent rules
-([twitchoglc/download.py:80](twitchoglc/download.py#L80)), a two-consent policy that is
+([twig_bb/download.py:80](twig_bb/download.py#L80)), a two-consent policy that is
 already correct, and per-user unpacking. What is missing is breadth, a way to *see* the
 choice, and a download that does not block the window.
 
@@ -1398,14 +1398,50 @@ documented.
 
 ### §10 — Acknowledgements ✅
 
-**Shipped 2026-07-28.** `twitchoglc.notices`, and it is built the way the plan
+**Shipped 2026-07-28.** `twig_bb.notices`, and it is built the way the plan
 asked: **the content half is generated** from the catalogue's own `copyright`
 field, so a pack added to `packs.json` is credited without anyone remembering —
 the whole reason that field is mandatory — and **the code half is checked**,
 with a test comparing `NOTICES.md` against what `pyproject.toml` declares, so a
 dependency added and not acknowledged fails the suite rather than shipping
 unattributed. The provenance statement is in there too. Printable with
-`python -m twitchoglc.notices`, and `--check` is the gate.
+`python -m twig_bb.notices`, and `--check` is the gate.
+
+**The other half, shipped 2026-08-03: crediting the world you are standing in.**
+`twig_bb.mapnotice` establishes what a running map is from three sources, none of
+which is required for the others to work — the **title and author** from the
+map's own `worldspawn` `message`, which is where a mapper signs the work and is
+inside the `.bsp` so it survives repacking; the **terms** from the catalogue
+entry for the pack whose directory the file sits under, matched by path
+component so `openarena-maps-old` is not taken for a child of
+`openarena-maps`; and the **licence documents** a release ships, found at the
+pack root and one level down (a release states its terms above the paks, while
+a map's content roots start at the pak) and cited by path rather than quoted.
+A map of somebody's own claims no pack's terms and is credited by name alone.
+
+It reaches the player in three places: **on screen as the level loads**, through
+the HUD's message queue; **at the top of the acknowledgements**, before the
+libraries, since a player who opens that screen mid-match is asking about the
+level; and in the **terminal and the overlay's `Map` section**, for a run with
+no window and for checking what a recording may be published under. Two
+findings paid for by drawing it rather than asserting it: the HUD's font has no
+glyph for an em dash and drew one as `?`, so the on-screen form is ASCII, and
+the message queue never wraps, so a long licence ran off the screen — it is now
+**wrapped, never shortened**, because a truncated licence states weaker terms
+than the content carries.
+
+**What a map *is* and what it is *drawn with* are two statements, not one.** A
+level resolves its textures against packs it did not come from, and every one of
+those roots is on its list and ships a `COPYING` of its own — so the first cut
+cited the replacement-texture licence under a heading reading *its own terms*,
+which misstates what the level is under. Documents now come from the map's own
+pack alone (or, for a map of your own, its roots minus any inside a catalogued
+pack), and the borrowed packs are listed under **Drawn with content from**. The
+distinction is not cosmetic: the Quake 3 replacement textures are CC BY-NC-ND
+while the maps are CC BY-SA, and somebody publishing a recording needs the
+stricter of the two stated where they are standing.
+
+**Red/Green TDD: 40 tests**, no GL, plus one against the fetched OpenArena pack.
 
 What follows is the design as it was written.
 
@@ -1429,7 +1465,7 @@ contributions).
   `title`, a `copyright` and a `url`; the screen renders that list, so a pack added in
   §9 appears here automatically and cannot be forgotten. That is the whole reason
   `copyright` is a mandatory field rather than a comment.
-- **The code half from a manifest** — a `NOTICES.md` listing twitch, OpenGLContext,
+- **The code half from a manifest** — a `NOTICES.md` listing twig-bb, OpenGLContext,
   PyOpenGL, pyvrml97, omi_physics, numpy, Pillow, GLFW and whatever §4 adds, each with
   its licence and its home. Checked in, checked against the installed dependency set by
   a test, so a new dependency that is not acknowledged fails the suite rather than
@@ -1467,7 +1503,7 @@ without a window.
 has a piece of code that keeps it, which is the point of having stated them
 early rather than a claim that multiplayer is close. Input is a command
 (`bots.Command`, produced by a bot exactly as a key press produces one). The
-rules are `twitchoglc.rules.Rules`, which takes its seconds as an argument and
+rules are `twig_bb.rules.Rules`, which takes its seconds as an argument and
 reads no clock — a test asserts the module imports neither `time` nor
 `datetime`, and another plays two identical matches out and asserts they end in
 the same places. State is data addressed by id (`Arena` + `PlayerState`). And
@@ -1630,7 +1666,7 @@ iterate on the event table far more than on the files.
 
 **Build.**
 
-- `twitchoglc.sounds`: the event table — a declared node with typed fields, like
+- `twig_bb.sounds`: the event table — a declared node with typed fields, like
   §7's weapon table — mapping an event name to its clip list, gain, priority,
   variation policy and falloff. Because the numbers are ours, the table is the
   design document; it must be readable, carry units, and be retunable without a
@@ -1669,8 +1705,8 @@ session re-runs them in a minute instead of rediscovering them. They are a
 on them, and replace this with §9's proper survey tool when it exists.
 
 Everything below was measured against the fetched OpenArena packs at
-`~/.config/OpenGLContext/twitch-content/` (50 maps: `openarena-data` +
-`openarena-maps` + `openarena-textures`), run from `twitch/` with the workspace
+`~/.config/OpenGLContext/twig-bb-content/` (50 maps: `openarena-data` +
+`openarena-maps` + `openarena-textures`), run from `twig-bb/` with the workspace
 virtualenv.
 
 #### 14.1 File formats, by extension
@@ -1694,7 +1730,7 @@ What each phase takes from that:
 
 ```python
 import collections, os
-root = os.path.expanduser('~/.config/OpenGLContext/twitch-content')
+root = os.path.expanduser('~/.config/OpenGLContext/twig-bb-content')
 counts = collections.Counter()
 for base, _dirs, files in os.walk(root):
     for name in files:
@@ -1736,10 +1772,10 @@ from the first load rather than it being a branch nobody runs.
 ```python
 import collections, glob, os, logging
 logging.disable(logging.WARNING)
-from twitchoglc.viewer import build_parser, load_map
+from twig_bb.viewer import build_parser, load_map
 counts, flags, noises = {}, collections.Counter(), collections.Counter()
 for path in sorted(glob.glob(os.path.expanduser(
-        '~/.config/OpenGLContext/twitch-content/openarena-maps/*/pak1-maps/maps/*.bsp'))):
+        '~/.config/OpenGLContext/twig-bb-content/openarena-maps/*/pak1-maps/maps/*.bsp'))):
     target = 'openarena-maps:%s' % os.path.basename(path)[:-4]
     loaded = load_map(build_parser().parse_args([target]), target)
     found = [e for e in loaded.entities if e.classname == 'target_speaker']
@@ -1788,9 +1824,9 @@ and no vertices.
 ```python
 import glob, os, logging
 logging.disable(logging.WARNING)
-from twitchoglc.viewer import build_parser, load_map
+from twig_bb.viewer import build_parser, load_map
 for path in sorted(glob.glob(os.path.expanduser(
-        '~/.config/OpenGLContext/twitch-content/openarena-maps/*/pak1-maps/maps/*.bsp'))):
+        '~/.config/OpenGLContext/twig-bb-content/openarena-maps/*/pak1-maps/maps/*.bsp'))):
     target = 'openarena-maps:%s' % os.path.basename(path)[:-4]
     loaded = load_map(build_parser().parse_args([target]), target)
     moving = [b for b in loaded.world.batches if b.style.animated and b.style.draw]
@@ -1816,9 +1852,9 @@ import os, sys
 PINNED = 0.0                       # then 1.6
 os.environ.update(OPENGLCONTEXT_BACKEND='glfw', OPENGLCONTEXT_PROFILE='core',
                   OPENGLCONTEXT_AUDIO='0')
-sys.argv = ['twitch-viewer', 'openarena-maps:oa_bases3',
+sys.argv = ['twig-bb', 'openarena-maps:oa_bases3',
             '--capture', '/tmp/t%s.png' % PINNED, '--frames', '10']
-from twitchoglc import viewer
+from twig_bb import viewer
 viewer.CAPTURE_TIME = PINNED
 viewer.main()
 
@@ -1855,10 +1891,10 @@ a memory. A phase's own section has the design; this is the checklist.
 
 | B3 | **Water triggered at ankle depth — fixed.** Standing in shallow water fogged the whole view. The liquid volume was the *BSP leaf's* bound, and a leaf holding a pool reaches as far as the split that made it — up to the ceiling of the room — so the camera was inside the volume long before it was inside the water. Volumes now come from the **brush's own planes** (`SPEC-BSP46 §4.7`, `§4.8`), which is where a liquid states its extent; a brush that is not a box still falls back to the leaf. Across the 50 shipped maps that turned **2713 leaf-boxes into 130 brush-boxes**. |
 | B4 | **Swimming dropped out of mouse-look — fixed.** `SwimMode` steered with `q`/`e` while every other mode steered with the pointer, so entering water took the player's aim away. Mouse-look moved onto `MovementMode` and is shared by both, so a player's sensitivity and inverted-look mean the same thing walking and swimming; `SwimMode` now captures the pointer as well. And **forward means where you are looking**, through a new `PhysicsViewPlatform.set_swim_move` that follows the pitch — a swim that flattened the move to the horizon is walking with the gravity turned off. Strafe stays level, and the dedicated up/down keys remain for holding depth while looking elsewhere. |
-| B5 | **Underwater looked like foggy air — fixed.** The fog is blended in linear HDR *before* tone mapping, so colours that read as a pleasant mid-blue when written down arrive far brighter than a dark level — and a fog that makes distant walls *brighter* is a fog lamp, not a body of water. The water colours are now roughly a sixth of what they were and the range is 9 m rather than 18, so distance swallows a corridor instead of lighting it. Rule of thumb recorded in `twitchoglc/underwater.py`: the fog colour has to sit at or below what the level itself averages. |
+| B5 | **Underwater looked like foggy air — fixed.** The fog is blended in linear HDR *before* tone mapping, so colours that read as a pleasant mid-blue when written down arrive far brighter than a dark level — and a fog that makes distant walls *brighter* is a fog lamp, not a body of water. The water colours are now roughly a sixth of what they were and the range is 9 m rather than 18, so distance swallows a corridor instead of lighting it. Rule of thumb recorded in `twig_bb/underwater.py`: the fog colour has to sit at or below what the level itself averages. |
 | B7 | **Texture animation ran far too fast in `ctf_inyard` — fixed.** The rates were parsed correctly; the wrong *stage* was animated. A Quake 3 material is a stack of stages drawn over one another, and this viewer draws **one** of them — the first with an image of its own (`SPEC-Q3SHADER §2.3.1`). `_claim_stage` gave the material's animation to the first stage that declared any, whichever that was. On the generator's light panels the base image is static and a faint glow scrolls across it on an *additive third stage*, so a layer that is never drawn handed its `tcMod scroll -0.7 0` to the panel and the whole panel raced past at 0.7 texture widths a second. Animation now comes from the stage that is actually drawn, and `ctf_inyard` goes from 6 animated batches to 4. **This is the same defect as B8** — a later stage deciding something only the first stage may decide — and both are worth remembering together when the next stage-derived property is added. The torches were never wrong: `animMap 10` over 8 frames is a 0.8 s cycle, which is what a flame looks like. |
 | B8 | **Whole floors rendered as dark glass — fixed.** Reported on `oa_minia`, `ctf_inyard` and others: opaque concrete showed the room beneath it, and dark-on-dark left the screen unreadable. `_finish` marked a material transparent if **any** stage carried a non-opaque `blendFunc`, but the stages are drawn in order and it is the **first** that decides whether the surface is see-through (`SPEC-Q3SHADER §2.3`) — a lightmap filtered over solid stone is still solid stone. `oa_minia` went from 13 translucent batches to 1, `oa_dm2` from 7 to 4. |
-| B9 | **Choosing bots produced no bots — fixed.** They were built, placed and given bodies, and then stood still for ever, because `TwitchContext.physicsWorld` asked the *view platform* for its world. A platform owns a **character** and the character owns the world, so the answer was always `None` and every caller treated that as "physics is not up yet". Silent by construction: it also disabled the player's own shots and hid the overlay's Physics section, with nothing logged in any of the three cases. Bots' initial spawn height was wrong too — a map's spawn entity marks a player's *eyes*, and the arena addresses everything by its feet, so they hovered a metre up until `game._spawns` subtracted the eye height. |
+| B9 | **Choosing bots produced no bots — fixed.** They were built, placed and given bodies, and then stood still for ever, because `TwigContext.physicsWorld` asked the *view platform* for its world. A platform owns a **character** and the character owns the world, so the answer was always `None` and every caller treated that as "physics is not up yet". Silent by construction: it also disabled the player's own shots and hid the overlay's Physics section, with nothing logged in any of the three cases. Bots' initial spawn height was wrong too — a map's spawn entity marks a player's *eyes*, and the arena addresses everything by its feet, so they hovered a metre up until `game._spawns` subtracted the eye height. |
 | B10 | **A single bot cost most of the frame budget — fixed, 34x.** Reported as "30 fps max and stuttery physics" as soon as B9 let the bots start thinking. Measured at **8.95 ms per tick for one bot** on `ctf_inyard`, which is over half a 60 Hz frame for one opponent. The bots were not doing anything extravagant — a bot casts twice a tick, once for line of sight and once to probe the step ahead — but **`raycast` had no spatial index**. It narrowed by testing every triangle's bounding box in one vectorised sweep, which is O(T) and at 66,596 triangles is ~4 ms of numpy per cast however short the ray. `omi_physics.body` had had a uniform grid for exactly this reason since the character controller needed one; the ray path simply never used it, and a grid asked for a *box* would not have helped anyway — a cast across a level has a bounding box containing the level. So the grid moved into `omi_physics/trigrid.py`, shared by both callers, and grew a second way to ask: walk the cells the ray actually enters, in order, and stop at its limit. That took one bot to 0.39 ms. The cost then moved to Moller-Trumbore running in a Python loop with two `numpy.cross` calls per triangle, where numpy's fixed per-operation cost dwarfs arithmetic on three numbers; solving the whole candidate set at once took it to **0.26 ms**. |
 | B11 | **Bot perception was O(n-squared) — fixed 2026-07-29, and it is now bounded by the interval rather than the count.** Every bot asked line of sight of every other combatant every tick: 0.26 ms at 1 bot, 3.07 ms at 4 and **17.6 ms at 8**, past a frame at a menu that offers 15. `Bot.look` now re-perceives at most every `PERCEPTION_INTERVAL` (0.1 s), and each bot's first look is offset by a seeded phase so a room of them never look on the same frame. **The saving is in how often, not in how much**: `perceive` is unchanged, so no difficulty sees less than any other. It is invisible because 0.1 s is shorter than the fastest `reactionTime` on the ladder (0.15 s) — a bot answers a sighting no sooner than that, so delaying the sighting itself by less changes nothing a player can feel, and slowing a *sense* far enough to matter would be a difficulty change by the back door. A sighting remembered between looks is filtered for aliveness each tick, which costs no casts and stops a bot emptying a magazine into a corpse. |
 | B12 | **The developer overlay recomputed the map's texture report every frame — fixed.** `missing_textures()` resolves every name the map draws against the content tree: 0.88 ms on `ctf_inyard`, spent 60 times a second on an answer that cannot change while a map is loaded. Now a `cached_property` on `LoadedMap`. Only paid with the overlay open, which is why it was not part of B10. |
@@ -1870,17 +1906,28 @@ a memory. A phase's own section has the design; this is the checklist.
 | ~~B8~~ | ~~**Solid surfaces are drawn half-transparent.**~~ **Fixed — and it was not `surfaceparm trans` at all.** Reported three times: "dark glass on dark glass" in `ctf_inyard`, a screenshot of `oa_dm2` with the lava trench showing through the floor, and `oa_minia`'s concrete floor. **The reader was deciding transparency from *any* stage's `blendFunc`.** `SPEC-Q3SHADER §2.3`: a material draws its stages in order, each over the one before, so whether the *surface* is see-through is decided by the **first**. `textures/proto2/marble02b_floor` — a real floor from the shipped content — has an opaque first stage and then three blended ones: an environment reflection, an additive pass and the `$lightmap`. Reading those as transparency made every lit floor in the game a sheet of glass, and it also dropped the lightmap (`§2.3.2` disables lightmapping on a transparent surface), so the floors went flat as well as see-through. Now only the first stage decides. Measured: `oa_minia` **13 → 1** translucent batches (a light beam), `oa_dm2` **7 → 4** (an invisible surface, an edge, water, lava), `ctf_inyard`'s remaining six are fog clouds, a flame and decals. Five tests, including the real four-stage floor. |
 | ~~B8b~~ | ~~Superseded — the `surfaceparm trans` theory below was wrong.~~ Kept as a note: `trans` is still read as transparency in `_surfaceparm`, which is *probably* also wrong (it reads as a compiler hint about light rather than a render instruction) but no longer causes a visible defect, and changing it wants a spec revision first. **Old text:** Reported twice: "dark glass on dark glass" in `ctf_inyard`, and a screenshot of `oa_dm2` where the lava trench and stairs *below the floor* show straight through it. **Measured: 7 of `oa_dm2`'s 20 drawn batches are at opacity 0.50, and one of them is `textures/proto2/marble02b_floor` — a floor.** The cause is in `q3shader._surfaceparm`: `surfaceparm trans` sets `material.transparent`, which `Material.style()` turns into a flat `TRANSLUCENT_OPACITY` of 0.5. **`surfaceparm trans` is almost certainly not a render instruction.** In this engine family it is a hint to the *compiler* — this surface lets light through, so trace lighting past it — while whether a surface is see-through at run time is decided by its stage's `blendFunc`. Reading it as "draw at half alpha" makes every floor a sheet of glass, and several stacked multiply down to the dark picture that was reported. **Do the spec first**: `SPEC-Q3SHADER §2.2` covers the surfaceparms and §E covers the stage keywords, and this needs a revision from the same published manual stating what `trans` governs before the code changes — the fix is then to take opacity from `blendFunc` and leave `trans` to the lightmap, with a test that a floor with `surfaceparm trans` and no blended stage comes out opaque. |
 | B6 | **The overlay's fps and frame time jumped about — fixed.** `format_value` dropped trailing zeros, which is right for a position and wrong for a number that updates sixty times a second: 60, 59.97 and 60.1 are three different widths in three consecutive frames. `debugoverlay.Fixed` keeps its decimals whatever the value, and the two frame rows use it. |
-| B18 | **Bots stuck in walls, floors and stairs, then vibrating and sinking through — fixed 2026-07-29, and there were two faults.** A bot was a *position* with one ray cast ahead of it, which is not a body: a probe is a line and a level is not, so it walked into corners the line missed, and nothing held it down. And it was published **inside the floor**: `game._spawns` dropped a spawn entity's origin by the *eye* height where the spawn convention lifts it by 0.61 m, so every bot started 0.56 m buried and nothing was trying to dig it out because nothing tested it against the geometry at all. Both are fixed at the source. `twitchoglc.avatar` states the body's size and the spawn lift **once**, and the camera's spawn and the arena's now go through the same correction — they had drifted, and the *shot* capsule and the *walking* capsule had drifted apart by forty centimetres besides. `twitchoglc.walkers` gives every bot the player's own `CharacterController`: same capsule, same move-and-slide, same step height, same ground snap, same impulse for knockback (so a burst now throws a bot upward as well as sideways). A bot placed inside geometry is bound from a step height above and dropped onto the floor, and one buried deeper falls, which the kill floor (B28) turns into a respawn. |
+| B18 | **Bots stuck in walls, floors and stairs, then vibrating and sinking through — fixed 2026-07-29, and there were two faults.** A bot was a *position* with one ray cast ahead of it, which is not a body: a probe is a line and a level is not, so it walked into corners the line missed, and nothing held it down. And it was published **inside the floor**: `game._spawns` dropped a spawn entity's origin by the *eye* height where the spawn convention lifts it by 0.61 m, so every bot started 0.56 m buried and nothing was trying to dig it out because nothing tested it against the geometry at all. Both are fixed at the source. `twig_bb.avatar` states the body's size and the spawn lift **once**, and the camera's spawn and the arena's now go through the same correction — they had drifted, and the *shot* capsule and the *walking* capsule had drifted apart by forty centimetres besides. `twig_bb.walkers` gives every bot the player's own `CharacterController`: same capsule, same move-and-slide, same step height, same ground snap, same impulse for knockback (so a burst now throws a bot upward as well as sideways). A bot placed inside geometry is bound from a step height above and dropped onto the floor, and one buried deeper falls, which the kill floor (B28) turns into a respawn. |
 | B19 | **The pistol taking 30+ hits to kill a bot — measured 2026-07-29, and the table was right.** Pinned by `TestHowManyHitsAKillTakes`: every weapon kills a fresh unarmoured target in exactly the number of hits its own numbers say (pistol 7, rifle 13) at 3, 6, 12 and 25 metres, and an aimed trace lands at every range out to 60. So the hits were not being lost and retuning `damage` would have buried whichever thing was. Two changes made it *play* as the arithmetic says: the aim bug (fixed 2026-07-29) was sending shots away from the crosshair, and the shootable capsule was 1.42 m tall where the drawn body was 1.8 (see B18), which is a third of the target missing. What remains is the cone: at 25 m a sustained pistol burst opens to about 1.3° and the crosshair shows it, so misses at range are the weapon's declared spread doing its job. |
 | B20 | **A grenade head-on not killing — fixed 2026-07-29.** The contact path was already right (`Projectiles._advance` detonates on a body rather than bouncing) and the *burst* was the part that did not arrive: `blast.burst` deliberately leaves whoever was struck head-on out of the splash, so a direct hit is one hit with one number behind it — and that number was 40 for a grenade and 90 for a rocket, neither of them a life. So a grenade square in somebody's chest left them walking, which is the one outcome nobody watching it would accept. Both direct-hit numbers are now 110: lethal against a full, unarmoured target, and armour still saves you, which is what makes armour worth the detour. Pinned at 1 m (inside the arming distance, where a projectile still ignores its thrower) and at 5 m. |
-| B21 | **No pickups — built 2026-07-29 (with T4).** `twitchoglc.items` reads the `item_*`, `weapon_*` and `ammo_*` entities a map places, and `Pickups` hands them out to anybody who walks through one. What each is worth *here* is a declared `ItemKind` table joined to the map by classname, so the amounts are tunable without touching the reader; several fields may be set at once, which is how a weapon pickup arrives with ammunition in it and why nothing branches on a *type*. An item nobody can use stays on the floor, one that is taken comes back after its own interval (`wait` overrides it), and a classname nothing declares is skipped and **counted** — reported on the load line and in the overlay, because a level whose weapon circuit is all content nobody has plays exactly like a reader that failed. `PlayerState.starting` replaces `carrying` in the viewer, `startingAmmo` is finally read, and a respawn restores the starting loadout rather than everything, which is what makes the circuit matter. Provenance: `SPEC-Q3ENTITIES §3`, measured from the entity lumps of 67 shipped maps. |
+| B33 | **A weapon walked over joined the bar but not the hand — fixed 2026-08-03.** Picking a weapon up is the pickup a player most wants to feel, and it changed nothing they could see: the number key became a step to remember mid-fight. `PlayerState.prefer` now puts a newly-taken weapon in hand when it beats what is held, `slot` order deciding — the same order the number keys and the bar use, so what counts as an upgrade is a property of the table a designer edits rather than a rule in the rules. **Better only:** being put on a pistol because you crossed the square it was lying on loses a firefight, so a weapon the hand already beats is taken and stowed. An empty hand takes whatever arrives; one already held is a pickup for its ammunition and does not disturb the hand. The table reaches the collection loop through `Pickups.advance(arena, dt, table)`, optional because ordering is the only thing it is for. Red/Green: 7 tests on the rule, 3 more holding the invariant the report actually named — **the model drawn is the weapon held**, over every weapon in the table, over a pickup, and never more than one at a time. Verified by walking onto a launcher in the real game. |
+| B32 | **The weapon on screen was not the weapon in hand — fixed 2026-08-03.** Reported as "the 5 weapons are all drawn with exactly the same (pistol) geometry". Two faults, one on top of the other, and both invisible to every test and capture taken until then because each was only reachable by switching weapon **at runtime** — spawning holding one works, since the scene is integrated after the hand is filled, which is why every `--weapon` capture looked right.
+
+**One: the swap was never announced.** `FlatPass` walks the scenegraph once (`SGObserver`) and thereafter keeps its renderable paths current from the add/remove signals a node's `children` list sends. `WeaponHand.select` rebound the whole list — `self.group.children = [holder]` — which puts a *new* list on the field instead of mutating the observed one, so nothing was sent and the pass went on drawing the path it last integrated. The scenegraph was correct throughout, which is what made it read as a rendering mystery. Replacing in place (`children[:] = [...]`) sends `new` and `del`.
+
+**Two: the weapon put away was never removed.** With the signals flowing, every weapon ever held stayed in the draw set — five switches took it from 8 paths to 34, and on screen a sniper rifle and a rifle overlapped in one hand. `SGObserver.onChildRemove` invalidates the detached path, and `NodePath.invalidate` marks "this path and all children" through `iterdescendents` — which, against its own docstring, walked **children and grandchildren only**. A weapon's renderable paths are seven deep (rig → group → holder → yaw → pitch → roll → Shape), so the Shapes were never marked broken and `purge` kept them. Fixed in pyvrml97: `iterdescendents` now walks every generation, iteratively, since a path is as deep as the content under it. **That repo's own test asserted the two-level behaviour**, fixture and all, so the bug was pinned rather than merely unnoticed; it is corrected alongside, with cases for the full subtree and for leaving siblings alone.
+
+**Scope beyond this project.** `node.children = [...]` is the natural spelling and it silently fails to notify; OpenGLContext trips over it in `physics/debugdraw.py` (new physics proxies), `scenegraph/tilesterrain.py` (streaming tiles) and `bin/gltf_demo.py`. The `invalidate` half is now fixed for every caller. The notification half is still worth fixing where the field is set, so the obvious spelling stops being the broken one.
+
+**Red/Green: 5 tests here** — the two signals, an end-to-end one building a real `FlatPass` over the rig and asserting its path set follows the weapon, and two that hold the draw set to one weapon across a full cycle of the table — **plus 4 in pyvrml97**. Verified by switching at runtime in the real game and looking. OpenGLContext's 4703 unit tests are unmoved by the `invalidate` change. |
+| B22 | **Spawning handed out the whole weapon table — fixed 2026-08-03.** B21 replaced `carrying` with `starting` in the *viewer*, but `Arena.add` builds every combatant's record and still called `carrying`, and `_buildMatch` adopts the arena's record over the one `_buildLoadout` made — so the starting loadout was constructed and then thrown away, for bots as well as for the player. Invisible as a crash and visible as a rule that made no sense: `restore` has always given back the starting loadout, so a **first death silently cost four weapons and never returned them**, and until you died the level's whole weapon circuit was scenery. `add` now hands out `PlayerState.starting`, which is what `restore` gives back — the two were the asymmetry. `carrying` stays for `twig-bb-hud`, where a weapon bar with one weapon on it demonstrates nothing. The test that pinned the old behaviour asserted it with the pre-item rationale in its docstring; it is replaced by one that spawns with the starting loadout and one that holds spawning and respawning to the same answer. Red/Green, and the other 1944 tests were unmoved. |
+| B21 | **No pickups — built 2026-07-29 (with T4).** `twig_bb.items` reads the `item_*`, `weapon_*` and `ammo_*` entities a map places, and `Pickups` hands them out to anybody who walks through one. What each is worth *here* is a declared `ItemKind` table joined to the map by classname, so the amounts are tunable without touching the reader; several fields may be set at once, which is how a weapon pickup arrives with ammunition in it and why nothing branches on a *type*. An item nobody can use stays on the floor, one that is taken comes back after its own interval (`wait` overrides it), and a classname nothing declares is skipped and **counted** — reported on the load line and in the overlay, because a level whose weapon circuit is all content nobody has plays exactly like a reader that failed. `PlayerState.starting` replaces `carrying` in the viewer, `startingAmmo` is finally read, and a respawn restores the starting loadout rather than everything, which is what makes the circuit matter. Provenance: `SPEC-Q3ENTITIES §3`, measured from the entity lumps of 67 shipped maps. |
 | B22 | **Lava barely hurting, and only while moving — fixed 2026-07-29.** The rate was never the problem; **where it sampled** was. `_bite` asked `volumes.kind_at(one.position)` and a combatant's position is their *feet*, and a liquid brush is not solid — falling into a pool takes you through it and on to whatever is underneath, which is commonly a hair below where the brush stops. The feet were then clear of every volume and only a step that bobbed them up a centimetre bit at all, which is exactly what was reported. `LiquidVolumes.kind_along` now tests the whole upright body, and where a body spans several volumes the **worst** wins rather than the innermost — waist-deep in lava under a sheet of water is a death, not a swim. Standing on the rim is still dry: it is the body's axis, not a cylinder around it. |
 | B23 | **Bots spawning in the same places and repeating the same opening — fixed 2026-07-29.** Three separate causes. `game.spawn_for` maximised distance to the nearest living combatant, which is deterministic, so with a stationary player it chose the *same* point every time and a player could wait at the far end of the level and shoot each arrival; it now picks at random among the points within `SPAWN_SPREAD` (0.7) of the best, which keeps the safety property and loses the predictability. `start_match` places each bot by the same rule instead of by index, so two matches on one level do not open identically. And `Bot.reset` no longer leaves every fresh mind in one state: which way it faces on arrival and how long before it first commits are spread from its own seed. `_wander` was redrawing its heading **every tick** — its own docstring said it held one — which is not wandering but shaking, and is also the worst possible input to a capsule sliding along a wall; it now holds one for about `WANDER_INTERVAL`, spread, so a room of bots does not turn in unison. |
-| B24 | **Dying kept the camera where it stood and respawned on a timer — fixed 2026-07-29.** The camera was the piece of a death with no owner: the view stayed exactly where it was killed, still steered by the mouse and still walked about by the keys, which reads as the death *notice* being wrong rather than as a death. `twitchoglc.deathcam` takes the view: it falls to near the floor over half a second, eased, and turns to look at whoever did it — the one thing a player wants in that second and cannot otherwise get — with a red `ScreenWash` coming up on the same movement. Nothing to blame (the lava, a fall) keeps the heading it died on, which is honest. **And the trigger ends it**: `Rules.on_request` holds the player back until they ask, so the respawn timer is the *shortest* a death may be rather than the trigger for its end; the notice stops counting and says `Fire to respawn`. A request made early is remembered rather than swallowed. Bots still come back on the timer — nobody is waiting for them to press a key. |
+| B24 | **Dying kept the camera where it stood and respawned on a timer — fixed 2026-07-29.** The camera was the piece of a death with no owner: the view stayed exactly where it was killed, still steered by the mouse and still walked about by the keys, which reads as the death *notice* being wrong rather than as a death. `twig_bb.deathcam` takes the view: it falls to near the floor over half a second, eased, and turns to look at whoever did it — the one thing a player wants in that second and cannot otherwise get — with a red `ScreenWash` coming up on the same movement. Nothing to blame (the lava, a fall) keeps the heading it died on, which is honest. **And the trigger ends it**: `Rules.on_request` holds the player back until they ask, so the respawn timer is the *shortest* a death may be rather than the trigger for its end; the notice stops counting and says `Fire to respawn`. A request made early is remembered rather than swallowed. Bots still come back on the timer — nobody is waiting for them to press a key. |
 | B25 | **Nothing said who you are looking at — half fixed 2026-07-29.** `combat.who_is_at` asks the *same trace a shot takes*, against the same staged bodies, and the HUD names the answer just below the reticule. Same trace on purpose: a name over somebody a shot would miss is worse than no name, and a wall answering nobody is also what stops it finding people through geometry. Asking damages nothing and puts nothing on the event stream, which matters because it is asked every frame. **The world-space plate is not built**, and the reason is upstream: `OpenGLContext.scenegraph.billboard.Billboard` says of itself that it is a stub and its `transform` does nothing, so a plate over each body needs billboarding implemented in the engine first. Worth deciding at the same time whether names should be visible through walls — always-on ones give positions away and change how the game plays, which is why the readout is deliberately reticule-gated. |
 | B26 | **A bot firing grenades at a target it cannot possibly reach — fixed 2026-07-29.** `SkillSet._usable` asked only whether the target was *far enough away* not to blow the bot up, with no upper bound at all, and the grenade's splash is the bigger one so `_worth` preferred it at every range there is. `bots.reach` bounds it from the projectile's own numbers: it stops existing (a fuse, a lifetime) and it falls, and since nothing lofts a shot it is `g t^2 / 2` below the line by the time it arrives — past a body's height of drop it is landing in the floor short of them. The grenade comes out at about 8 m and the rocket, which does not fall, at its lifetime. `reach` is pinned against the **flight itself** rather than against a closed form, so the rule and the simulation cannot drift apart. |
 | B27 | **Shoot-to-trigger doors do not react — open, and the last of the reported defects.** There is **no trigger system at all**: `func_door`, `func_button` and the `target`/`targetname` links are not read, and a shot that meets that geometry is an ordinary world impact. This is the same missing machinery that blocks T8 (a map's triggered speakers) and the `targetname` a handful of pickups carry (`SPEC-Q3ENTITIES §3.7.4`), so all three should be planned together. **Where to start:** the entity facts go in `SPEC-Q3ENTITIES` beside §3's pickups — which classnames respond to damage, how `targetname` links a trigger to what it moves, and the movement a door declares — before any code, and the same way §3 was done: by reading the entity lumps of the shipped maps rather than anybody's source. |
-| B28 | **Falling off the edge fell for ever — fixed 2026-07-29.** `twitchoglc.falling.KillFloor` sits a hundred metres below the map's own bounds and ends anything that passes it, with a named cause the death notice phrases (`fell out of the world`). It is a **kill** rather than a very large amount of damage — `Arena.kill` is its own verb — because armour is for being shot and the bottom of the world is not a hit, and expressing it as damage would leave somebody with enough armour surviving it. It applies to bots too, which also bounds what a bot walking through geometry can do to itself. |
+| B28 | **Falling off the edge fell for ever — fixed 2026-07-29.** `twig_bb.falling.KillFloor` sits a hundred metres below the map's own bounds and ends anything that passes it, with a named cause the death notice phrases (`fell out of the world`). It is a **kill** rather than a very large amount of damage — `Arena.kill` is its own verb — because armour is for being shot and the bottom of the world is not a hit, and expressing it as damage would leave somebody with enough armour surviving it. It applies to bots too, which also bounds what a bot walking through geometry can do to itself. |
 | B29 | **The HUD never showed the score — fixed 2026-07-29 (with T7).** Two readings, because they answer different questions. Frags against the match's limit sit in the top-right corner **all the time**, because that is a question a player has continuously and nobody holds a key to answer one of those; it colours when one frag from the end. The whole board — everybody's frags and deaths, from `game.scoreboard_lines`, which finally has a caller — goes up on a **held** tab: it covers the middle of the screen, and a board left up by accident is a board you get shot behind. Deaths are deliberately not in the corner: on the board they are a comparison, and alone they are a number that only goes up. |
 | B30 | **Eight opponents cost about 10 ms a tick — measured 2026-07-29, open.** On `ztn3dm1`: 0.6 ms at 1 bot, 4.4 at 4, 9.9 at 8. That is down from 22.8 before B11's perception interval and the shared static-proxy cache, and it is now spent in the **character controllers** rather than in perception — roughly 0.6 ms per bot per tick, most of it `_push_out` running `collide` against the level's mesh. A frame is 16.7 ms, so eight is playable and the menu's fifteen would not be. **Where to start:** a bot standing still on flat ground resolves the same geometry every tick and could keep its answer until it moves or the ground under it changes; and `_push_out` is called twice per step (once to depenetrate, once to ground-snap) where one may do. Neither is a change to make without a measurement to compare against, which the numbers above are. |
 | B31 | **A frame-budget test measured the machine — fixed 2026-07-29.** `test_several_hundred_still_fit_in_one_frame` asserts that three hundred projectiles cost under a frame, and failed on and off. Measured: with nothing else running the tick costs **12.5 ms** against its 16 ms budget, and on a box running another test suite the *same code* costs **31.5** — cores, caches and memory bandwidth are all shared, so a millisecond bound stops measuring the code. Neither `time.process_time` nor a minimum over repeats helps, because the work genuinely takes longer. The test now measures **the same code at a twentieth of the scale** first, which is the only calibration that degrades the way the thing being measured does (0.71 ms quiet, 1.76 loaded), and skips with a reason when the machine is not quiet enough for the budget to mean anything. Loosening the bound instead would leave a number that no longer means "fits in a frame", which is the only thing it is for. The same disease as B15, and it is worth expecting a third: a wall-clock assertion is a claim about a machine. |
@@ -1890,17 +1937,17 @@ a memory. A phase's own section has the design; this is the checklist.
 | # | Phase | What is left |
 |---|---|---|
 | ~~T0~~ | §9 | ~~**Level art in the chooser.**~~ **Done.** `OpenGLContext.ui.gallery` — a `Picture` (letterboxed, never stretched) and a `Carousel`: a band of five level shots with the chosen one in the middle, arrows rolling it round, click any picture you can see, and the chosen level's full name across the band because a tile is too narrow for one. `match.Level` gained `art`, found by walking each pack's `levelshots/` once. **59 of the 63 installed levels have a picture.** 38 tests, no GL. |
-| ~~T1~~ | §9 | ~~**Start on the menu.**~~ **Done.** Launching with no map opens the main menu; `TwitchContext.OnInit` no longer loads a level, `_loadLevel` does, and the menu calls it. Play chooses a level and the opponents, "Get content" downloads packs with a progress screen that can be stopped, and Acknowledgements opens the notices. The last choice is remembered. |
+| ~~T1~~ | §9 | ~~**Start on the menu.**~~ **Done.** Launching with no map opens the main menu; `TwigContext.OnInit` no longer loads a level, `_loadLevel` does, and the menu calls it. Play chooses a level and the opponents, "Get content" downloads packs with a progress screen that can be stopped, and Acknowledgements opens the notices. The last choice is remembered. |
 | T2 | §6 | **The navigation mesh — built, tested, and not yet usable on a real level.** `OpenGLContext.nav.navmesh` exists: walkable-triangle extraction by slope and facing, neighbours by shared edge, A* over the cells and a **string-pulled** path through the portals, `random_point` for a bot with nothing to do, and `from_world` to build one from a physics world. 25 tests, all green, and on synthetic geometry it does the right thing — an open floor gives a straight line, an obstacle is routed around, a ramp is climbed, an island is unreachable. **On `oa_dm1` it builds 1220 connected cells in 0.03 s and then fails at the last step: no spawn point resolves to a cell.** The coordinates line up (spawn at y=-3.05, nearest cell centre 0.35 m away horizontally at y=0.0), so the fault is in `cell_at` — either `_over`'s point-in-triangle test or the floor those spawns are actually over being dropped by the slope filter. That is where to start. **The bots are deliberately not wired to it**: half-wiring would make them worse than the heading-and-refuse they have now. Two further gaps once it resolves: the headroom test is too blunt for a real level (it removed 1092 of 1220 cells, almost none near a wall — it compares bounding boxes where it wants a distance) and is off by default; and there are no off-mesh links, so jump pads are not yet edges in the graph. |
 | T3 | §9 | **A base-shader gap the catalogue cannot fill.** Maps built against Quake 3's own `.shader` scripts — `textures/liquids/protolava` and its neighbours — have no script in any pack this project can offer, so those surfaces draw untextured and still (B2). The replacement *textures* exist (`quake3-core`); the replacement *scripts* do not. Worth finding out whether a freely-licensed script set exists, and saying so in the download screen if it does not, since "28 unscripted surfaces" is now reported and a user will ask what to do about it. |
-| ~~T4~~ | §6 | ~~**Item and weapon spawns.**~~ **Done 2026-07-29.** `twitchoglc.items` reads a map's `item_*`, `weapon_*` and `ammo_*` entities and `Pickups` hands them out; `PlayerState.starting` has replaced the carry-everything stand-in and `startingAmmo` is finally read. The facts went in `SPEC-Q3ENTITIES §3`, measured from the entity lumps of 67 shipped maps. See B21. |
-| T4 | §7 | **Projectiles, splash and knockback.** **Done 2026-07-28**: `twitchoglc.projectiles` steps a swept numpy batch, `twitchoglc.blast` answers each detonation with a declared falloff blocked by geometry, and the impulse goes into the character controller — so rocket jumps work. |
+| ~~T4~~ | §6 | ~~**Item and weapon spawns.**~~ **Done 2026-07-29.** `twig_bb.items` reads a map's `item_*`, `weapon_*` and `ammo_*` entities and `Pickups` hands them out; `PlayerState.starting` has replaced the carry-everything stand-in and `startingAmmo` is finally read. The facts went in `SPEC-Q3ENTITIES §3`, measured from the entity lumps of 67 shipped maps. See B21. |
+| T4 | §7 | **Projectiles, splash and knockback.** **Done 2026-07-28**: `twig_bb.projectiles` steps a swept numpy batch, `twig_bb.blast` answers each detonation with a declared falloff blocked by geometry, and the impulse goes into the character controller — so rocket jumps work. |
 | T5 | §7 | **Liquid damage.** **Done 2026-07-28**: `liquids.LiquidHarm` bites every 0.4 s from the same volumes the swimming uses, and the death carries the liquid's name as its cause. |
 | T6 | §5 | **Characters.** The rig and clip-name contract, the animation state machine, the Quaternius CC0 stand-ins fitted *through* that contract, and the artist brief. The capsule stays underneath. |
 | ~~T7~~ | §3 | ~~**The scoreboard on a key, and a permanent score readout.**~~ **Done 2026-07-29.** Frags against the limit in the corner permanently, the whole board on a held tab, and `game.scoreboard_lines` finally has a caller. See B29. |
 | T8 | §4 | **Entity audio — the `*`-prefixed sounds.** `SPEC-Q3ENTITIES §1.2.5` records that a `noise` beginning with `*` names a sound belonging to an entity's own *model* rather than to the content tree, and that all 16 in the shipped maps are triggered. They are skipped today. Resolving them needs §12's MD3 reader (to know what an entity's model *is*) and a trigger system (to know when to fire one), so this is gated on both and is recorded here so it is not mistaken for an oversight. |
 | T9 | §13 | **The game's own sounds.** The engine has had no customer since it landed; weapons, footsteps, impacts and deaths now emit events for one to subscribe to. `omi_audio.synth` is the placeholder path. |
-| ~~T12~~ | §7 | ~~**Art for the pickups.**~~ **The health packs are done 2026-07-31**; the rest still draw as boxes. `ItemKind` gained `model`, `modelScale` and `modelOffset`, so what a pickup looks like is a table edit like a weapon's; `twitchoglc.art` is the one place that knows where shipped art lives and how to load and recolour it, and `weapons`/`firstperson` now go through it too. The medikit — a cross in a glass bubble, ours, BSD, 30 kB — is **one model painted four ways** from each kind's `colour`, so the four health packs differ only in hue and a fifth is a row in the table with no new geometry. The colours moved from four near-identical greens (hues 130–132°, one item at any real distance) to white/red/blue/gold. `tools/clean_model.py` is the Blender script that prepared it and is reusable: it drops loose parts, faces normals outward, reports open boundaries (and closes them on request), and makes a model concentric so it turns without wobbling. Armour, ammunition and the weapon pickups keep the designed box fallback, which is also what a model that fails to load falls back to. |
+| ~~T12~~ | §7 | ~~**Art for the pickups.**~~ **The health packs are done 2026-07-31**; the rest still draw as boxes. `ItemKind` gained `model`, `modelScale` and `modelOffset`, so what a pickup looks like is a table edit like a weapon's; `twig_bb.art` is the one place that knows where shipped art lives and how to load and recolour it, and `weapons`/`firstperson` now go through it too. The medikit — a cross in a glass bubble, ours, BSD, 30 kB — is **one model painted four ways** from each kind's `colour`, so the four health packs differ only in hue and a fifth is a row in the table with no new geometry. The colours moved from four near-identical greens (hues 130–132°, one item at any real distance) to white/red/blue/gold. `tools/clean_model.py` is the Blender script that prepared it and is reusable: it drops loose parts, faces normals outward, reports open boundaries (and closes them on request), and makes a model concentric so it turns without wobbling. Armour, ammunition and the weapon pickups keep the designed box fallback, which is also what a model that fails to load falls back to. |
 | T10 | §9 | **A committed content-survey tool**, replacing §14's recipes, with model counts by kind. |
 | ~~T11~~ | §9 | ~~**Downloads from the menu.**~~ **Done.** `_contentScreen` opens the consent screen and starts a `fetcher.FetchJob`, which `OnIdle` polls and publishes into the progress bar; Stop cancels it. |
 
@@ -1939,53 +1986,44 @@ and the fetched content is the levels it is played in**.
 | **The engine and the game's own sounds are separate phases** (§4, §13) | §4 is a mixer, a device seam and a `target_speaker` reader, and is finishable now; §13 is a commission and an event table, and cannot start before §5 and §7 have anything to make a noise. Bundling them meant §4 could not be called done until a game existed |
 | **Difficulty spans near-passive to nightmare** (§6) | the range is the axis the bot is built along, not a late multiplier: presets are declared data, only perception quality and decision-making scale, the senses never do, and the ladder is verified by headless bot-versus-bot matches |
 | **Gore is stylised** (§7, §8) | an effects decision, not a rules one — it rides the damage events the simulation already emits, so intensity is a presentation setting that cannot alter play |
-| **The title is a working title; the library stays `twitchoglc`** | *Twitchy Binners* for now, provisional and uncommitted — so the title lives in one constant and never keys stored state, while the released package and every user's cache stay untouched |
+| **The title is *Twitchy GLitchy Bang Bang*; game and library share one name** (2026-08-03) | settled — the package is `twig_bb`, distributed as `twig-bb`, and `twig-bb` is the command; the title still lives in one constant and still keys no stored state, so a later title change costs one line |
 
-### The name, and why nothing needs renaming
+### The name — settled 2026-08-03
 
-**Working title: *Twitchy Binners*** — a twitchy game that bins its opponents. It says
-what the game does and it is nobody else's. It is **provisional and nothing is committed
-to it**, which is a constraint on the code rather than a caveat on the plan: build so
-that the title can change the week before release without touching anything but one
-line.
+**The title is *Twitchy GLitchy Bang Bang*.** The package is `twig_bb`, distributed on
+PyPI as `twig-bb`, and `twig-bb` is what a player types. Game and library carry one
+name: the loader has no audience that the game does not also serve, and one name is one
+thing to find, install and search for.
 
-**Therefore the title lives in exactly one place.** A single constant that the window
-title, §9's start screen, §10's acknowledgements and any generated documentation read
-from. Two rules keep that honest:
+| | |
+|---|---|
+| Formal title | Twitchy GLitchy Bang Bang |
+| Import name | `twig_bb` |
+| Distribution | `twig-bb` — `pip install twig-bb`, `uvx twig-bb` |
+| Commands | `twig-bb` (play), `twig-bb-hud`, `twig-bb-fetch`, `twig-bb-bsp` |
+| Module form | `python -m twig_bb` |
+| Cache directories | `~/.config/OpenGLContext/twig-bb-maps`, `.../twig-bb-content` |
+
+**The title still lives in exactly one place** — `twig_bb.menu.GAME_TITLE`, which the
+window title, §9's start screen, §10's acknowledgements and any generated documentation
+read from. Two rules keep that true:
 
 - **Never key stored state to the display title.** The settings namespace, save files
-  and cache directories use a stable internal identifier chosen once and never shown to
-  anyone. A title change must never migrate a player's configuration.
+  and cache directories use a stable internal identifier that is never shown to anyone,
+  so a title change never migrates a player's configuration.
 - **No name in an asset filename or a translated string** where a constant would do.
 
-Costed properly, this is minutes of care during §3 and §9, and it is the difference
-between renaming a game and renaming a codebase.
+**On the earlier name, factually:** "twitch" on its own collides with a very well-known
+service, which matters for a public game title in a way it does not for an internal
+module name. The title carries "Twitchy" as an adjective describing play, which is the
+distinguishable form.
 
-**The library keeps its own name, and that is the whole answer to the migration
-problem.** `twitchoglc` is not a placeholder: it is **published on PyPI at 2.0.1**, a
-Quake-style PK3/BSP loader, a component with its own reason to exist and its own
-possible users. The game is a product built on it. Naming them separately is simply
-accurate — and it happens to cost nothing, where renaming would cost real things:
-
-- **A released package would need a rename and a compatibility shim.** Splitting means
-  it needs neither.
-- **Users' caches stay where they are.** `~/.config/OpenGLContext/twitch-maps` and
-  `twitch-content` already hold fetched content — potentially hundreds of megabytes —
-  and those directories belong to the *loader*, which is not being renamed. No migration
-  step, no re-download, no stranded cache.
-- The viewer keeps `twitch-viewer`, `twitch-download` and `twitch-parse-bsp`; the game
-  gets its own entry point when there is a game to start. Two names for two things.
-
-**On trademarks, briefly and factually:** "twitch" on its own collides with a very
-well-known service, which matters much more for a public game title than for an internal
-library name — one more reason the game, not the library, is the thing that carries the
-new name, whatever that name turns out to be. Whichever title is eventually settled on
-wants a check against existing game titles as well as package indexes.
-
-**Availability, for whenever that happens:** `twitchy-binners`, `twitchybinners` and
-`binners` were all unclaimed on PyPI when this was written (`twitchy` is taken by an
-unrelated API wrapper). Nothing needs claiming while the title is provisional — that is
-a decision for the day it stops being provisional, and re-checking then costs a minute.
+**The cache directories move with the name.** `twig-bb-maps` and `twig-bb-content`
+replace the previous names outright; anyone holding fetched content from before re-fetches
+it, or renames the two directories by hand. The alternative — carrying the old names
+forward as an internal detail, or writing adoption code — buys a one-time convenience at
+the price of a permanent inconsistency between what the program is called and what it
+writes.
 
 The through-line worth noticing: with characters, weapons and their sounds authored by
 us (§5, §7, §13), our own weapon behaviour, our own difficulty design and our own

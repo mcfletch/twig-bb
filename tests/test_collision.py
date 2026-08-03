@@ -12,9 +12,9 @@ import numpy as np
 from omi_physics import model, raycast
 from omi_physics.world import PhysicsWorld
 
-from twitchoglc import collision
-from twitchoglc.surfaces import SurfaceStyle
-from twitchoglc.worldgeometry import GeometryBuilder, SurfaceIndex
+from twig_bb import collision
+from twig_bb.surfaces import SurfaceStyle
+from twig_bb.worldgeometry import GeometryBuilder, SurfaceIndex
 
 
 def _quad(x: float, style: SurfaceStyle):

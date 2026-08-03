@@ -10,7 +10,7 @@ import math
 import numpy as np
 import pytest
 
-from twitchoglc import surfaceanim as anim
+from twig_bb import surfaceanim as anim
 
 
 class TestWaveFunctions:

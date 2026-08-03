@@ -8,8 +8,8 @@ window.  Building a panel touches no GL.
 from __future__ import annotations
 
 
-from twitchoglc import match, menu
-from twitchoglc.assetpack import AssetPack
+from twig_bb import match, menu
+from twig_bb.assetpack import AssetPack
 
 
 def widget(panel, name):
@@ -75,6 +75,38 @@ class TestTheMainMenu:
 
     def test_it_offers_quit(self):
         assert widget(menu.main_menu(), 'quit') is not None
+
+    def test_it_offers_resume_when_a_match_is_running(self):
+        """Escape must never be the only answer to "I am mid-match"."""
+        panel = menu.main_menu(on_resume=lambda: None)
+        resume = widget(panel, 'resume')
+        assert resume is not None
+        assert 'Resume' in str(resume.text)
+
+    def test_resume_comes_before_quit(self):
+        """Somebody who pressed Escape by accident wants out of this screen."""
+        panel = menu.main_menu(on_resume=lambda: None)
+        assert names(panel).index('resume') < names(panel).index('quit')
+
+    def test_resume_is_the_primary_action_mid_match(self):
+        """Enter should carry on playing, not start choosing a level again."""
+        panel = menu.main_menu(on_resume=lambda: None)
+        assert widget(panel, 'resume').role == 'primary'
+        assert widget(panel, 'play').role != 'primary'
+
+    def test_escape_leaves_it_when_there_is_a_match_behind_it(self):
+        assert menu.main_menu(on_resume=lambda: None).closeOnEscape
+
+    def test_resume_runs_its_handler(self):
+        went = []
+        panel = menu.main_menu(on_resume=lambda: went.append(True))
+        widget(panel, 'resume').on_activate(widget(panel, 'resume'))
+        assert went == [True]
+
+    def test_with_no_match_running_there_is_nothing_to_resume(self):
+        panel = menu.main_menu()
+        assert widget(panel, 'resume') is None
+        assert not panel.closeOnEscape
 
     def test_each_button_calls_its_handler(self):
         called = []

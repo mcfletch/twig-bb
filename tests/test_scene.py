@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import numpy as np
-from twitchoglc.lightmapatlas import build_atlas
-from twitchoglc.materials import MaterialLibrary
-from twitchoglc.scene import build_scene
-from twitchoglc.surfaces import SurfaceStyle
-from twitchoglc.worldgeometry import GeometryBuilder
+from twig_bb.lightmapatlas import build_atlas
+from twig_bb.materials import MaterialLibrary
+from twig_bb.scene import build_scene
+from twig_bb.surfaces import SurfaceStyle
+from twig_bb.worldgeometry import GeometryBuilder
 
 
 def _library(tmp_path):

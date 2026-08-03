@@ -13,7 +13,7 @@ world time discarded this frame, and the debt accumulated since the map loaded.
 
 import pytest
 
-from twitchoglc.frameclock import FrameClock
+from twig_bb.frameclock import FrameClock
 
 
 @pytest.fixture

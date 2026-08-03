@@ -44,9 +44,9 @@ Usage, either through a Blender install or through the ``bpy`` module -- the
 same code runs both ways::
 
     blender medpack.blend --background --python tools/clean_model.py \\
-        -- --export ../twitchoglc/assets/items/medpack.glb
+        -- --export ../twig_bb/assets/items/medpack.glb
     python tools/clean_model.py medpack.blend \\
-        --export twitchoglc/assets/items/medpack.glb
+        --export twig_bb/assets/items/medpack.glb
 
 The ``.blend`` is rewritten in place unless ``--save`` names somewhere else,
 and left alone entirely under ``--no-save`` -- which, with ``--export``, is how
@@ -54,7 +54,7 @@ a shipped asset is regenerated without touching the art it came from.
 
 **Needs Blender**, which the rest of this project does not: either an install
 on the ``PATH`` or the ``bpy`` module, which is published for CPython 3.11 only
-and is a large download.  Neither is a dependency of twitch and neither is
+and is a large download.  Neither is a dependency of twig-bb and neither is
 needed to *play* it -- the ``.glb`` this writes is committed, and this is how it
 is regenerated when the art changes::
 

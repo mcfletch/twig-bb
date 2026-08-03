@@ -5,11 +5,11 @@
 | Source consulted | **No copyleft source was consulted.** See "Provenance" below. |
 | Licence of source | n/a — the sources used are a published format reference, this workspace's own BSD-licensed code, and sample file bytes |
 | Version / commit | n/a |
-| Files consulted | `http://www.mralligator.com/q3/` (published format reference); `twitch/twitchoglc/bsp.py` at `master` (this workspace's own BSD code, whose module docstring cites that same reference); the bytes of sample `.bsp` files |
+| Files consulted | `http://www.mralligator.com/q3/` (published format reference); `twitch/twig_bb/bsp.py` at `master` (this workspace's own BSD code, whose module docstring cites that same reference); the bytes of sample `.bsp` files |
 | Non-copyleft sources checked first | This document *is* the non-copyleft record: no engine tree was opened at any point. |
 | Reader | n/a — not a clean-room spec; written by the Implementer from licence-clean sources |
 | Date | 2026-07-25 |
-| **Clean-room status** | **Not applicable.** No copyleft source was read for any fact below, so no wall was needed. This file exists to satisfy the "record which you used" requirement in [../plans/TWITCH-ARENA-VIEWER.md](../plans/TWITCH-ARENA-VIEWER.md), and to give the implementation a numbered document to cite, exactly as it cites the clean-room specs. |
+| **Clean-room status** | **Not applicable.** No copyleft source was read for any fact below, so no wall was needed. This file exists to satisfy the "record which you used" requirement in [../plans/TWIG-BB-ARENA-VIEWER.md](../plans/TWIG-BB-ARENA-VIEWER.md), and to give the implementation a numbered document to cite, exactly as it cites the clean-room specs. |
 
 ## Provenance
 
@@ -20,7 +20,7 @@ Three licence-clean sources, in the order of preference set by
    a long-circulated third-party description of the `IBSP` v46 container. It
    supplied the magic and version, the 17-entry lump directory and its index
    order, and the binary record layout of every lump (§1, §2, §4).
-2. **This workspace's own prior implementation** — `twitch/twitchoglc/bsp.py`,
+2. **This workspace's own prior implementation** — `twitch/twig_bb/bsp.py`,
    BSD-licensed code written by this project's author, whose module docstring
    records that same public reference as its source. It independently confirms
    every record layout in §4 and the patch-tessellation convention in §6.

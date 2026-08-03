@@ -12,9 +12,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from twitchoglc import arena, avatar, items, weapons
-from twitchoglc.entities import Entity
-from twitchoglc.player import PlayerState
+from twig_bb import arena, avatar, items, weapons
+from twig_bb.entities import Entity
+from twig_bb.player import PlayerState
 
 
 def match(where=(0.0, 0.0, 0.0), bots=0, health=10):
@@ -400,3 +400,88 @@ class TestNothingHereReadsAClock:
 
 def test_a_level_can_say_how_many_it_holds():
     assert len(placed(kind(health=25))) == 1
+
+
+class TestTakingAWeaponPutsItInHand:
+    """Walking over a weapon arms you with it.
+
+    A player who starts with a pistol (`PlayerState.starting`) collects the
+    level's weapons as they go. Adding one to the bar and leaving the pistol in
+    hand means the pickup that mattered most is the one that changed nothing
+    you can see, and the number key becomes a step the player has to remember
+    in the middle of a fight.
+
+    **Better only.** A weapon already beaten by what is held does not take the
+    hand: being downgraded mid-firefight by walking over a pistol is worse than
+    not switching at all. Which beats which is the table's `slot` order, the
+    same order the number keys and the weapon bar use.
+    """
+
+    def _walk_over(self, weapon_key, holding=None, table=None):
+        table = table or weapons.default_table()
+        made = match()
+        player = made.combatant('player').player
+        if holding is not None:
+            player.give(holding)
+            player.selected = holding
+        placed(kind(key='w', title='W', weapon=weapon_key, ammo=5,
+                    ammoType='rockets'),
+               where=(0.0, 0.0, 0.0)).advance(made, 0.0, table=table)
+        return player
+
+    def test_a_better_weapon_takes_the_hand(self):
+        player = self._walk_over('rocket', holding='pistol')
+        assert player.selected == 'rocket'
+
+    def test_it_is_held_as_well_as_selected(self):
+        player = self._walk_over('rocket', holding='pistol')
+        assert player.has('rocket')
+
+    def test_a_worse_weapon_does_not_take_the_hand(self):
+        """Walking over a pistol while holding a rocket launcher."""
+        player = self._walk_over('pistol', holding='rocket')
+        assert player.selected == 'rocket'
+        assert player.has('pistol')
+
+    def test_one_already_held_does_not_take_the_hand(self):
+        """Its ammunition is still worth taking; the hand is not disturbed."""
+        table = weapons.default_table()
+        made = match()
+        player = made.combatant('player').player
+        player.give('rocket')
+        player.give('shotgun')
+        player.selected = 'rocket'
+        placed(kind(key='w', title='W', weapon='shotgun', ammo=5,
+                    ammoType='shells')).advance(made, 0.0, table=table)
+        assert player.selected == 'rocket'
+
+    def test_with_no_table_the_hand_is_left_alone(self):
+        """Slot order is the table's; without one there is no better or worse."""
+        made = match()
+        player = made.combatant('player').player
+        player.give('pistol')
+        player.selected = 'pistol'
+        placed(kind(key='w', title='W', weapon='rocket', ammo=5,
+                    ammoType='rockets')).advance(made, 0.0)
+        assert player.selected == 'pistol'
+        assert player.has('rocket')
+
+    def test_an_empty_hand_takes_whatever_arrives(self):
+        table = weapons.default_table()
+        made = match()
+        player = made.combatant('player').player
+        player.weapons = []
+        player.selected = ''
+        placed(kind(key='w', title='W', weapon='shotgun', ammo=5,
+                    ammoType='shells')).advance(made, 0.0, table=table)
+        assert player.selected == 'shotgun'
+
+    def test_a_medikit_never_touches_the_hand(self):
+        table = weapons.default_table()
+        made = match()
+        player = made.combatant('player').player
+        player.give('pistol')
+        player.selected = 'pistol'
+        placed(kind(key='h', title='H', health=25)).advance(made, 0.0,
+                                                            table=table)
+        assert player.selected == 'pistol'

@@ -9,15 +9,15 @@ licence reproduced is the kind of omission nobody notices until somebody else
 does, so it is a failing build rather than a note in a review.
 
 The *content* half of the acknowledgements is not here: it is **generated** from
-[`twitchoglc/packs.json`](twitchoglc/packs.json), so a pack added to the
+[`twig_bb/packs.json`](twig_bb/packs.json), so a pack added to the
 catalogue is credited without anyone having to remember. Run
-`python -m twitchoglc.notices` to print the whole thing.
+`python -m twig_bb.notices` to print the whole thing.
 
 ## This program
 
 | | |
 |---|---|
-| **twitch / twitchoglc** | BSD-3-Clause — Mike C. Fletcher · <https://github.com/mcfletch/twitch> |
+| **Twitchy GLitchy Bang Bang (`twig-bb`)** | BSD-3-Clause — Mike C. Fletcher · <https://github.com/mcfletch/twig-bb> |
 
 ## Libraries it is built on
 
@@ -30,7 +30,7 @@ catalogue is credited without anyone having to remember. Run
 | omi_audio | MIT | <https://github.com/mcfletch/omi_audio> | required |
 | numpy | BSD-3-Clause | <https://numpy.org/> | required |
 | pillow | MIT-CMU | <https://python-pillow.org/> | required |
-| miniaudio | MIT | <https://github.com/irmen/pyminiaudio> | **optional** (`pip install twitchoglc[audio]`) |
+| miniaudio | MIT | <https://github.com/irmen/pyminiaudio> | **optional** (`pip install twig-bb[audio]`) |
 
 **miniaudio is optional and the distinction matters here**, because a notice has
 to be accurate about what a given install actually contains. It is not a
@@ -61,13 +61,13 @@ because that is the rule for every piece of geometry here whether or not its
 licence demands it — the next person to read those directories should not have
 to guess which files carry an obligation. What was done to the models, and why
 some of the weapons ship without textures, is recorded in
-[`twitchoglc/assets/weapons/CREDITS.md`](twitchoglc/assets/weapons/CREDITS.md)
-and [`twitchoglc/assets/items/CREDITS.md`](twitchoglc/assets/items/CREDITS.md).
+[`twig_bb/assets/weapons/CREDITS.md`](twig_bb/assets/weapons/CREDITS.md)
+and [`twig_bb/assets/items/CREDITS.md`](twig_bb/assets/items/CREDITS.md).
 
 **No audio files ship with this program at all**, and that is a decision rather
 than a gap. Every sound a fight makes — the weapons, impacts, deaths and
 explosions — is *synthesised* from numbers declared in
-[`twitchoglc/combatsound.py`](twitchoglc/combatsound.py), through
+[`twig_bb/combatsound.py`](twig_bb/combatsound.py), through
 OpenGLContext's own `audio.synth`. Arithmetic has no licence, so the game ships
 with a full complement of sound, nothing to credit and nothing to check. A
 voice in that table may name a file instead, which is how commissioned or CC0
@@ -79,8 +79,8 @@ credited here like the geometry above.
 Not shipped — fetched to a per-user cache, at the user's request, and never
 vendored into this repository. That is what keeps a BSD codebase BSD while
 playing content under share-alike terms. The list is generated from the
-catalogue; `twitch-viewer --list-packs` prints it, as does
-`python -m twitchoglc.notices`.
+catalogue; `twig-bb --list-packs` prints it, as does
+`python -m twig_bb.notices`.
 
 ## Where the format knowledge came from
 

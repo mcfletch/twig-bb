@@ -15,9 +15,9 @@ import os
 import numpy as np
 import pytest
 
-from twitchoglc import speakers
-from twitchoglc.entities import Entity
-from twitchoglc.worldgeometry import SCENE_SCALE
+from twig_bb import speakers
+from twig_bb.entities import Entity
+from twig_bb.worldgeometry import SCENE_SCALE
 
 
 def write_sound(root, relative):
@@ -235,7 +235,7 @@ class TestThroughTheMapLoader:
     def test_a_loaded_map_offers_its_speakers(self, write_map, tmp_path):
         import bspbuilder
 
-        from twitchoglc import maploader
+        from twig_bb import maploader
         write_sound(tmp_path / "content", "sound/world/wind1.wav")
         path = write_map(46, {'entities': bspbuilder.entity_text([
             {'classname': 'worldspawn'},
@@ -250,7 +250,7 @@ class TestThroughTheMapLoader:
         """Most installs have the maps and not the base game's sounds."""
         import bspbuilder
 
-        from twitchoglc import maploader
+        from twig_bb import maploader
         path = write_map(46, {'entities': bspbuilder.entity_text([
             {'classname': 'worldspawn'},
             {'classname': 'target_speaker', 'origin': '0 0 0',
@@ -263,13 +263,13 @@ class TestAgainstRealContent:
     """The shipped maps, when this machine has them fetched."""
 
     def content_root(self):
-        root = os.path.expanduser('~/.config/OpenGLContext/twitch-content')
+        root = os.path.expanduser('~/.config/OpenGLContext/twig-bb-content')
         if not os.path.isdir(root):
             pytest.skip('no content packs fetched')
         return root
 
     def test_the_star_prefixed_name_in_am_galmevish_is_silent_not_fatal(self):
         """SPEC-Q3ENTITIES §1.2.5, hit by real content on the first load."""
-        from twitchoglc.sounds import SoundLibrary
+        from twig_bb.sounds import SoundLibrary
         library = SoundLibrary([self.content_root()])
         assert library.resolve('*falling1.wav') is None

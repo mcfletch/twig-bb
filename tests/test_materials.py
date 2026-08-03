@@ -9,8 +9,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from twitchoglc.materials import MaterialLibrary
-from twitchoglc.surfaces import SurfaceStyle
+from twig_bb.materials import MaterialLibrary
+from twig_bb.surfaces import SurfaceStyle
 
 
 def write_image(path, size=(8, 4), colour=(255, 0, 0)):

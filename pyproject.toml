@@ -3,9 +3,9 @@ requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "twitchoglc"
+name = "twig-bb"
 dynamic = ["version"]
-description = "Quake 2 / Alien Arena / Quake 3 map viewer built on OpenGLContext"
+description = "Twitchy GLitchy Bang Bang -- a PK3-based FPS built on OpenGLContext"
 readme = "README.md"
 license = "BSD-3-Clause"
 requires-python = ">=3.10"
@@ -14,11 +14,14 @@ authors = [
 ]
 keywords = [
     "PyOpenGL", "OpenGL", "OpenGLContext", "Quake", "BSP", "PK3", "map", "viewer",
+    "FPS", "game",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Multimedia :: Graphics :: 3D Rendering",
+    "Topic :: Games/Entertainment :: First Person Shooters",
     "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
 ]
 
 # The download path runs through ``OpenGLContext.loaders.resolver``, so there is
@@ -34,7 +37,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov", "ruff", "mypy"]
-# omi_audio itself is a dependency -- the sound design in twitchoglc.combatsound
+# omi_audio itself is a dependency -- the sound design in twig_bb.combatsound
 # is written against its model and its synthesiser -- and it mixes happily with
 # no backend at all.  What is optional is the backend that reaches a sound card,
 # and its absence is silence, never an error.  The reason it is optional is
@@ -49,30 +52,32 @@ dev = ["pytest", "pytest-cov", "ruff", "mypy"]
 audio = ["omi_audio[playback]"]
 
 [project.scripts]
-twitch-viewer = "twitchoglc.viewer:main"
-twitch-hud-demo = "twitchoglc.hudsample:main"
-twitch-download = "twitchoglc.download:main"
-twitch-parse-bsp = "twitchoglc.maploader:main"
+twig-bb = "twig_bb.viewer:main"
+twig-bb-hud = "twig_bb.hudsample:main"
+twig-bb-fetch = "twig_bb.download:main"
+twig-bb-bsp = "twig_bb.maploader:main"
 
 [project.urls]
-Homepage = "https://github.com/mcfletch/twitch"
+Homepage = "https://github.com/mcfletch/twig-bb"
 
 [tool.setuptools.dynamic]
-version = {attr = "twitchoglc.__version__"}
+version = {attr = "twig_bb.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["twitchoglc*"]
+include = ["twig_bb*"]
 
-# The stand-in weapon art ships with the package: it is CC0, so unlike the
-# fetched OpenArena content there is nothing to carry onto a redistributor.
-# See twitchoglc/assets/weapons/CREDITS.md.
+# The stand-in weapon and item art ships with the package: it is CC0, so unlike
+# the fetched OpenArena content there is nothing to carry onto a redistributor.
+# The credits travel with the art rather than being collected elsewhere, so that
+# an installed copy carries its own provenance -- see
+# twig_bb/assets/weapons/CREDITS.md and twig_bb/assets/items/CREDITS.md.
 [tool.setuptools.package-data]
-twitchoglc = [
+twig_bb = [
     "packs.json",
-    "assets/weapons/*.glb",
-    "assets/weapons/Textures/*.png",
-    "assets/weapons/CREDITS.md",
+    "assets/**/*.glb",
+    "assets/**/*.png",
+    "assets/**/CREDITS.md",
 ]
 
 [tool.ruff]

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import types
 import sys
 
 import numpy as np
@@ -16,7 +17,7 @@ import pytest
 import bspbuilder
 from OpenGLContext.move import viewplatform
 from OpenGLContext.move.viewplatformmixin import ViewPlatformMixin
-from twitchoglc import (
+from twig_bb import (
     arena, collision, deathcam, firstperson, game, hud, maploader, player,
     projectiles, rules, viewer, weapons,
 )
@@ -192,7 +193,7 @@ def test_the_viewer_renders_a_map_and_captures_it(tmp_path, arena_map):
     """The whole path: load, build a PBR scene, render on the core profile."""
     out = tmp_path / 'shot.png'
     result = subprocess.run(
-        [VENV_PYTHON, '-m', 'twitchoglc.viewer', arena_map,
+        [VENV_PYTHON, '-m', 'twig_bb.viewer', arena_map,
          '--capture', str(out), '--frames', '6', '--capture-delay', '0.2',
          '--no-physics'],
         capture_output=True, text=True, timeout=300,
@@ -210,7 +211,7 @@ def test_the_viewer_walks_a_map_under_physics(tmp_path, arena_map):
     """Walk mode must survive a real window, not only the unit tests."""
     out = tmp_path / 'walk.png'
     result = subprocess.run(
-        [VENV_PYTHON, '-m', 'twitchoglc.viewer', arena_map,
+        [VENV_PYTHON, '-m', 'twig_bb.viewer', arena_map,
          '--capture', str(out), '--frames', '10', '--capture-delay', '0.5',
          '--physics'],
         capture_output=True, text=True, timeout=300,
@@ -502,20 +503,20 @@ def test_no_map_on_the_command_line_is_a_start_screen_rather_than_an_error(
     the one place a player would look for it.
     """
     started = []
-    monkeypatch.setattr(viewer.TwitchContext, 'ContextMainLoop',
+    monkeypatch.setattr(viewer.TwigContext, 'ContextMainLoop',
                         classmethod(lambda cls, **named: started.append(named)))
     viewer.main([])
     assert started
-    assert viewer.TwitchContext._target in (None, '')
+    assert viewer.TwigContext._target in (None, '')
 
 
 def test_a_named_map_still_goes_straight_into_it(monkeypatch, tmp_path):
     """The start screen is the *default*, not a step everyone has to walk past."""
     started = []
-    monkeypatch.setattr(viewer.TwitchContext, 'ContextMainLoop',
+    monkeypatch.setattr(viewer.TwigContext, 'ContextMainLoop',
                         classmethod(lambda cls, **named: started.append(named)))
     viewer.main(['some-map.bsp'])
-    assert viewer.TwitchContext._target == 'some-map.bsp'
+    assert viewer.TwigContext._target == 'some-map.bsp'
 
 
 def test_naming_a_map_inside_a_pack_fetches_the_pack(tmp_path, monkeypatch):
@@ -785,10 +786,10 @@ def _platform_stub():
     class _P:
         submerged = False
 
-        def set_move(self, forward=0.0, strafe=0.0, mode='walk'):
+        def set_move(self, forward=0.0, strafe=0.0, mode='walk', speed=None):
             pass
 
-        def set_fly_move(self, forward=0.0, strafe=0.0, up=0.0):
+        def set_fly_move(self, forward=0.0, strafe=0.0, up=0.0, speed=None):
             pass
 
         def jump(self):
@@ -880,7 +881,7 @@ class _Headless(ViewPlatformMixin):
     def getViewPort(self):
         return (800, 600)
 
-    physicsWorld = viewer.TwitchContext.physicsWorld
+    physicsWorld = viewer.TwigContext.physicsWorld
 
     def getEventManager(self, kind):
         return None
@@ -1003,7 +1004,7 @@ def test_leaving_the_water_takes_the_character_out_of_swimming():
 def test_being_in_a_liquid_volume_puts_the_avatar_in_the_swim_mode(tmp_path):
     """The world imposes the mode: nothing is selected, entering water is what
     decides it (`SPEC-BSP38 §9.4`)."""
-    from twitchoglc import liquids
+    from twig_bb import liquids
     nav = _nav(tmp_path)
     context = _Headless(nav)
     volumes = liquids.LiquidVolumes([
@@ -1015,7 +1016,7 @@ def test_being_in_a_liquid_volume_puts_the_avatar_in_the_swim_mode(tmp_path):
 
 
 def test_leaving_the_water_gives_the_mode_back(tmp_path):
-    from twitchoglc import liquids
+    from twig_bb import liquids
     nav = _nav(tmp_path)
     context = _Headless(nav)
     empty = liquids.LiquidVolumes([])
@@ -1025,7 +1026,7 @@ def test_leaving_the_water_gives_the_mode_back(tmp_path):
 
 
 def test_a_map_with_no_liquid_never_reports_being_submerged(tmp_path):
-    from twitchoglc import liquids
+    from twig_bb import liquids
     nav = _nav(tmp_path)
     viewer.update_submerged(nav, liquids.LiquidVolumes([]))
     assert not nav.submerged
@@ -1084,7 +1085,7 @@ def test_function_keys_are_bound_where_they_are_actually_delivered():
     `keypress`: it produces no character.  A keypress binding for one is
     accepted and then silently never fires."""
     recorder = _Recorder()
-    viewer.TwitchContext.bindScreenKeys(recorder)
+    viewer.TwigContext.bindScreenKeys(recorder)
     for kind, name, state in recorder.bindings:
         if name and name.startswith('<F'):
             assert kind == 'keyboard', '%s bound on %r' % (name, kind)
@@ -1093,7 +1094,7 @@ def test_function_keys_are_bound_where_they_are_actually_delivered():
 
 def test_the_settings_and_binding_screens_have_keys():
     recorder = _Recorder()
-    viewer.TwitchContext.bindScreenKeys(recorder)
+    viewer.TwigContext.bindScreenKeys(recorder)
     names = [name for _kind, name, _state in recorder.bindings]
     assert '<F10>' in names
     assert '<F6>' in names
@@ -1109,7 +1110,7 @@ class _KeyStub(eventhandlermixin.EventHandlerMixin):
     def __init__(self):
         self.initializeEventManagers()
         self.opened = []
-        viewer.TwitchContext.bindScreenKeys(self)
+        viewer.TwigContext.bindScreenKeys(self)
 
     def _settings(self, event):
         self.opened.append('settings')
@@ -1148,7 +1149,7 @@ def test_a_key_nothing_binds_reaches_nothing():
 
 def _mode_row(definition):
     """What the developer overlay's Player section says the mode is."""
-    from twitchoglc import debug as twitchdebug
+    from twig_bb import debug as twigdebug
 
     class Viewer:
         contextDefinition = definition
@@ -1160,7 +1161,7 @@ def _mode_row(definition):
         def getViewPlatform(self):
             return None
 
-    return dict(twitchdebug.player_provider(Viewer())()).get('mode')
+    return dict(twigdebug.player_provider(Viewer())()).get('mode')
 
 
 def test_the_overlay_names_the_mode_in_force():
@@ -1341,7 +1342,7 @@ class TestDyingAndComingBack:
         context.hand = firstperson.WeaponHand(context.weapons)
         for name in ('_shoot', '_aim', '_cameBack', '_watchDeath'):
             setattr(context, name,
-                    getattr(viewer.TwitchContext, name).__get__(context))
+                    getattr(viewer.TwigContext, name).__get__(context))
         fired = []
         monkeypatch.setattr(viewer.game, 'shoot',
                             lambda *a, **k: fired.append(a) or None)
@@ -1499,7 +1500,7 @@ class TestTheWeaponWheel:
         recorder.hud = _MessageSink()
         for name in ('_bindWeaponKeys', '_wheelWeapon', '_runCommands'):
             setattr(recorder, name,
-                    getattr(viewer.TwitchContext, name).__get__(recorder))
+                    getattr(viewer.TwigContext, name).__get__(recorder))
         recorder._bindWeaponKeys()
         return recorder
 
@@ -1555,7 +1556,7 @@ class TestTheScoreboardKey:
         for name in ('_bindWeaponKeys', '_wheelWeapon', '_runCommands',
                      '_showScores', '_hideScores'):
             setattr(recorder, name,
-                    getattr(viewer.TwitchContext, name).__get__(recorder))
+                    getattr(viewer.TwigContext, name).__get__(recorder))
         recorder._bindWeaponKeys()
         return recorder
 
@@ -1615,7 +1616,7 @@ class TestTheMatchWiringStaysInStep:
         made._audioEngine = lambda: None
         for name in ('_buildMatch', '_bindPresenter'):
             setattr(made, name,
-                    getattr(viewer.TwitchContext, name).__get__(made))
+                    getattr(viewer.TwigContext, name).__get__(made))
         made._buildMatch()          # what OnInit does before a level exists
         made.hud = _MessageSink()
         made._bindPresenter()       # what _startGame does once there is a HUD
@@ -1674,7 +1675,7 @@ class TestTheMouseFiresInTheGame:
         fired = []
         for name in ('_sampleWeapons', '_runCommands'):
             setattr(made, name,
-                    getattr(viewer.TwitchContext, name).__get__(made))
+                    getattr(viewer.TwigContext, name).__get__(made))
         made._shoot = lambda: fired.append(1)
         return made, fired
 
@@ -1746,12 +1747,12 @@ class TestAShotGoesWhereTheCameraLooks:
         """
         context = _Headless(nav)
         context._nav = nav
-        return np.asarray(viewer.TwitchContext._aim(context)[1], dtype='d')
+        return np.asarray(viewer.TwigContext._aim(context)[1], dtype='d')
 
     def origin(self, nav):
         context = _Headless(nav)
         context._nav = nav
-        return np.asarray(viewer.TwitchContext._aim(context)[0], dtype='d')
+        return np.asarray(viewer.TwigContext._aim(context)[0], dtype='d')
 
     def test_straight_ahead_it_agrees(self, tmp_path):
         made = self.platform(tmp_path)
@@ -1806,7 +1807,7 @@ class TestAShotGoesWhereTheCameraLooks:
         class _NotWalkingYet:
             _nav = None
 
-        origin, direction = viewer.TwitchContext._aim(_NotWalkingYet())
+        origin, direction = viewer.TwigContext._aim(_NotWalkingYet())
         assert np.asarray(direction) == pytest.approx((0.0, 0.0, -1.0))
         assert np.asarray(origin) == pytest.approx((0.0, 0.0, 0.0))
 
@@ -1846,7 +1847,7 @@ class TestTheShotIsUnderTheCrosshair:
         platform.setOrientation(nav.camera_orientation())
         context = _Headless(nav)
         context._nav = nav
-        origin, direction = viewer.TwitchContext._aim(context)
+        origin, direction = viewer.TwigContext._aim(context)
         mark = np.append(np.asarray(origin, dtype='d')
                          + np.asarray(direction, dtype='d') * self.RANGE, 1.0)
         clip = np.dot(mark, np.dot(np.asarray(platform.modelMatrix()),
@@ -1861,3 +1862,62 @@ class TestTheShotIsUnderTheCrosshair:
         made.yaw, made.pitch = yaw, pitch
         assert self.screen_position(made) == pytest.approx((0.0, 0.0),
                                                            abs=1e-6)
+
+
+class TestEscapeMidMatch:
+    """Escape must never end a match without asking.
+
+    It was bound straight to the context's forcible quit, so a key pressed to
+    close a screen, dismiss a notice or back out of anything at all ended the
+    session -- with no confirmation and nothing to undo it.
+    """
+
+    def context(self, loaded=True):
+        recorder = _WheelRecorder()
+        recorder.quits = 0
+        recorder.pushed = []
+        recorder._menuPanel = None
+        recorder.loaded = (types.SimpleNamespace(name='q3dm1')
+                           if loaded else None)
+        recorder.config = types.SimpleNamespace(cache_dir=None)
+        recorder.pushOverlay = lambda panel: (recorder.pushed.append(panel)
+                                              or panel)
+        recorder.OnQuit = lambda event=None: setattr(
+            recorder, 'quits', recorder.quits + 1)
+        for name in ('OnEscape', 'showMenu', '_closeMenu', '_menuSubtitle',
+                     '_playScreen', '_contentScreen', '_creditsScreen',
+                     '_settings'):
+            setattr(recorder, name,
+                    getattr(viewer.TwigContext, name).__get__(recorder))
+        return recorder
+
+    def test_it_puts_the_menu_up_instead_of_quitting(self):
+        recorder = self.context()
+        recorder.OnEscape()
+        assert recorder.pushed, 'no menu appeared'
+        assert recorder.quits == 0
+
+    def test_that_menu_offers_resume(self):
+        recorder = self.context()
+        recorder.OnEscape()
+        assert recorder.pushed[-1].find('resume') is not None
+
+    def test_resuming_puts_the_menu_away_and_keeps_the_match(self):
+        recorder = self.context()
+        recorder.OnEscape()
+        panel = recorder.pushed[-1]
+        panel.find('resume').activate()
+        assert panel.closed
+        assert recorder.quits == 0
+
+    def test_quitting_is_still_offered(self):
+        recorder = self.context()
+        recorder.OnEscape()
+        recorder.pushed[-1].find('quit').activate()
+        assert recorder.quits == 1
+
+    def test_with_no_match_running_there_is_nothing_to_resume(self):
+        """At the start screen, Escape has nothing to go back to."""
+        recorder = self.context(loaded=False)
+        recorder.OnEscape()
+        assert recorder.pushed[-1].find('resume') is None

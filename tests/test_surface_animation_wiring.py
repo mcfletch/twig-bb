@@ -7,7 +7,7 @@ them to being carried all the way through to the style the renderer reads.
 import numpy as np
 import pytest
 
-from twitchoglc import q2bsp, q3shader, surfaceanim as anim, surfaces
+from twig_bb import q2bsp, q3shader, surfaceanim as anim, surfaces
 
 
 def material(text):

@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 
 import bspbuilder
-from twitchoglc import q3bsp, q3geometry
-from twitchoglc.surfaces import SurfaceStyle
+from twig_bb import q3bsp, q3geometry
+from twig_bb.surfaces import SurfaceStyle
 
 
 def _style(name: str) -> SurfaceStyle:

@@ -12,7 +12,7 @@ import os
 
 import pytest
 
-from twitchoglc.sounds import SOUND_EXTENSIONS, SoundLibrary
+from twig_bb.sounds import SOUND_EXTENSIONS, SoundLibrary
 
 
 def write(root, relative):

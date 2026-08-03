@@ -12,8 +12,8 @@ import pytest
 
 from OpenGLContext.ui.metrics import FontMetrics
 
-from twitchoglc import hud, weapons
-from twitchoglc.player import PlayerState
+from twig_bb import hud, weapons
+from twig_bb.player import PlayerState
 
 
 @pytest.fixture

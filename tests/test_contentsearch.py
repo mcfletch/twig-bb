@@ -12,7 +12,7 @@ import os
 
 import pytest
 
-from twitchoglc.contentsearch import ContentSearch
+from twig_bb.contentsearch import ContentSearch
 
 
 @pytest.fixture

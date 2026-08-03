@@ -10,7 +10,7 @@ import zipfile
 import pytest
 
 import bspbuilder
-from twitchoglc import download
+from twig_bb import download
 
 
 def _archive(entries):

@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 
 import bspbuilder
-from twitchoglc import liquids, maploader, q2bsp
-from twitchoglc.worldgeometry import SCENE_SCALE, to_scene_points
+from twig_bb import liquids, maploader, q2bsp
+from twig_bb.worldgeometry import SCENE_SCALE, to_scene_points
 
 
 def _volumes(*boxes):
@@ -296,7 +296,7 @@ class TestWhatStandingInItCosts:
                                  kind=kind)])
 
     def match(self, where=(0.0, -1.0, 0.0)):
-        from twitchoglc import arena, weapons
+        from twig_bb import arena, weapons
         made = arena.Arena(weapons=weapons.default_table())
         made.add('player', position=where, name='You')
         return made
@@ -335,7 +335,7 @@ class TestWhatStandingInItCosts:
         assert not self.harm('lava', seconds=8.0).combatant('player').alive
 
     def test_the_death_says_what_did_it(self):
-        from twitchoglc import arena
+        from twig_bb import arena
         found = self.harm('lava', seconds=8.0)
         deaths = [event for event in found.events
                   if isinstance(event, arena.Death)]
@@ -411,7 +411,7 @@ class TestWhatStandingInItCosts:
         assert liquids.LiquidVolumes([]).kind_along((0.0, 0.0, 0.0), 1.8) == ''
 
     def test_every_combatant_is_burned_not_only_the_player(self):
-        from twitchoglc import arena, weapons
+        from twig_bb import arena, weapons
         found = arena.Arena(weapons=weapons.default_table())
         found.add('player', position=(0.0, -1.0, 0.0))
         found.add('bot1', position=(1.0, -1.0, 0.0), bot=True)

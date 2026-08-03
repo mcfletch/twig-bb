@@ -17,8 +17,8 @@ import time
 
 import pytest
 
-from twitchoglc import fetcher
-from twitchoglc.assetpack import AssetPack
+from twig_bb import fetcher
+from twig_bb.assetpack import AssetPack
 
 
 def pack(**named):

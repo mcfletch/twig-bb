@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from twitchoglc import arena, effects, game, weapons
+from twig_bb import arena, effects, game, weapons
 
 
 @pytest.fixture

@@ -20,7 +20,7 @@ import pytest
 from omi_physics import model
 from omi_physics.world import PhysicsWorld
 
-from twitchoglc import arena, bots, combat, projectiles, weapons
+from twig_bb import arena, bots, combat, projectiles, weapons
 
 
 def world():
@@ -81,7 +81,7 @@ class TestTheDifficultyPresets:
 
     def test_every_declared_difficulty_has_a_preset(self):
         """A menu offers these names; one with no numbers behind it is a crash."""
-        from twitchoglc import match as matchmod
+        from twig_bb import match as matchmod
         for name in matchmod.DIFFICULTIES:
             assert bots.preset(name) is not None
 

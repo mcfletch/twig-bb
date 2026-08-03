@@ -5,9 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from twitchoglc import jumppads
-from twitchoglc.entities import Entity
-from twitchoglc.worldgeometry import SCENE_SCALE
+from twig_bb import jumppads
+from twig_bb.entities import Entity
+from twig_bb.worldgeometry import SCENE_SCALE
 
 MAP_GRAVITY = jumppads.DEFAULT_GRAVITY
 
@@ -325,7 +325,7 @@ def test_a_system_with_no_volumes_never_fires():
 
 def _scene(map_point):
     """A map-space point as the scene-space position the system is given."""
-    from twitchoglc.worldgeometry import to_scene_points
+    from twig_bb.worldgeometry import to_scene_points
     return to_scene_points(np.array([map_point]))[0]
 
 

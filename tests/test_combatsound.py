@@ -12,7 +12,7 @@ import pytest
 
 from omi_audio import model as audiomodel
 
-from twitchoglc import arena, combatsound, game, weapons
+from twig_bb import arena, combatsound, game, weapons
 
 
 class FakeEngine:

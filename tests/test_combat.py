@@ -13,9 +13,9 @@ import pytest
 from omi_physics import model
 from omi_physics.world import PhysicsWorld
 
-from twitchoglc import arena, collision, combat, weapons
-from twitchoglc.surfaces import SurfaceStyle
-from twitchoglc.worldgeometry import SurfaceIndex
+from twig_bb import arena, collision, combat, weapons
+from twig_bb.surfaces import SurfaceStyle
+from twig_bb.worldgeometry import SurfaceIndex
 
 
 def _imported_from(node):

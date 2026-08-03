@@ -2,7 +2,7 @@
 
 import pytest
 
-from twitchoglc.entities import Entity, parse_entities
+from twig_bb.entities import Entity, parse_entities
 
 
 def test_a_block_becomes_an_entity_with_its_keys():

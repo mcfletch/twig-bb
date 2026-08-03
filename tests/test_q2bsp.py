@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 
 import bspbuilder
-from twitchoglc import q2bsp
-from twitchoglc.bspfile import MalformedBSP
+from twig_bb import q2bsp
+from twig_bb.bspfile import MalformedBSP
 
 
 def test_the_header_identifies_a_version_38_map(write_map):

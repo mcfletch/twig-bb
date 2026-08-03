@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from twitchoglc import arena, weapons
+from twig_bb import arena, weapons
 
 
 def _imported_from(node):
@@ -63,9 +63,27 @@ class TestWhoIsInIt:
     def test_a_combatant_starts_alive(self):
         assert match().combatant('player').alive
 
-    def test_a_combatant_carries_the_whole_weapon_table(self):
-        """Nothing hands out weapons yet; number keys that do nothing read as broken."""
-        assert len(match().combatant('player').player.weapons) > 1
+    def test_a_combatant_spawns_with_the_starting_loadout(self):
+        """One weapon and its own ammunition; the rest is on the floor.
+
+        A map places what a player picks up (`twig_bb.items`), so spawning
+        with everything leaves nothing worth walking to.
+        """
+        carried = match().combatant('player').player.weapons
+        assert carried == ['pistol']
+
+    def test_spawning_and_respawning_hand_out_the_same_thing(self):
+        """The asymmetry that dying used to cost four weapons for good.
+
+        `restore` has always given back the starting loadout; `add` handed out
+        the whole table, so a first death quietly took the difference away and
+        never returned it.
+        """
+        made = match()
+        fought = made.combatant('player').player
+        spawned = list(fought.weapons)
+        fought.restore(made.weapons)
+        assert list(fought.weapons) == spawned
 
 
 class TestBeingShot:
@@ -419,7 +437,7 @@ class TestComingBackAsTheSamePerson:
     """A respawn must not hand out a new record for the same combatant.
 
     The HUD, the input path and the rules all hold *one*
-    :class:`~twitchoglc.player.PlayerState` per person, on purpose: two records
+    :class:`~twig_bb.player.PlayerState` per person, on purpose: two records
     of the same health would eventually disagree. Replacing it on a respawn is
     exactly that disagreement, and it shows up as a HUD frozen at nought health
     from the player's first death onwards.

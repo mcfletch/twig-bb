@@ -15,7 +15,7 @@ import pytest
 
 from OpenGLContext.scenegraph.basenodes import Transform
 
-from twitchoglc import firstperson, weapons
+from twig_bb import firstperson, weapons
 
 
 class FakeQuaternion:
@@ -118,11 +118,11 @@ class TestPinnedToTheView:
     """
 
     def test_the_viewer_places_its_weapon_through_the_render_hook(self):
-        from twitchoglc import viewer
-        assert hasattr(viewer.TwitchContext, 'placeViewAttachments')
+        from twig_bb import viewer
+        assert hasattr(viewer.TwigContext, 'placeViewAttachments')
 
     def test_the_demo_does_too(self):
-        from twitchoglc import hudsample
+        from twig_bb import hudsample
         assert hasattr(hudsample.HUDSampleContext, 'placeViewAttachments')
 
     def test_the_hook_poses_the_hand_from_the_camera_it_is_given(self):
@@ -141,8 +141,8 @@ class TestPinnedToTheView:
     def test_nothing_poses_the_weapon_from_the_idle_callback(self):
         """The regression itself: OnIdle must not be where this happens."""
         import inspect
-        from twitchoglc import viewer
-        source = inspect.getsource(viewer.TwitchContext.OnIdle)
+        from twig_bb import viewer
+        source = inspect.getsource(viewer.TwigContext.OnIdle)
         assert '_updateWeapon' not in source, (
             'the weapon is posed in OnIdle, which runs before the camera moves')
 
@@ -180,7 +180,7 @@ class TestItIsActuallyInViewSpace:
         return np.dot(model, view)
 
     def local(self):
-        from twitchoglc import weapons
+        from twig_bb import weapons
         return firstperson.weapon_transform(
             weapons.default_table().by_key('pistol'))
 
@@ -246,32 +246,32 @@ class TestOrientingASourceModel:
         return found
 
     def test_a_weapon_can_be_pitched_as_well_as_yawed(self):
-        from twitchoglc import weapons
+        from twig_bb import weapons
         holder = firstperson.weapon_transform(
             weapons.Weapon(modelPitch=-90.0))
         assert self.rotations(holder), 'the pitch was dropped'
 
     def test_the_pitch_is_about_the_side_axis_in_radians(self):
-        from twitchoglc import weapons
+        from twig_bb import weapons
         holder = firstperson.weapon_transform(weapons.Weapon(modelPitch=90.0))
         axis = self.rotations(holder)[0]
         assert axis[:3] == (1.0, 0.0, 0.0)
         assert axis[3] == pytest.approx(math.pi / 2)
 
     def test_all_three_angles_can_be_used_at_once(self):
-        from twitchoglc import weapons
+        from twig_bb import weapons
         holder = firstperson.weapon_transform(
             weapons.Weapon(modelYaw=10.0, modelPitch=20.0, modelRoll=30.0))
         assert len(self.rotations(holder)) == 3
 
     def test_a_weapon_that_needs_no_turning_gets_no_rotation_nodes(self):
-        from twitchoglc import weapons
+        from twig_bb import weapons
         holder = firstperson.weapon_transform(weapons.Weapon())
         assert self.rotations(holder) == []
 
     def test_the_model_hangs_below_whatever_turning_it_needed(self):
         """Whatever the chain, the model is at the end of it."""
-        from twitchoglc import weapons
+        from twig_bb import weapons
         holder = firstperson.weapon_transform(
             weapons.Weapon(modelYaw=10.0, modelPitch=20.0))
         node, depth = holder, 0
@@ -294,7 +294,7 @@ class TestSeeingTheWeaponAtAll:
     """
 
     def rig(self):
-        from twitchoglc import weapons
+        from twig_bb import weapons
         return firstperson.view_rig(
             firstperson.WeaponHand(weapons.default_table()))
 
@@ -306,7 +306,7 @@ class TestSeeingTheWeaponAtAll:
             'a light on the camera relights the map, which is baked')
 
     def test_the_hand_is_in_the_rig(self):
-        from twitchoglc import weapons
+        from twig_bb import weapons
         hand = firstperson.WeaponHand(weapons.default_table())
         assert hand.group in list(firstperson.view_rig(hand).children)
 
@@ -314,7 +314,7 @@ class TestSeeingTheWeaponAtAll:
         """Emission in the material is what keeps it visible in a dark map."""
         import json
         import struct
-        from twitchoglc import weapons
+        from twig_bb import weapons
 
         for weapon in weapons.default_table().weapons:
             data = open(weapons.model_path(weapon), 'rb').read()
@@ -415,3 +415,174 @@ class TestTheGunMovesWhenItFires:
         made.select(table.by_key('shotgun'))
         made.settle(now=10.0)
         assert self.where(made) == pytest.approx((0.0, 0.0, 0.0), abs=1e-9)
+
+
+class TestSwitchingReachesTheRenderer:
+    """A weapon swapped into the hand has to reach what is being drawn.
+
+    The render pass walks the scenegraph **once** and then keeps its set of
+    renderable paths up to date from the child-added/child-removed signals a
+    node's `children` list emits (`OpenGLContext.passes._flat.SGObserver`).
+    Rebinding the whole list -- ``node.children = [x]`` -- replaces the
+    observable list instead of mutating it, so no signal is sent and the pass
+    goes on drawing the model that was there when it last looked. The
+    scenegraph is then correct and the screen is wrong, which is the hardest
+    shape of bug to see: the HUD reads the player's state directly and says
+    `ROCKET` while the hand still holds the pistol.
+    """
+
+    class _Listener:
+        """Every child-add/remove signal sent from when it is made.
+
+        A bound method rather than a local function because the dispatcher
+        holds its receivers weakly: a closure would be collected before
+        anything was sent, and the test would pass for the wrong reason.
+        """
+
+        def __init__(self):
+            from pydispatch.dispatcher import Any, connect
+            from vrml import olist
+            self.seen = []
+            connect(self.record, signal=olist.OList.NEW_CHILD_EVT, sender=Any)
+            connect(self.record, signal=olist.OList.DEL_CHILD_EVT, sender=Any)
+
+        def record(self, sender=None, value=None, **named):
+            self.seen.append(named.get('signal'))
+
+    def test_taking_a_weapon_out_announces_the_change(self):
+        table = weapons.default_table()
+        hand = firstperson.WeaponHand(table)
+        hand.select(table.by_key('pistol'))
+        listening = self._Listener()
+        hand.select(table.by_key('rocket'))
+        assert 'new' in listening.seen and 'del' in listening.seen
+
+    def test_emptying_the_hand_announces_the_change(self):
+        table = weapons.default_table()
+        hand = firstperson.WeaponHand(table)
+        hand.select(table.by_key('pistol'))
+        listening = self._Listener()
+        hand.select(None)
+        assert 'del' in listening.seen
+
+    def test_the_renderers_own_path_set_follows_the_swap(self):
+        """End to end, against the observer the render pass actually uses."""
+        from OpenGLContext.passes._flat import FlatPass
+        from vrml.vrml97 import nodetypes
+
+        table = weapons.default_table()
+        hand = firstperson.WeaponHand(table)
+        hand.select(table.by_key('pistol'))
+        rig = firstperson.view_rig(hand)
+        observer = FlatPass(rig, [])
+
+        def drawn():
+            return {id(path[-1])
+                    for path in observer.paths.get(nodetypes.Rendering, ())
+                    if not path.broken}
+
+        before = drawn()
+        hand.select(table.by_key('rocket'))
+        after = drawn()
+        assert before and after
+        assert before != after, 'the pass is still drawing the previous weapon'
+
+    def test_the_weapon_put_away_stops_being_drawn(self):
+        """Switching replaces what is in hand rather than adding to it.
+
+        The detached weapon's paths have to go with it. When they did not, a
+        player who cycled through the table carried every weapon they had ever
+        held, overlapping, and the draw count grew with each press.
+        """
+        from OpenGLContext.passes._flat import FlatPass
+        from vrml.vrml97 import nodetypes
+
+        table = weapons.default_table()
+        hand = firstperson.WeaponHand(table)
+        hand.select(table.by_key('pistol'))
+        rig = firstperson.view_rig(hand)
+        observer = FlatPass(rig, [])
+
+        def drawn():
+            return len([path
+                        for path in observer.paths.get(nodetypes.Rendering, ())
+                        if not path.broken])
+
+        alone = drawn()
+        for name in ('shotgun', 'rifle', 'rocket', 'grenade', 'pistol'):
+            hand.select(table.by_key(name))
+        assert drawn() == alone, 'weapons put away are still being drawn'
+
+    def test_cycling_the_whole_table_twice_is_stable(self):
+        from OpenGLContext.passes._flat import FlatPass
+        from vrml.vrml97 import nodetypes
+
+        table = weapons.default_table()
+        hand = firstperson.WeaponHand(table)
+        rig = firstperson.view_rig(hand)
+        observer = FlatPass(rig, [])
+        counts = []
+        for _round in range(2):
+            for weapon in table.weapons:
+                hand.select(weapon)
+                counts.append(len([
+                    path for path in observer.paths.get(nodetypes.Rendering, ())
+                    if not path.broken]))
+        half = len(counts) // 2
+        assert counts[:half] == counts[half:], counts
+
+
+class TestTheHandShowsWhatIsHeld:
+    """The invariant: the model drawn is the weapon the player is holding.
+
+    Not "is updated when the key is pressed" -- *is*, on every frame and
+    whatever changed it. A weapon reaches the hand by the number key, by the
+    wheel, by walking over it, and by a respawn putting the loadout back, and
+    each of those is a different caller. Stating it as one rule over
+    `PlayerState.selected` is what keeps a new way of changing weapon from
+    quietly being a fifth thing that forgets.
+    """
+
+    def _rig_holds(self, hand, rig):
+        """The model path currently under the rig, by the file it came from."""
+        def contains(node, target):
+            if node is target:
+                return True
+            return any(contains(child, target)
+                       for child in (getattr(node, 'children', []) or []))
+        return {name for name, model in hand._loaded.items()
+                if contains(rig, model)}
+
+    def test_every_weapon_in_the_table_reaches_the_hand(self):
+        table = weapons.default_table()
+        hand = firstperson.WeaponHand(table)
+        rig = firstperson.view_rig(hand)
+        for weapon in table.weapons:
+            # Exactly what the viewer does each frame, from the player's state.
+            hand.select(table.by_key(str(weapon.key)))
+            assert self._rig_holds(hand, rig) == {str(weapon.model)}, weapon.key
+
+    def test_a_weapon_taken_by_walking_over_it_reaches_the_hand(self):
+        """Pickup is not a special case: it moves `selected`, the hand follows."""
+        from twig_bb.player import PlayerState
+
+        table = weapons.default_table()
+        player = PlayerState.starting(table)
+        hand = firstperson.WeaponHand(table)
+        rig = firstperson.view_rig(hand)
+        hand.select(table.by_key(player.selected))
+        assert self._rig_holds(hand, rig) == {
+            str(table.by_key('pistol').model)}
+        player.give('rocket')
+        player.prefer(table, 'rocket')
+        hand.select(table.by_key(player.selected))
+        assert self._rig_holds(hand, rig) == {
+            str(table.by_key('rocket').model)}
+
+    def test_only_one_weapon_is_ever_in_the_hand(self):
+        table = weapons.default_table()
+        hand = firstperson.WeaponHand(table)
+        rig = firstperson.view_rig(hand)
+        for weapon in list(table.weapons) + list(reversed(table.weapons)):
+            hand.select(table.by_key(str(weapon.key)))
+            assert len(self._rig_holds(hand, rig)) == 1

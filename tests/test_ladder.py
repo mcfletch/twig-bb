@@ -25,7 +25,7 @@ import pytest
 from omi_physics import model
 from omi_physics.world import PhysicsWorld
 
-from twitchoglc import arena, bots, combat, weapons
+from twig_bb import arena, bots, combat, weapons
 
 #: The tick the match is simulated at.  Fixed, and nothing reads a clock.
 TICK = 1.0 / 30.0
@@ -185,7 +185,7 @@ class TestTheLadderHolds:
 def play_armed(first: str, second: str, seed: int = 0,
                seconds: float = MATCH_SECONDS) -> tuple:
     """One match with the full loadout; returns the arena and what it emitted."""
-    from twitchoglc import game, projectiles
+    from twig_bb import game, projectiles
 
     world = room()
     table = weapons.default_table()
@@ -253,7 +253,7 @@ class TestTheWholeLoadout:
 
     def test_nobody_is_left_in_the_air_at_the_end(self):
         """A projectile with nothing to hit must give up rather than be carried."""
-        from twitchoglc import projectiles
+        from twig_bb import projectiles
         world = room()
         table, kinds = weapons.default_table(), projectiles.default_table()
         match = arena.Arena(weapons=table)
@@ -261,7 +261,7 @@ class TestTheWholeLoadout:
         flight = projectiles.Projectiles(kinds)
         flight.launch(kinds.by_key(projectiles.ROCKET), origin=(0, 2, 0),
                       direction=(0, 1, 0), owner='a')
-        from twitchoglc import game
+        from twig_bb import game
         for _ in range(int(10.0 / TICK)):
             game.step_projectiles(world, match, flight, TICK)
         assert len(flight) == 0

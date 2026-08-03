@@ -20,7 +20,7 @@ from omi_physics.world import PhysicsWorld
 
 from OpenGLContext.scenegraph.box import Box
 
-from twitchoglc import (arena, art, avatar, game, match as matchmod, walkers,
+from twig_bb import (arena, art, avatar, game, match as matchmod, walkers,
                         weapons)
 
 
@@ -480,7 +480,7 @@ class TestDrawingWhatTheMapPlaced:
     """A map places fifty of these on average, so they are made once."""
 
     def pickups(self, count=2, colour=(1.0, 0.0, 0.0), key='test', **named):
-        from twitchoglc import items
+        from twig_bb import items
         kind = items.ItemKind(key=key, title='TEST', health=25,
                               colour=colour, **named)
         return items.Pickups([
@@ -542,13 +542,13 @@ class TestDrawingAPickupAsItsModel:
     """A kind that names a model is drawn as one; anything else is a box."""
 
     def kind(self, **named):
-        from twitchoglc import items
+        from twig_bb import items
         named.setdefault('key', 'test')
         named.setdefault('colour', (0.2, 0.55, 0.95))
         return items.ItemKind(title='TEST', health=25, **named)
 
     def medikit(self, **named):
-        from twitchoglc import items
+        from twig_bb import items
         return self.kind(**dict(items.MEDPACK, **named))
 
     def test_a_kind_with_no_model_is_still_a_box(self):
@@ -587,7 +587,7 @@ class TestDrawingAPickupAsItsModel:
 
     def test_one_kind_is_one_subtree_however_many_a_map_places(self):
         """Fifty pickups a map, several of a kind; one medikit, not eight."""
-        from twitchoglc import items
+        from twig_bb import items
         kind = self.medikit()
         where = items.Pickups([
             items.Pickup(kind=kind, position=np.array([index * 4.0, 1.0, 0.0]))
@@ -596,7 +596,7 @@ class TestDrawingAPickupAsItsModel:
         assert len({id(body.children[0]) for body in bodies}) == 1
 
     def test_two_kinds_are_two_subtrees_so_they_can_differ_in_colour(self):
-        from twitchoglc import items
+        from twig_bb import items
         where = items.Pickups([
             items.Pickup(kind=self.medikit(key='a', colour=(1.0, 0.0, 0.0)),
                          position=np.array([0.0, 1.0, 0.0])),
@@ -619,7 +619,7 @@ class TestDrawingWhatIsInFlight:
     """
 
     def flight(self, count=0):
-        from twitchoglc import projectiles
+        from twig_bb import projectiles
         table = projectiles.default_table()
         made = projectiles.Projectiles(table, capacity=4)
         for index in range(count):
@@ -678,7 +678,7 @@ class TestSayingHowSomebodyDied:
 
     def test_falling_out_of_the_world_is_named(self):
         """The one death a player has no other way of understanding."""
-        from twitchoglc import falling
+        from twig_bb import falling
         assert 'fell' in self.line(target=game.PLAYER_ID, by='',
                                    cause=falling.FELL)
 

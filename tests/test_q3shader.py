@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from twitchoglc import q3shader
-from twitchoglc.surfaces import SurfaceStyle
+from twig_bb import q3shader
+from twig_bb.surfaces import SurfaceStyle
 
 
 def parse(text: str):

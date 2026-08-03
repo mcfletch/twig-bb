@@ -1,18 +1,24 @@
-# twitch — a Quake 3 (and Quake 2) map viewer
+# Twitchy GLitchy Bang Bang (twig-bb) — a pk3-based FPS
 
-Load a `.bsp` map and walk around inside it, rendered through
-[OpenGLContext](https://github.com/mcfletch/openglcontext)'s physically-based
-render pass on the OpenGL core profile, with the map's own baked lighting.
+`twig-bb` is an FPS engine that can load PK3 maps and glTF assets. It
+can load most OpenArena maps, though some features such as vehicles and
+doors are not yet implemented. It is implemented as a relatively thin
+layer on top of OpenGLContext's rendering, UI and physics layers.
+
+The underlying PK3 loader is coded in numpy with memory mapping directly
+onto the underlying file, so load times are generally pretty fast. 
+Rendering uses the built-in lightmaps in the OpenGLContext PBR render 
+passes but we don't currently implement the PK3 sky rendering.
 
 ```bash
-twitch-viewer                                 # the start screen: pick a level
-twitch-viewer arena/maps/ctf-curvy.bsp        # a map you already have
-twitch-viewer some-map.pk3                    # an archive: unpacked for you
-twitch-viewer https://example.com/map.pk3     # a URL: fetched and cached
-twitch-viewer openarena:oa_dm1                # a map from a content pack
+twig-bb                                 # the start screen: pick a level
+twig-bb arena/maps/ctf-curvy.bsp        # a map you already have
+twig-bb some-map.pk3                    # an archive: unpacked for you
+twig-bb https://example.com/map.pk3     # a URL: fetched and cached
+twig-bb openarena:oa_dm1                # a map from a content pack
 ```
 
-With nothing of your own to look at, `twitch-viewer --list-packs` shows what can
+With nothing of your own to look at, `twig-bb --list-packs` shows what can
 be downloaded and `openarena:<map>` fetches and opens one of the fifty
 OpenArena levels — see [Content packs](#content-packs).
 
@@ -29,14 +35,14 @@ volumes — is the same objects either way.
 
 ## Content Licensing Note
 
-openglcontext-twitch is mostly targetted at allowing you to use existing
+twig-bb is mostly targetted at allowing you to use existing
 infrastructure (e.g. quake3 map editors) to create your own games.
 However, it is also a map loader/viewer, and can be used to render existing
 pk3 files.
 
 Most sample maps that you will find on the Internet have somewhat restrictive
 licenses, or are dependent on assets that have such licenses. If you are using
-openglcontext-twitch as a viewer for your own use, this is fine. We can load
+twig-bb as a viewer for your own use, this is fine. We can load
 OpenArena or secondary pk3 files. However, most maps will reuse base textures.
 When you download or install these packs, you are accepting their licenses,
 and that includes any restrictions on use.
@@ -51,6 +57,38 @@ base texture replacements to allow most Quake 3/OpenArena maps to load.
 > Note that Kpax's textures are **NOT** licensed for commercial use, so if
 > you are building a game with this library and intending to sell it you will
 > need to *not* offer this texture pack to the user.
+
+### Who made the map you are in
+
+A level is somebody's work, and the licences these packs arrive under ask for
+attribution. Every map therefore credits itself, in three places:
+
+| Where | What it says |
+|---|---|
+| On screen as the map loads | the map, its author, and the terms — a few lines through the HUD's message queue, which fade like any other message |
+| The **Acknowledgements** screen (escape → Acknowledgements) | the same, at the top and before the libraries, plus the paths of the licence documents shipped with the content |
+| The terminal, and the developer overlay's Map section | the same again, for a run with no window to read and for checking what a recording may be published under |
+
+Three sources feed it, and any of them may be silent without the others
+failing. The **title and author** come from the map file itself: a Quake map's
+`worldspawn` carries a `message`, which is where a mapper signs the work, and
+being inside the `.bsp` it survives repacking. The **terms** come from the
+catalogue entry for the pack the file sits under — a map of your own claims no
+pack's terms and is credited by name alone. The **licence documents** a release
+ships (`COPYING`, `CREDITS`, `LICENSE`) are cited by path rather than quoted:
+they run to tens of kilobytes, and what a reader wants is where the
+authoritative text is.
+
+**What a map is drawn with is stated separately from what it is.** A level
+resolves its textures against packs it did not come from, and those can carry
+stricter terms than the map's own — the Quake 3 replacement textures are
+CC BY-NC-ND, which matters to anyone recording or publishing what is on screen.
+The acknowledgements list them under their own heading, so *its own terms* means
+only that.
+
+The on-screen credit is **wrapped, never shortened**: a truncated licence would
+state weaker terms than the content carries. `twig_bb.mapnotice` is where all of
+this lives.
 
 ## Controls
 
@@ -71,10 +109,11 @@ base texture replacements to allow most Quake 3/OpenArena maps to load.
 | left mouse button, or ctrl | fire (held) — down the middle of the reticule, wherever you are looking; **and what brings you back when you are dead** |
 | tab | the scoreboard (held) — everybody's frags and deaths |
 | alt + `f` | developer overlay — frame rate, loop timing, draw counts, where you are |
-| `F2` | save a screenshot — `twitch-<date>-<time>.png`, in the directory you launched from |
-| alt + `s` | the engine's own screenshot key — `twitch-viewer-screen-0001.png`, same place |
+| `F2` | save a screenshot — `twig-bb-<date>-<time>.png`, in the directory you launched from |
+| alt + `s` | the engine's own screenshot key — `twig-bb-screen-0001.png`, same place |
 | `F6` | key bindings — rebind any command, over the map |
 | `F10` | rendering settings — shadows, lighting, detail, over the map |
+| escape | the menu — **Resume** first, then Quit. Escape again resumes. It never ends the match on its own: a key pressed to close something else must not throw a match away |
 
 **Mouse-look (`fps`) is the mode you start in** — an arena map is played with
 the mouse, and the pointer is grabbed so the view keeps turning past the edge of
@@ -142,7 +181,7 @@ what makes it a HUD rather than a panel. `--no-hud` turns it off, and a
 bar over one turns every visual comparison into a comparison of the health bar.
 
 **The reticule belongs to the weapon**, not to the game. Each entry in
-[`twitchoglc/weapons.py`](twitchoglc/weapons.py) names its own crosshair shape
+[`twig_bb/weapons.py`](twig_bb/weapons.py) names its own crosshair shape
 and its cone of fire, and firing opens that cone — so the reticule widens by
 exactly the angle a shot might now land within, projected through the renderer's
 own frustum. The colours on the meters are thresholds rather than a gradient,
@@ -162,18 +201,19 @@ hides: how much of the projectile budget is in the air, how many particles the
 effects are holding, and what the effects setting actually is. A rocket that
 never arrives and a full budget look identical from inside the game.
 
-Its **`Map` section reports what a level has that this game cannot answer**, and
-each row exists because its absence is invisible from inside the game and looks
-exactly like a bug: surfaces no material script defines (so their animation is
-gone), speakers that found no sound, liquid volumes, where the floor of the
-world is, how many pickups were placed, and how many pickups are of kinds
-nothing here has anything to give for.
+Its **`Map` section names the level and credits it** — title, author, pack and
+terms, beside the file name — and then **reports what a level has that this game
+cannot answer**, where each row exists because its absence is invisible from
+inside the game and looks exactly like a bug: surfaces no material script
+defines (so their animation is gone), speakers that found no sound, liquid
+volumes, where the floor of the world is, how many pickups were placed, and how
+many pickups are of kinds nothing here has anything to give for.
 
 **The developer overlay** (alt + `f`) is everything a player should never see:
 frame rate and frame time, the renderer's features and what the last frame cost
 in shapes and draw calls, the camera's position in scene metres *and* in map units, which movement mode is in force, whether you are submerged, and the
 physics world's body and contact counts. It is fed by *registered providers* —
-`twitchoglc/debug.py` registers this game's, OpenGLContext registers the
+`twig_bb/debug.py` registers this game's, OpenGLContext registers the
 engine's — so a new subsystem appears in it by registering rather than by anyone
 editing it. `OPENGLCONTEXT_DISABLE_FPS_DISPLAY` decides whether it starts on
 screen, which is what keeps captures clean.
@@ -205,7 +245,7 @@ real time with almost a second of it discarded since the map loaded. To get the
 breakdown on stdout rather than watching for it:
 
 ```console
-$ OPENGLCONTEXT_STALL_MS=40 twitch-viewer some-map.pk3 --map some-map.bsp --bots 4
+$ OPENGLCONTEXT_STALL_MS=40 twig-bb some-map.pk3 --map some-map.bsp --bots 4
 WARNING OpenGLContext.looptrace:main loop stalled 67ms: match 54ms, render 12ms,
   character 1ms, animate 0ms, draw 0ms, idle 0ms, navigation 0ms, liquids 0ms,
   weapons 0ms, cascade 0ms, poll 0ms, wait 0ms, repeats 0ms
@@ -223,7 +263,7 @@ the main thread *during* the slow frames and writes a file, one record per slow
 period:
 
 ```console
-$ OPENGLCONTEXT_STALL_TRACE=/tmp/stalls.jsonl twitch-viewer some-map.pk3 --bots 4
+$ OPENGLCONTEXT_STALL_TRACE=/tmp/stalls.jsonl twig-bb some-map.pk3 --bots 4
 $ python -m OpenGLContext.stalltrace /tmp/stalls.jsonl
 17 slow periods, 5.1s of them
 
@@ -244,7 +284,7 @@ per-function tally at the top is the answer while the stacks below it are the
 evidence.
 
 See [docs/hud.html](../openglcontext/docs/hud.html) for the whole section and
-`twitchoglc/frameclock.py` for the timestep accounting.
+`twig_bb/frameclock.py` for the timestep accounting.
 
 The widgets themselves are OpenGLContext's
 ([docs/hud.html](../openglcontext/docs/hud.html)), because a crosshair and a bar
@@ -252,12 +292,12 @@ meter are the same in every game; what is here is what the numbers *mean*.
 
 ### Weapons, and what is a stand-in
 
-`twitch-hud-demo` puts the whole HUD on screen over a small lit room with a
+`twig-bb-hud` puts the whole HUD on screen over a small lit room with a
 first-person weapon in your hands — the fastest way to see any of the above, and
 it needs no map and no downloads:
 
 ```console
-twitch-hud-demo          # 1-5 choose, p picks up, the mouse fires, h hurts
+twig-bb-hud          # 1-5 choose, p picks up, the mouse fires, h hurts
 ```
 
 The weapon table is **declared data**: fire rate, cone of fire, ammunition type
@@ -307,38 +347,60 @@ A rocket and a grenade differ in **three** of those numbers — gravity, bounce
 and fuse — and in nothing else: two weapons needing two code paths would mean
 the table was not carrying the design.
 
-**You carry every weapon in the table from the start**, with each weapon's own
-`startingAmmo` — eight rockets against a hundred and twenty rifle cells, because
-sixty of everything makes a rocket launcher a rifle with a bigger bang. Not a design
-decision:
-nothing in a map hands a player a weapon yet — item entities are
-[§6](PROJECT-PLAN.md) — and a player who spawned with one would have number keys
-that could never do anything, which reads as a broken key rather than as a
-feature that has not arrived. `PlayerState.starting` still spawns with one
-weapon, which is what a match will want once items exist.
+**You spawn with one weapon and go and find the rest.** It is whichever sits on
+slot 1 — the pistol — with that weapon's own `startingAmmo`, and everything else
+is placed around the level for you to walk to: see
+[Picking things up](#picking-things-up). Dying returns you to exactly that, so
+what you had collected is what a death costs, and the circuit is worth running
+again.
 
-The models are **stand-ins**, and that is a considered position rather than a
-gap: what a weapon contributes to play is its behaviour, its reticule and where
-its shot leaves from, none of which is the model. Each weapon has its **own**
-model, though — a weapon you switch to that looks identical to the last one
-reads as a key that did nothing. They are CC0 firearms from 3dmodelscc0's
+`startingAmmo` is per weapon rather than one number for all of them — eight
+rockets against a hundred and twenty rifle cells — because sixty of everything
+makes a rocket launcher a rifle with a bigger bang. It is read in both places
+that hand ammunition out: what you spawn holding, and what a weapon pickup
+arrives with. Slot 1 is read from the table too, so a variant that retunes the
+table changes what a player starts with by editing the table and nothing else.
+
+`PlayerState.carrying` still exists and holds the whole table, but nothing in a
+match uses it: it is what `twig-bb-hud` wants, where the point is to show every
+weapon on the bar.
+
+**The models are stand-ins, and the gap is real.** The weapons play as their
+table says — behaviour, reticule, where the shot leaves from — and what is on
+screen is a placeholder for art this project has not commissioned yet
+([§7](PROJECT-PLAN.md)).
+
+Each weapon has a model of its own, so a number key visibly does something, but
+only two of the five are recognisable as what they are. They are CC0 firearms
+from 3dmodelscc0's
 [Guns & Explosives pack](https://3dmodelscc0.itch.io/free-cc0-guns-explosives-pack)
-— a Luger, a pump shotgun, an AK-47, and (standing in for the two launchers,
-which the pack has none of) a sniper rifle and a pipe bomb — trimmed for the
-repository by
-[`tools/prepare_weapon.py`](tools/prepare_weapon.py), which resamples or strips
-the 2048px maps that make each source model 8–10 MB. Every piece of geometry,
-its author and a link to their page are in
-[`twitchoglc/assets/weapons/CREDITS.md`](twitchoglc/assets/weapons/CREDITS.md),
+— a Luger, a pump shotgun and an AK-47, plus a sniper rifle and a pipe bomb
+standing in for the two launchers, which the pack has none of. Two things
+follow, and both are worth knowing before you judge what you see:
+
+- **Three of them carry no texture.** Each source model is 8–10 MB of 2048px
+  PBR maps, and [`tools/prepare_weapon.py`](tools/prepare_weapon.py) either
+  resamples those or strips them. The pistol and the pipe bomb kept theirs,
+  resampled; the shotgun, rifle and rocket launcher were stripped and are drawn
+  in a plain metallic material, which on screen is a pale grey shape with the
+  right silhouette and no detail.
+- **Two of them are the wrong weapon.** A sniper rifle in hand is the rocket
+  launcher and a pipe bomb is the grenade launcher, because a launcher is what
+  a pack of firearms does not contain.
+
+Every piece of geometry, its author and a link to their page are in
+[`twig_bb/assets/weapons/CREDITS.md`](twig_bb/assets/weapons/CREDITS.md),
 which is the rule for all art here and is enforced by a test. CC0 is why they
 may be committed at all: a public-domain dedication with no conditions, unlike
 the share-alike OpenArena content, which is fetched to a user cache and never
-vendored. Replacing them is a table edit — `model`, `modelScale`,
-`modelOffset` and `modelYaw` are fields of the weapon.
+vendored. Replacing any of it is a table edit rather than a code change:
+`model`, `modelScale`, `modelOffset` and `modelYaw` are fields of the weapon,
+so better art is a row in the table and a file in
+[`twig_bb/assets/weapons/`](twig_bb/assets/weapons/).
 
 The weapon is drawn as **part of the scene**, on a transform put where the
 camera is each frame, so it takes the map's own lighting and is occluded by
-geometry the way anything else is. `twitch-hud-demo --weapon shotgun` starts
+geometry the way anything else is. `twig-bb-hud --weapon shotgun` starts
 holding one, which is how the offsets above are dialled in.
 
 ## Options
@@ -362,7 +424,7 @@ given and how many notches it made of it. Platforms disagree about what one
 click of a wheel comes to — X11 says 1.0 and GLFW's Wayland backend says 1.5 —
 and this is how to see which yours is.
 
-Set `TWITCH_DEBUG_JUMP=1` to have every jump press say what the capsule thought
+Set `TWIG_BB_DEBUG_JUMP=1` to have every jump press say what the capsule thought
 at the time — whether it fired, and if not whether it was airborne, crouching or
 flying. A press that does nothing can fail in four places (the event queue, the
 mode that owns the binding, the character, its footing) and they look identical
@@ -375,8 +437,8 @@ from the outside; this says which.
 Two more commands come with it:
 
 ```bash
-twitch-parse-bsp map.bsp     # report a map's contents without opening a window
-twitch-download URL          # fetch and unpack an archive; prints the map path
+twig-bb-bsp map.bsp     # report a map's contents without opening a window
+twig-bb-fetch URL          # fetch and unpack an archive; prints the map path
 ```
 
 ## Content: your maps, measured against OpenArena
@@ -412,8 +474,8 @@ fetch the OpenArena content for you — see [Content packs](#content-packs) — 
 you can point it at an installed copy:
 
 ```bash
-twitch-viewer openarena:oa_dm3            # fetched for you
-twitch-viewer oa/maps/oa_dm3.bsp --content oa-textures --content oa-pak0
+twig-bb openarena:oa_dm3            # fetched for you
+twig-bb oa/maps/oa_dm3.bsp --content oa-textures --content oa-pak0
 ```
 
 ## Content packs
@@ -438,11 +500,11 @@ to no file however much art is on disk — maps-and-art alone leaves only 6 of
 the 50 complete.
 
 **Nothing is fetched without being asked for.** There are exactly two consents:
-naming a map inside a pack (`twitch-viewer openarena:oa_dm1`) or naming the pack
-(`twitch-viewer --fetch openarena-textures`) is itself the answer, since a pack
+naming a map inside a pack (`twig-bb openarena:oa_dm1`) or naming the pack
+(`twig-bb --fetch openarena-textures`) is itself the answer, since a pack
 must be on disk before there is a window to ask in; anything else is asked in
 the window, over the map it is about, with two buttons. A pack unpacks once per
-user under `<cache>/twitch-content/<pack>` and every later run finds it there.
+user under `<cache>/twig-bb-content/<pack>` and every later run finds it there.
 
 The OpenArena release is split, so what one map needs spans several packs:
 fetching only the maps gets you geometry and baked lighting rendered in grey.
@@ -486,13 +548,13 @@ Quake 3 replacement set. Offering the wrong one would download hundreds of
 megabytes that cannot name a single one of the map's textures.
 
 A pack is unpacked into a named directory of its own —
-`<cache>/twitch-content/<pack>` — rather than into one more hash-named
+`<cache>/twig-bb-content/<pack>` — rather than into one more hash-named
 per-archive tree, which makes it something you can find, point another tool at,
 or delete on purpose. It is unpacked rather than read straight from the archive
 because texture lookup lists directories to match names whose case differs from
 the map's. A release that wraps its content in a version directory and a pak
 directory is resolved to the level texture names are actually relative to.
-`twitch-download --purge` removes it along with the unpacked maps.
+`twig-bb-fetch --purge` removes it along with the unpacked maps.
 
 Two other gaps are deliberate. A `.wal` texture is palette-indexed and the
 palette is separate content this viewer does not carry, so a stock Quake 2 map
@@ -551,9 +613,31 @@ engine.
 
 ## Installing
 
+To play without installing anything permanently:
+
 ```bash
-pip install -e .
+uvx twig-bb
 ```
+
+To install it:
+
+```bash
+pip install twig-bb            # from PyPI
+pip install twig-bb[audio]     # with the sound-card backend, see Sound
+pip install -e .               # from a checkout, for working on it
+```
+
+The import name is `twig_bb` and the distribution is `twig-bb`. Four commands
+come with it, and the game also runs as a module, which needs no directory on
+`PATH`:
+
+| | |
+|---|---|
+| `twig-bb` | play — the start screen, or a map named on the command line |
+| `python -m twig_bb` | the same thing, from any interpreter that can import it |
+| `twig-bb-hud` | the HUD over a small lit room, with a weapon in hand |
+| `twig-bb-fetch` | fetch and unpack an archive; prints the map path |
+| `twig-bb-bsp` | report a map's contents without opening a window |
 
 It needs `OpenGLContext` with a GLFW backend, `omi_physics`, `numpy` and
 `pillow`. It does **not** need `requests` (downloads go through the
@@ -594,9 +678,9 @@ built on freely-licensed content owes, and eventually multiplayer. It records
 the design, the order, and which sources may and may not be read, and it marks
 each phase with what is done and what is not.
 
-The game that plan describes has a working title of its own — **Twitchy Binners**.
-`twitchoglc` stays what it is: the map-loading and rendering library the game is
-built on, and a component you can use without the game.
+The game that plan describes is **Twitchy GLitchy Bang Bang**. `twig_bb` is both
+halves: the map-loading and rendering library, usable on its own as a component,
+and the game built on it.
 
 The game's own content — characters, weapons and their sounds — is **ours**,
 authored in glTF and shipped with the code. What gets fetched is the levels: maps,
@@ -631,8 +715,8 @@ together rather than drifting apart. Version 38 has no scripts, so its
 `SURF_FLOWING` flag produces the same value object a `tcMod scroll` does and
 nothing downstream branches on which family a map came from.
 
-The evaluation is `twitchoglc.surfaceanim` (waves, coordinate transforms,
-deformation, colour) and the application is `twitchoglc.animator` (which
+The evaluation is `twig_bb.surfaceanim` (waves, coordinate transforms,
+deformation, colour) and the application is `twig_bb.animator` (which
 material field each answer lands on). Both are tested without a window: 154
 tests over the numbers at known times. Against the shipped OpenArena scripts the
 parser reads **1387 materials, of which 498 animate** — 226 rotations, 173
@@ -703,7 +787,7 @@ as the sound having broken.
 0.4 s rather than as a trickle — a number sliding down by one is not a warning
 and being taken a chunk at a time is. Lava takes 32 health a second and slime
 12; water takes none, which is a decision recorded in the same table
-(`twitchoglc.liquids.HARM`) rather than a hole in it. The numbers are ours, and
+(`twig_bb.liquids.HARM`) rather than a hole in it. The numbers are ours, and
 what they are chosen around is that lava should be a mistake you may just
 survive crossing.
 
@@ -713,7 +797,7 @@ rule — dying to the map costs a frag — applies without anything having to
 invent a killer to put on the scoreboard.
 
 The colours, ranges and muffles are this game's own numbers
-([`twitchoglc/underwater.py`](twitchoglc/underwater.py)); no specification says
+([`twig_bb/underwater.py`](twig_bb/underwater.py)); no specification says
 how far you can see through slime.
 
 ## Sound
@@ -761,7 +845,7 @@ gives one warning and a silent run, never an error and never a refusal to start.
 Install the optional backend with:
 
 ```bash
-pip install 'twitchoglc[audio]'
+pip install 'twig-bb[audio]'
 ```
 
 ## Fighting
@@ -769,8 +853,8 @@ pip install 'twitchoglc[audio]'
 `--bots N` puts opponents in the map and the scoreboard starts moving.
 
 ```bash
-twitch-viewer openarena:oa_dm1 --bots 3 --difficulty hard
-twitch-viewer openarena:oa_dm1 --bots 1 --difficulty near-passive   # a companion
+twig-bb openarena:oa_dm1 --bots 3 --difficulty hard
+twig-bb openarena:oa_dm1 --bots 1 --difficulty near-passive   # a companion
 ```
 
 **The left mouse button fires** — held, so it keeps firing at the weapon's own
@@ -890,7 +974,7 @@ a fixed loadout spent once.
 Walk into one and you take it. On `ztn3dm1` that is 44 things — eleven armour
 shards, seven small medikits, three rifles, a rocket launcher, a body armour and
 a mega health among them — with the nearest 4 m from a spawn point. What each is
-worth *here* is a declared table (`twitchoglc.items`), and the join to the map is
+worth *here* is a declared table (`twig_bb.items`), and the join to the map is
 the classname the level was authored with, so the amounts are tunable without
 touching the reader:
 
@@ -901,6 +985,15 @@ touching the reader:
 | `ammo_bullets`, `ammo_shells`, `ammo_cells`, `ammo_rockets`, `ammo_grenades` | that pool, refilled |
 | `weapon_shotgun`, `weapon_rocketlauncher`, `weapon_grenadelauncher` | the weapon, **with ammunition in it** |
 | `weapon_railgun`, `weapon_lightning`, `weapon_plasmagun`, `weapon_chaingun` | the rifle: no counterpart exists here, and the nearest one keeps the level's circuit intact |
+
+**A weapon you walk over goes into your hands**, not just onto the bar — but
+only when it beats what you are already holding. Which beats which is the
+table's `slot` order, the same order the number keys use, so walking over a
+rocket launcher while holding the pistol arms you with it and walking over a
+pistol while holding the rocket launcher does not disarm you. One you already
+have is a pickup for the ammunition inside it and leaves your hands alone.
+Whatever you are holding is what is drawn in front of you: `1`–`5`, the wheel,
+a pickup and a respawn all move the same one thing.
 
 An item nobody can use **stays on the floor** — walking over a medikit at full
 health does not destroy it for everybody else — and one that is taken comes back
@@ -919,7 +1012,7 @@ are ours.
 The four health pickups are drawn as a **medikit**: a cross floating inside a
 glass bubble, half a metre across, turning on the spot so it does not read as
 part of the wall. It is ours, it is BSD, and it is credited in
-[`twitchoglc/assets/items/CREDITS.md`](twitchoglc/assets/items/CREDITS.md) —
+[`twig_bb/assets/items/CREDITS.md`](twig_bb/assets/items/CREDITS.md) —
 which is the rule for all art here, and is enforced by a test.
 
 **All four are the same model in four different colours**, and the colour is
@@ -970,7 +1063,7 @@ for two players to set differently.
 
 **The sounds are ours, and they are arithmetic rather than files.** Every one is
 synthesised through OpenGLContext's `audio.synth` from numbers declared in
-`twitchoglc.combatsound`, so the game ships with a full complement of sound, no
+`twig_bb.combatsound`, so the game ships with a full complement of sound, no
 audio files, and nothing to check under
 [CLEAN-ROOM](../CLEAN-ROOM.md). A voice may name a file instead, which is how
 commissioned or CC0 content would replace a synthesised stand-in: a table edit.

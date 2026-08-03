@@ -12,7 +12,7 @@ import json
 
 import pytest
 
-from twitchoglc import catalog, download
+from twig_bb import catalog, download
 
 
 class TestTheShippedCatalogue:

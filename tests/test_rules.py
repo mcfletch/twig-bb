@@ -13,7 +13,7 @@ import pytest
 from omi_physics import model
 from omi_physics.world import PhysicsWorld
 
-from twitchoglc import (arena, avatar, bots, falling, game, liquids,
+from twig_bb import (arena, avatar, bots, falling, game, liquids,
                         projectiles, rules, weapons)
 
 
@@ -91,7 +91,7 @@ class TestATickOfAMatch:
 class TestWhatTheMapLeftLyingAbout:
 
     def pickups(self):
-        from twitchoglc import items
+        from twig_bb import items
         return items.Pickups([items.Pickup(
             kind=items.ItemKind(key='health', title='HEALTH', health=25),
             position=np.zeros(3))])

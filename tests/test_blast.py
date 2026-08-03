@@ -13,7 +13,7 @@ import pytest
 from omi_physics import model
 from omi_physics.world import PhysicsWorld
 
-from twitchoglc import arena, blast, projectiles, weapons
+from twig_bb import arena, blast, projectiles, weapons
 
 
 def world():

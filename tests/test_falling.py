@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from twitchoglc import arena, falling, weapons
+from twig_bb import arena, falling, weapons
 
 
 def match(*positions):

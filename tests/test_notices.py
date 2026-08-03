@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 
-from twitchoglc import notices
+from twig_bb import notices
 
 
 class TestTheContentHalf:
@@ -23,19 +23,19 @@ class TestTheContentHalf:
 
     def test_every_registered_pack_appears(self):
         text = notices.content_notices()
-        from twitchoglc import catalog
+        from twig_bb import catalog
         for pack in catalog.load():
             assert pack.title in text
 
     def test_each_pack_is_shown_with_its_terms(self):
         text = notices.content_notices()
-        from twitchoglc import catalog
+        from twig_bb import catalog
         for pack in catalog.load():
             assert pack.copyright in text
 
     def test_a_pack_added_to_the_catalogue_needs_no_edit_here(self):
         """The whole reason `copyright` is a mandatory field."""
-        from twitchoglc.assetpack import AssetPack
+        from twig_bb.assetpack import AssetPack
         extra = AssetPack(key='new', title='A brand new pack',
                           url='https://example.com/n.zip', directory='new',
                           archive='zip', approximate_bytes=1,

@@ -27,7 +27,7 @@ from test_combat_gl import AHEAD, _lit, render        # noqa: F401
 
 from OpenGLContext.scenegraph.transform import Transform
 
-from twitchoglc import game, items
+from twig_bb import game, items
 
 pytestmark = [pytest.mark.gl]
 

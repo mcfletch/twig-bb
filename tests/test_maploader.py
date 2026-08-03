@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 
 import bspbuilder
-from twitchoglc import maploader
-from twitchoglc.bspfile import MalformedBSP
+from twig_bb import maploader
+from twig_bb.bspfile import MalformedBSP
 
 
 def _q2(tmp_path, lumps=None, name='ctf-test.bsp'):
@@ -238,7 +238,7 @@ def test_a_texture_that_is_present_is_not_reported_missing(tmp_path):
 
 def test_undrawn_surfaces_are_not_reported_as_missing_textures(tmp_path):
     """A nodraw surface has no texture to find, so naming it would be noise."""
-    from twitchoglc import q2bsp
+    from twig_bb import q2bsp
     lumps = bspbuilder.v38_quad(flags=q2bsp.SURF_NODRAW)
     assert maploader.load(_q2(tmp_path, lumps)).missing_textures() == []
 

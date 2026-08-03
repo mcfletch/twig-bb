@@ -24,7 +24,7 @@ re-model.
 
 Requires ``pygltflib`` and ``Pillow``, both already dependencies of the test
 environment.  Prints what it did, because the numbers belong in
-``twitchoglc/assets/weapons/CREDITS.md`` beside the model.
+``twig_bb/assets/weapons/CREDITS.md`` beside the model.
 """
 
 from __future__ import annotations

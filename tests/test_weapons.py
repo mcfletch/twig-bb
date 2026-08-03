@@ -11,7 +11,7 @@ import math
 
 import pytest
 
-from twitchoglc import weapons
+from twig_bb import weapons
 
 
 class TestTable:

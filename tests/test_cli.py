@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 import bspbuilder
-from twitchoglc import download, jumppads, maploader
+from twig_bb import download, jumppads, maploader
 
 
 def _map(tmp_path, lumps=None, name='cli-test.bsp'):
@@ -17,7 +17,7 @@ def _map(tmp_path, lumps=None, name='cli-test.bsp'):
 
 
 def test_the_map_reporter_summarises_a_map(tmp_path, capsys, monkeypatch):
-    monkeypatch.setattr('sys.argv', ['twitch-parse-bsp', _map(tmp_path)])
+    monkeypatch.setattr('sys.argv', ['twig-bb-bsp', _map(tmp_path)])
     maploader.main()
     printed = capsys.readouterr().out
     assert 'quake2' in printed
@@ -34,7 +34,7 @@ def test_the_map_reporter_names_the_push_volumes_it_found(tmp_path, capsys,
         {'classname': 'trigger_push', 'model': '*1', 'angle': '-1'}])
     lumps['models'] = (bspbuilder.v38_model((0, 0, 0), (64, 64, 0), (0, 0, 0), 0, 0, 1)
                        + bspbuilder.v38_model((0, 0, 0), (64, 64, 8), (0, 0, 0), 0, 0, 0))
-    monkeypatch.setattr('sys.argv', ['twitch-parse-bsp', _map(tmp_path, lumps),
+    monkeypatch.setattr('sys.argv', ['twig-bb-bsp', _map(tmp_path, lumps),
                                      '--verbose'])
     maploader.main()
     assert '1 trigger_push' in capsys.readouterr().out
@@ -42,7 +42,7 @@ def test_the_map_reporter_names_the_push_volumes_it_found(tmp_path, capsys,
 
 def test_the_downloader_prints_the_path_it_resolved(tmp_path, capsys, monkeypatch):
     target = _map(tmp_path)
-    monkeypatch.setattr('sys.argv', ['twitch-download', target])
+    monkeypatch.setattr('sys.argv', ['twig-bb-fetch', target])
     download.main()
     assert capsys.readouterr().out.strip() == target
 
@@ -50,7 +50,7 @@ def test_the_downloader_prints_the_path_it_resolved(tmp_path, capsys, monkeypatc
 def test_the_downloader_can_purge_its_cache(tmp_path, capsys, monkeypatch):
     cache = tmp_path / 'cache'
     (cache / 'stale').mkdir(parents=True)
-    monkeypatch.setattr('sys.argv', ['twitch-download', 'ignored', '--purge',
+    monkeypatch.setattr('sys.argv', ['twig-bb-fetch', 'ignored', '--purge',
                                      '--cache-dir', str(cache)])
     download.main()
     assert not cache.exists()
@@ -87,7 +87,7 @@ def test_the_summary_calls_out_freeze_volumes():
 
 
 def test_a_shader_file_that_cannot_be_read_is_skipped(tmp_path, caplog):
-    from twitchoglc import q3shader
+    from twig_bb import q3shader
     (tmp_path / 'scripts').mkdir()
     (tmp_path / 'scripts' / 'broken.shader').mkdir()
     with caplog.at_level('WARNING'):

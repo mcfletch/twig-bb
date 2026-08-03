@@ -16,7 +16,7 @@ from omi_physics import model
 from omi_physics.character import CharacterCapabilities
 from omi_physics.world import PhysicsWorld
 
-from twitchoglc import avatar, walkers
+from twig_bb import avatar, walkers
 
 
 def capabilities():

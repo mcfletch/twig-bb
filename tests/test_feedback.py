@@ -15,7 +15,7 @@ import pytest
 
 from OpenGLContext.ui.metrics import FontMetrics
 
-from twitchoglc import arena, feedback, game, hud, weapons
+from twig_bb import arena, feedback, game, hud, weapons
 
 
 @pytest.fixture
@@ -228,7 +228,7 @@ class TestOneStreamManyReaders:
         assert screen.damage.marks
 
     def test_the_effects_see_it_too(self, match, screen):
-        from twitchoglc import effects as effectsmod
+        from twig_bb import effects as effectsmod
         drawn = effectsmod.Effects(match)
         presenter = feedback.Presenter(match, hud=screen, effects=drawn)
         match.impact(point=(1, 0, 0), normal=(0, 1, 0), surface='stone')
