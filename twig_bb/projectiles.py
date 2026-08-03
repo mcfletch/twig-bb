@@ -119,6 +119,18 @@ class Projectile(node.Node):
     #: because it has to be a *decision*.
     selfDamage = field.newField('selfDamage', 'SFFloat', 1, 0.5)
 
+    #: What one looks like in the air, relative to :data:`twig_bb.art.ASSETS`,
+    #: and how big it is drawn.  A rocket and a grenade differ by three numbers
+    #: in this table and not in code (see the module docstring); what they are
+    #: *shaped* like is a fourth, and belongs here for the same reason.  Empty
+    #: falls back to a glowing ball, which is what a kind whose art has not
+    #: been made yet is drawn as.
+    model = field.newField('model', 'SFString', 1, '')
+    #: Larger than life on purpose: what a player has to do with an incoming
+    #: rocket is *see* it in time, and a round drawn at the size it really is
+    #: crosses a room as a dot.
+    modelScale = field.newField('modelScale', 'SFFloat', 1, 1.0)
+
 
 class ProjectileTable(node.Node):
     """Every kind of projectile this game knows about."""
@@ -155,14 +167,19 @@ def default_table() -> ProjectileTable:
             key=ROCKET, speed=26.0, gravity=0.0, radius=0.14,
             fuse=0.0, lifetime=6.0, bounce=0.0,
             damage=110.0, splashDamage=60.0, splashRadius=4.0,
-            knockback=9.5, selfDamage=0.5),
+            knockback=9.5, selfDamage=0.5,
+            model='weapons/javelin-rocket.glb', modelScale=1.6),
         Projectile(
             key=GRENADE, speed=16.0, gravity=14.0, radius=0.12,
             # Longer than the flight to anywhere it can be usefully thrown, so
             # the fuse is a decision about *timing* rather than a range limit.
             fuse=2.2, lifetime=6.0, bounce=0.42,
             damage=110.0, splashDamage=80.0, splashRadius=4.5,
-            knockback=8.0, selfDamage=0.6),
+            knockback=8.0, selfDamage=0.6,
+            # The 40 mm round the launcher fires, drawn at three times life so
+            # a tumbling grenade is something a player can pick out and run
+            # away from rather than a speck.
+            model='weapons/grenade-round.glb', modelScale=3.0),
     ])
 
 
@@ -236,6 +253,18 @@ class Projectiles:
         self.owner[index] = self._index(self._owners, owner)
         self.live = index + 1
         return True
+
+    def kind_at(self, slot: int) -> Optional[Projectile]:
+        """Which kind of projectile is in ``slot``, or None if nothing is.
+
+        The batch stores the kind as an index into a registry of its own, which
+        is the right shape for stepping a hundred of them as arrays and the
+        wrong shape for anybody else.  This is how the renderer asks what it is
+        drawing without reaching inside.
+        """
+        if not 0 <= int(slot) < self.live:
+            return None
+        return self._kinds[int(self.kind[int(slot)])]
 
     @staticmethod
     def _index(registry: List[Any], value: Any) -> int:

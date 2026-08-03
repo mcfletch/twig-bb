@@ -225,8 +225,8 @@ def default_table() -> WeaponTable:
             recoilKick=0.030, recoilRise=3.5, recoilRecovery=0.14,
             crosshair=Crosshair(shape=CROSS, gap=5, length=7, thickness=2),
             fireSound='fire-pistol',
-            model='weapons/luger-pistol.glb', modelScale=1.0,
-            modelOffset=(0.15, -0.19, -0.30),
+            model='weapons/handgun.glb', modelScale=1.0,
+            modelOffset=(0.15, -0.17, -0.34),
         ),
         Weapon(
             key='shotgun', title='SHOTGUN', slot=2,
@@ -236,8 +236,8 @@ def default_table() -> WeaponTable:
             recoilKick=0.075, recoilRise=7.0, recoilRecovery=0.30,
             crosshair=Crosshair(shape=CIRCLE, gap=9, thickness=2),
             fireSound='fire-shotgun',
-            model='weapons/pump-shotgun.glb', modelScale=1.0,
-            modelOffset=(0.21, -0.27, -0.12),
+            model='weapons/sawn-off-shotgun.glb', modelScale=1.0,
+            modelOffset=(0.19, -0.19, -0.40),
         ),
         Weapon(
             key='rifle', title='RIFLE', slot=3,
@@ -247,8 +247,8 @@ def default_table() -> WeaponTable:
             recoilKick=0.018, recoilRise=2.0, recoilRecovery=0.09,
             crosshair=Crosshair(shape=CROSS_DOT, gap=4, length=5, thickness=2),
             fireSound='fire-rifle',
-            model='weapons/assault-rifle.glb', modelScale=1.0,
-            modelOffset=(0.19, -0.25, -0.14),
+            model='weapons/sniper-rifle.glb', modelScale=1.0,
+            modelOffset=(0.17, -0.20, -0.52),
         ),
         # The two that throw something instead of tracing a line.  Nothing
         # here says what a rocket *does* -- how fast it goes, whether it
@@ -264,8 +264,11 @@ def default_table() -> WeaponTable:
             recoilKick=0.090, recoilRise=8.0, recoilRecovery=0.34,
             crosshair=Crosshair(shape=CIRCLE, gap=11, thickness=2),
             fireSound='fire-rocket',
-            model='weapons/rocket-launcher.glb', modelScale=1.0,
-            modelOffset=(0.16, -0.30, -0.62),
+            # Modelled for this game at life size, in metres, already pointing
+            # the way glTF calls forward -- so it needs no scaling and none of
+            # the three correction angles the imported art needs.
+            model='weapons/javelin-launcher.glb', modelScale=1.0,
+            modelOffset=(0.30, -0.32, -0.86),
         ),
         Weapon(
             key='grenade', title='GRENADES', slot=5,
@@ -275,7 +278,7 @@ def default_table() -> WeaponTable:
             recoilKick=0.045, recoilRise=5.0, recoilRecovery=0.22,
             crosshair=Crosshair(shape=CROSS_DOT, gap=10, length=4, thickness=2),
             fireSound='fire-grenade',
-            model='weapons/pipe-bomb.glb', modelScale=1.0,
-            modelOffset=(0.20, -0.34, -0.44),
+            model='weapons/grenade-launcher.glb', modelScale=1.0,
+            modelOffset=(0.19, -0.20, -0.46),
         ),
     ])

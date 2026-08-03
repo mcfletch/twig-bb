@@ -37,7 +37,7 @@ from .worldgeometry import to_scene_points
 log = logging.getLogger(__name__)
 
 __all__ = ['ItemKind', 'ItemTable', 'Pickup', 'Pickups', 'Taken', 'MEDPACK',
-           'default_table', 'from_entities']
+           'LAUNCHER_PICKUP', 'ROCKET_PICKUP', 'default_table', 'from_entities']
 
 #: The classname prefixes that mean "this is probably something to pick up"
 #: (``SPEC-Q3ENTITIES §3.2.1``).  Used only to tell an *unrecognised pickup*
@@ -68,6 +68,45 @@ REACH_HEIGHT = REACH
 #: and a pickup turns about its middle rather than about the modeller's floor.
 MEDPACK = dict(model='items/medpack.glb', modelScale=0.5,
                modelOffset=(0.0, -1.0, 0.0))
+
+#: The rocket launcher and its ammunition, each modelled as the thing itself
+#: floating in a soap bubble the same size as the medikit's.  ``tinted`` is off
+#: because these say which pickup they are by their *shape*: painting a
+#: launcher flat red would throw away the only reason to model one.  Their
+#: middles are already their origins, so unlike the medikit they need no
+#: offset.  The bubbles are the same mesh in both files, which is what lets
+#: every one on screen collapse into a single instanced draw.
+LAUNCHER_PICKUP = dict(model='items/javelin-launcher-pickup.glb',
+                       modelScale=0.5, tinted=False)
+ROCKET_PICKUP = dict(model='items/javelin-rocket-pickup.glb',
+                     modelScale=0.5, tinted=False)
+
+#: The rest of the arsenal, on the same terms.  Each weapon's two pickups share
+#: a bubble colour, so a player learns one colour per weapon rather than one
+#: per pickup: green is the shotgun, cyan the grenade launcher, lime the
+#: sniper, orange the handgun, red the rocket launcher.
+def _pickup(name):
+    return dict(model='items/%s.glb' % (name,), modelScale=0.5, tinted=False)
+
+
+SHOTGUN_PICKUP = _pickup('sawn-off-shotgun-pickup')
+SHELL_PICKUP = _pickup('shotgun-shell-pickup')
+GRENADE_LAUNCHER_PICKUP = _pickup('grenade-launcher-pickup')
+GRENADE_ROUND_PICKUP = _pickup('grenade-round-pickup')
+SNIPER_PICKUP = _pickup('sniper-rifle-pickup')
+SNIPER_ROUND_PICKUP = _pickup('sniper-round-pickup')
+HANDGUN_PICKUP = _pickup('handgun-pickup')
+CARTRIDGE_PICKUP = _pickup('handgun-cartridge-pickup')
+
+#: Armour, in gold: a shard is one plate of the stuff and a suit is two on a
+#: pair of straps, so the pair are told apart by *how much of it there is*,
+#: which is what they are worth.
+ARMOUR_SHARD_PICKUP = _pickup('armour-shard-pickup')
+ARMOUR_PICKUP = _pickup('armour-pickup')
+#: The same carrier with a pauldron over each shoulder: a hundred armour is
+#: fifty's shape with more of it on, so the two are read against each other
+#: rather than learnt separately.
+BODY_ARMOUR_PICKUP = _pickup('body-armour-pickup')
 
 #: Seconds before a taken item comes back, when the entity does not say.
 #: ``SPEC-Q3ENTITIES §3.5.1`` observes ``wait`` clustering hard at 10 seconds
@@ -119,6 +158,15 @@ class ItemKind(node.Node):
     #: it is the design and not a decoration -- see :func:`default_table`.  A
     #: kind with no model is drawn as a box in it.
     colour = vfield.newField('colour', 'SFColor', 1, (1.0, 1.0, 1.0))
+
+    #: Whether the model is painted in :attr:`colour`, or arrived with colours
+    #: of its own worth keeping.  The four medikits are one model painted four
+    #: ways and *must* be tinted -- the colour is the whole of what tells them
+    #: apart.  A pickup modelled as the thing it gives says which it is by its
+    #: shape instead, and painting that one flat colour would throw away the
+    #: shape it was modelled for.  Either way it is lit from within, because a
+    #: map places no dynamic lights.
+    tinted = vfield.newField('tinted', 'SFBool', 1, True)
 
     #: The model, relative to :data:`twig_bb.art.ASSETS`, and how to place
     #: it.  Empty for a kind whose art has not been made yet, which is drawn as
@@ -239,52 +287,64 @@ def default_table() -> ItemTable:
                  classnames=['item_health_mega'], respawn=35.0,
                  colour=(1.00, 0.78, 0.18), **MEDPACK),
         ItemKind(key='armour-shard', title='ARMOUR', armour=5,
+                 **ARMOUR_SHARD_PICKUP,
                  classnames=['item_armor_shard'], respawn=15.0,
                  colour=(0.9, 0.85, 0.3)),
         ItemKind(key='armour', title='ARMOUR', armour=50,
+                 **ARMOUR_PICKUP,
                  classnames=['item_armor_combat'], respawn=25.0,
                  colour=(0.95, 0.8, 0.2)),
         ItemKind(key='armour-body', title='BODY ARMOUR', armour=100,
+                 **BODY_ARMOUR_PICKUP,
                  classnames=['item_armor_body'], respawn=35.0,
                  colour=(1.0, 0.7, 0.1)),
 
         ItemKind(key='bullets', title='BULLETS', ammo=30, ammoType='bullets',
                  classnames=['ammo_bullets', 'ammo_belt', 'ammo_chaingun'],
-                 colour=(0.75, 0.7, 0.6)),
+                 colour=(0.75, 0.7, 0.6), **CARTRIDGE_PICKUP),
         ItemKind(key='shells', title='SHELLS', ammo=10, ammoType='shells',
-                 classnames=['ammo_shells'], colour=(0.8, 0.5, 0.3)),
+                 classnames=['ammo_shells'], colour=(0.8, 0.5, 0.3),
+                 **SHELL_PICKUP),
         ItemKind(key='cells', title='CELLS', ammo=50, ammoType='cells',
                  classnames=['ammo_cells', 'ammo_lightning', 'ammo_slugs',
                              'ammo_nails', 'ammo_nailgun'],
-                 colour=(0.4, 0.7, 1.0)),
+                 colour=(0.4, 0.7, 1.0), **SNIPER_ROUND_PICKUP),
         ItemKind(key='rockets', title='ROCKETS', ammo=5, ammoType='rockets',
                  classnames=['ammo_rockets', 'ammo_bfg'],
-                 colour=(1.0, 0.45, 0.2)),
+                 colour=(1.0, 0.45, 0.2), **ROCKET_PICKUP),
         ItemKind(key='grenades', title='GRENADES', ammo=5,
                  ammoType='grenades',
                  classnames=['ammo_grenades', 'ammo_mines', 'ammo_proxmine'],
-                 colour=(0.6, 0.8, 0.35)),
+                 colour=(0.6, 0.8, 0.35), **GRENADE_ROUND_PICKUP),
 
         # Each arrives with ammunition in it, because a weapon you cannot fire
         # is not a pickup, it is a disappointment.
         ItemKind(key='weapon-shotgun', title='SHOTGUN', weapon='shotgun',
                  ammo=10, ammoType='shells', respawn=20.0,
-                 classnames=['weapon_shotgun'], colour=(0.8, 0.5, 0.3)),
+                 classnames=['weapon_shotgun'], colour=(0.8, 0.5, 0.3),
+                 **SHOTGUN_PICKUP),
         ItemKind(key='weapon-rifle', title='RIFLE', weapon='rifle',
                  ammo=50, ammoType='cells', respawn=20.0,
                  classnames=['weapon_railgun', 'weapon_lightning',
                              'weapon_plasmagun', 'weapon_chaingun',
                              'weapon_nailgun'],
-                 colour=(0.4, 0.7, 1.0)),
+                 colour=(0.4, 0.7, 1.0), **SNIPER_PICKUP),
         ItemKind(key='weapon-rocket', title='ROCKET LAUNCHER',
                  weapon='rocket', ammo=5, ammoType='rockets', respawn=25.0,
                  classnames=['weapon_rocketlauncher', 'weapon_bfg'],
-                 colour=(1.0, 0.45, 0.2)),
+                 colour=(1.0, 0.45, 0.2), **LAUNCHER_PICKUP),
         ItemKind(key='weapon-grenade', title='GRENADES', weapon='grenade',
                  ammo=5, ammoType='grenades', respawn=20.0,
                  classnames=['weapon_grenadelauncher',
                              'weapon_prox_launcher', 'weapon_proxmine'],
-                 colour=(0.6, 0.8, 0.35)),
+                 colour=(0.6, 0.8, 0.35), **GRENADE_LAUNCHER_PICKUP),
+        # The handgun a player starts with is still worth placing: a map that
+        # offers one is offering ammunition and a second chance, and the
+        # classname is the one Quake III uses for its own starting weapon.
+        ItemKind(key='weapon-pistol', title='PISTOL', weapon='pistol',
+                 ammo=30, ammoType='bullets', respawn=20.0,
+                 classnames=['weapon_machinegun'], colour=(0.75, 0.7, 0.6),
+                 **HANDGUN_PICKUP),
     ])
 
 

@@ -94,6 +94,29 @@ class TestTheTable:
         assert kinds.by_key('nothing-like-this') is None
 
 
+class TestAskingWhatIsInASlot:
+    """Which kind is in each slot, for whoever has to *draw* the batch.
+
+    A rocket and a grenade are not the same shape, so the renderer needs to
+    know which of the two it is looking at -- and the batch stores that as an
+    index into a registry it owns, which is not a thing to reach into.
+    """
+
+    def test_a_slot_says_which_kind_is_in_it(self, flight, rocket, grenade):
+        flight.launch(rocket, origin=(0, 1, 0), direction=(1, 0, 0), owner='player')
+        flight.launch(grenade, origin=(0, 1, 0), direction=(1, 0, 0), owner='player')
+        assert flight.kind_at(0) is rocket
+        assert flight.kind_at(1) is grenade
+
+    def test_an_empty_slot_holds_no_kind(self, flight):
+        assert flight.kind_at(0) is None
+
+    def test_and_so_does_one_past_the_end(self, flight, rocket):
+        flight.launch(rocket, origin=(0, 1, 0), direction=(1, 0, 0), owner='player')
+        assert flight.kind_at(1) is None
+        assert flight.kind_at(-1) is None
+
+
 class TestFlying:
 
     def test_a_launched_projectile_is_in_the_air(self, flight, rocket):

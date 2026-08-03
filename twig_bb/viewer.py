@@ -869,7 +869,7 @@ class TwigContext(OverlayMixin, BaseContext):
         # one rebuilt at the rate somebody holds the trigger down.
         self.flight = projectiles.Projectiles(projectiles.default_table())
         self.projectileGroup, self.projectileBodies = game.projectile_bodies(
-            self.flight.capacity)
+            self.flight.capacity, self.flight.table)
         # Given the same tables the player has, so a bot chooses between
         # exactly the weapons the player can carry and knows what each throws.
         self.minds = game.place_bots(self.arena, projectiles=self.flight.table)
@@ -1180,7 +1180,9 @@ class TwigContext(OverlayMixin, BaseContext):
         game.move_bodies(self.arena, self.botBodies)
         game.move_items(self.rules.pickups, self.itemBodies, hudclock())
         game.move_projectiles(self.flight, self.projectileBodies)
-        self.effects.trail(self.flight.position[:len(self.flight)], dt)
+        flying = len(self.flight)
+        self.effects.trail(self.flight.position[:flying], dt,
+                           velocities=self.flight.velocity[:flying])
         self._presentMatch(tick.events)
 
     def _watchDeath(self, events: Any, dt: float) -> None:  # pragma: no cover - GL

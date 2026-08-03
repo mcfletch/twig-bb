@@ -585,6 +585,30 @@ class TestDrawingAPickupAsItsModel:
         for shape in art.shapes(look):
             assert max(shape.appearance.material.emissiveColor) > 0.0
 
+    def test_art_that_came_coloured_keeps_its_colours(self):
+        """A launcher in a red bubble is a launcher, not a red launcher."""
+        from twig_bb import items
+        look = game.item_look(self.kind(colour=(0.9, 0.2, 0.15),
+                                        **dict(items.LAUNCHER_PICKUP)))
+        painted = {tuple(round(float(value), 3)
+                         for value in shape.appearance.material.baseColor)
+                   for shape in art.shapes(look)}
+        assert len(painted) > 1, 'the whole model was painted one colour'
+
+    def test_but_it_still_carries_its_own_light(self):
+        """Unlit maps: art that is not repainted still may not be a silhouette."""
+        from twig_bb import items
+        look = game.item_look(self.kind(colour=(0.9, 0.2, 0.15),
+                                        **dict(items.LAUNCHER_PICKUP)))
+        assert any(max(shape.appearance.material.emissiveColor) > 0.0
+                   for shape in art.shapes(look))
+
+    def test_a_kind_that_asks_to_be_tinted_still_is(self):
+        look = game.item_look(self.medikit(colour=(0.2, 0.55, 0.95)))
+        for shape in art.shapes(look):
+            assert tuple(shape.appearance.material.baseColor) == pytest.approx(
+                (0.2, 0.55, 0.95))
+
     def test_one_kind_is_one_subtree_however_many_a_map_places(self):
         """Fifty pickups a map, several of a kind; one medikit, not eight."""
         from twig_bb import items
@@ -628,33 +652,140 @@ class TestDrawingWhatIsInFlight:
                         owner='player')
         return made
 
-    def test_there_is_one_body_per_slot(self):
+    def test_there_is_one_body_per_slot_of_each_kind(self):
+        from twig_bb import projectiles
         group, bodies = game.projectile_bodies(4)
-        assert len(bodies) == 4
-        assert len(group.children) == 4
+        assert all(len(row) == 4 for row in bodies.values())
+        assert len(group.children) == 4 * len(bodies)
+        assert projectiles.ROCKET in bodies
 
     def test_an_unused_body_is_out_of_sight(self):
+        from twig_bb import projectiles
         _group, bodies = game.projectile_bodies(2)
         game.move_projectiles(self.flight(), bodies)
-        assert tuple(bodies[0].translation) == game.OFFSTAGE
+        assert tuple(bodies[projectiles.ROCKET][0].translation) == game.OFFSTAGE
 
     def test_a_flying_projectile_is_drawn_where_it_is(self):
+        from twig_bb import projectiles
         _group, bodies = game.projectile_bodies(4)
         flight = self.flight(2)
         game.move_projectiles(flight, bodies)
-        assert tuple(bodies[0].translation) == pytest.approx((0.0, 1.0, 0.0))
-        assert tuple(bodies[1].translation) == pytest.approx((1.0, 1.0, 0.0))
-        assert tuple(bodies[2].translation) == game.OFFSTAGE
+        rockets = bodies[projectiles.ROCKET]
+        assert tuple(rockets[0].translation) == pytest.approx((0.0, 1.0, 0.0))
+        assert tuple(rockets[1].translation) == pytest.approx((1.0, 1.0, 0.0))
+        assert tuple(rockets[2].translation) == game.OFFSTAGE
 
-    def test_they_all_share_one_geometry_so_the_pass_can_batch_them(self):
+    def test_each_kind_of_projectile_gets_its_own_shape(self):
+        """A grenade is not a rocket, and neither is a ball."""
+        from twig_bb import projectiles
+        _group, bodies = game.projectile_bodies(2)
+        assert set(bodies) == {projectiles.ROCKET, projectiles.GRENADE}
+
+    def test_a_grenade_in_the_air_is_drawn_as_a_grenade(self):
+        from twig_bb import projectiles
+        table = projectiles.default_table()
+        flight = projectiles.Projectiles(table, capacity=4)
+        flight.launch(table.by_key(projectiles.GRENADE), origin=(3, 1, 0),
+                      direction=(1, 0, 0), owner='player')
+        _group, bodies = game.projectile_bodies(4)
+        game.move_projectiles(flight, bodies)
+        assert tuple(bodies[projectiles.GRENADE][0].translation) \
+            == pytest.approx((3.0, 1.0, 0.0))
+        assert all(tuple(body.translation) == game.OFFSTAGE
+                   for body in bodies[projectiles.ROCKET])
+
+    def test_two_kinds_at_once_each_go_to_their_own_bodies(self):
+        from twig_bb import projectiles
+        table = projectiles.default_table()
+        flight = projectiles.Projectiles(table, capacity=4)
+        flight.launch(table.by_key(projectiles.ROCKET), origin=(1, 0, 0),
+                      direction=(1, 0, 0), owner='player')
+        flight.launch(table.by_key(projectiles.GRENADE), origin=(2, 0, 0),
+                      direction=(1, 0, 0), owner='player')
+        _group, bodies = game.projectile_bodies(4)
+        game.move_projectiles(flight, bodies)
+        assert tuple(bodies[projectiles.ROCKET][0].translation)[0] == pytest.approx(1.0)
+        assert tuple(bodies[projectiles.GRENADE][0].translation)[0] == pytest.approx(2.0)
+
+    def test_they_all_share_one_body_so_the_pass_can_batch_them(self):
+        """Two hundred rockets are two hundred matrices, not two hundred models.
+
+        The pass batches on the identity of the geometry, so every slot has to
+        be handed the *same* subtree rather than its own copy of one.
+        """
+        from twig_bb import projectiles
         _group, bodies = game.projectile_bodies(3)
-        radii = {float(body.children[0].geometry.radius) for body in bodies}
-        assert radii == {game.PROJECTILE_DRAW_RADIUS}
+        held = {id(body.children[0]) for body in bodies[projectiles.ROCKET]}
+        assert len(held) == 1
+
+    def test_a_projectile_is_drawn_as_a_rocket(self):
+        from twig_bb import projectiles
+        _group, bodies = game.projectile_bodies(1)
+        assert list(art.shapes(bodies[projectiles.ROCKET][0])), \
+            'the rocket model brought no shapes'
+
+    def test_a_missing_model_still_leaves_something_to_see(self):
+        """Art that will not load is not a reason for an invisible rocket."""
+        from twig_bb import projectiles
+        table = projectiles.ProjectileTable(kinds=[
+            projectiles.Projectile(key='ghost', model='weapons/absent.glb')])
+        _group, bodies = game.projectile_bodies(2, table=table)
+        assert len(bodies['ghost']) == 2
+        assert list(art.shapes(bodies['ghost'][0]))
 
     def test_no_batch_at_all_parks_everything(self):
         _group, bodies = game.projectile_bodies(2)
         game.move_projectiles(None, bodies)
-        assert all(tuple(body.translation) == game.OFFSTAGE for body in bodies)
+        assert all(tuple(body.translation) == game.OFFSTAGE
+                   for row in bodies.values() for body in row)
+
+
+class TestPointingARocketWhereItIsGoing:
+    """A rocket is a shape with a nose, so which way it lies is visible.
+
+    The model is authored along -Z, which is the way glTF calls forward and the
+    way the view looks; turning it is therefore a rotation from there onto
+    wherever the projectile is actually headed.
+    """
+
+    def turned(self, direction):
+        """Where the model's nose ends up once ``direction`` has turned it."""
+        axis = np.asarray(game.heading_rotation(direction)[:3], dtype=float)
+        angle = game.heading_rotation(direction)[3]
+        nose = np.asarray(game.MODEL_FORWARD, dtype=float)
+        length = np.linalg.norm(axis)
+        if length == 0.0:
+            return nose
+        axis = axis / length
+        # Rodrigues, so the test does not lean on the same maths as the code.
+        return (nose * np.cos(angle)
+                + np.cross(axis, nose) * np.sin(angle)
+                + axis * np.dot(axis, nose) * (1.0 - np.cos(angle)))
+
+    def test_the_nose_ends_up_pointing_along_the_flight(self):
+        for direction in ((1, 0, 0), (0, 0, 1), (0, 1, 0), (-1, 0, 0),
+                          (0.3, 0.5, -0.8)):
+            wanted = np.asarray(direction, dtype=float)
+            wanted = wanted / np.linalg.norm(wanted)
+            assert np.allclose(self.turned(direction), wanted, atol=1e-6), direction
+
+    def test_flying_straight_backwards_turns_right_around(self):
+        """The one direction with no unique axis to turn about."""
+        assert np.allclose(self.turned((0, 0, 1)), (0, 0, 1), atol=1e-6)
+
+    def test_going_nowhere_is_left_alone(self):
+        assert game.heading_rotation((0.0, 0.0, 0.0))[3] == 0.0
+
+    def test_a_flying_projectile_is_turned_to_face_its_flight(self):
+        from twig_bb import projectiles
+        table = projectiles.default_table()
+        flight = projectiles.Projectiles(table, capacity=2)
+        flight.launch(table.by_key(projectiles.ROCKET), origin=(0, 1, 0),
+                      direction=(1, 0, 0), owner='player')
+        _group, bodies = game.projectile_bodies(2)
+        game.move_projectiles(flight, bodies)
+        assert tuple(bodies[projectiles.ROCKET][0].rotation) == pytest.approx(
+            game.heading_rotation((1, 0, 0)))
 
 
 class TestSayingHowSomebodyDied:

@@ -376,8 +376,22 @@ class TestTellingTheHealthPickupsApart:
         red = items.default_table().by_key('health')
         assert red.colour[0] > 0.6 and red.colour[1] < 0.4 and red.colour[2] < 0.4
 
-    def test_a_kind_with_no_art_yet_names_no_model(self):
-        assert str(items.default_table().by_key('armour').model) == ''
+    def test_every_kind_names_art_that_is_actually_there(self):
+        """Every pickup now has a model, so a typo is the only way to lose one.
+
+        The box fallback is still the designed answer for a kind whose art has
+        not been made (``twig_bb.game.item_look``, and there is a test for it
+        over there) -- but nothing in the shipped table wants it any more, and
+        a misspelt filename would quietly take a pickup back to a box rather
+        than failing.
+        """
+        import os
+
+        from twig_bb import art
+        for kind in items.default_table().kinds:
+            named = str(kind.model)
+            assert named, 'no model for %r' % (str(kind.key),)
+            assert os.path.exists(art.path_for(named)), named
 
 
 class TestNothingHereReadsAClock:

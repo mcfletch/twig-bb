@@ -367,16 +367,21 @@ weapon on the bar.
 
 **The models are stand-ins, and the gap is real.** The weapons play as their
 table says — behaviour, reticule, where the shot leaves from — and what is on
-screen is a placeholder for art this project has not commissioned yet
+screen is a placeholder for art this project has not commissioned or built yet
 ([§7](PROJECT-PLAN.md)).
 
 Each weapon has a model of its own, so a number key visibly does something, but
 only two of the five are recognisable as what they are. They are CC0 firearms
 from 3dmodelscc0's
 [Guns & Explosives pack](https://3dmodelscc0.itch.io/free-cc0-guns-explosives-pack)
-— a Luger, a pump shotgun and an AK-47, plus a sniper rifle and a pipe bomb
-standing in for the two launchers, which the pack has none of. Two things
-follow, and both are worth knowing before you judge what you see:
+
+- Pistol -- a Luger pistol
+- Shotgun -- pump shotgun
+- Rifle -- currently an AK-47
+- Rocket Launcher -- custom rocket launcher for this project
+- Grenade Launcher -- a pipe bomb
+
+Two things follow, and both are worth knowing before you judge what you see:
 
 - **Three of them carry no texture.** Each source model is 8–10 MB of 2048px
   PBR maps, and [`tools/prepare_weapon.py`](tools/prepare_weapon.py) either

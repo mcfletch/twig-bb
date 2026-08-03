@@ -5,7 +5,67 @@ its author's page, whether or not its licence requires it.** That is the rule
 for all art in this project, not a courtesy extended to some of it. A model
 whose author cannot be named from this file does not belong here.
 
-## Shipped now — 3dmodelscc0, Free CC0 Guns & Explosives Pack
+## Made for this project — the javelin launcher and its rocket
+
+| | |
+|---|---|
+| **Author** | this project |
+| **Licence** | the same BSD terms as the rest of twig-bb |
+| **Source** | [`grass-clumps/arsenal.py`](../../../../grass-clumps/arsenal.py) in this workspace |
+
+| File | Used as | Textures |
+|---|---|---|
+| `javelin-launcher.glb` | the rocket launcher | its own, baked at 512px |
+| `javelin-rocket.glb` | what it throws — the projectile in flight | its own, baked at 256px |
+| `sawn-off-shotgun.glb` | the shotgun | its own, baked at 512px |
+| `grenade-launcher.glb` | the grenade launcher | its own, baked at 512px |
+| `grenade-round.glb` | what it throws — the projectile in flight | its own, baked at 256px |
+| `sniper-rifle.glb` | the rifle | its own, baked at 512px |
+| `handgun.glb` | the pistol | its own, baked at 512px |
+
+One script builds all of them: the geometry, the materials and the maps, from
+nothing every time it runs, written straight into this directory. Re-running it after
+an edit is the whole update procedure, and `javelin-launcher.blend` beside it
+opens with the material node graphs still live rather than with the flattened
+textures.
+
+The rocket is modelled to fit the launcher's barrel — 0.20 m long and 0.066 m
+across, inside the 0.084 m bore — so the two are to each other's scale rather
+than to a guess. [`twig_bb.game`](../../game.py) draws it for everything in
+flight, at :data:`~twig_bb.game.PROJECTILE_DRAW_SCALE`, and every slot in the
+batch is handed *the same* subtree so the pass collapses them into one
+instanced draw per part however many are in the air.
+
+It is modelled at life size in metres — a 0.60 m tube with a 0.10 m barrel —
+and its wear is procedural: paint chipped off the edges, scratches down the
+flanks, grime in the hollows. None of that survives a glTF export as nodes, so
+the export bakes it into the three maps of the glTF metallic/roughness
+material: base colour, a second image carrying occlusion, roughness and
+metallic in its red, green and blue, and a tangent-space normal map. The
+accent strips are not textured at all; their emission travels as a factor.
+
+Its **emissive floor follows its own base colour** rather than being flat grey
+— the same 0.07 as everything else here, and for the same reason (see below),
+but applied through the base-colour map, so the paint keeps its hue instead of
+being lifted towards grey.
+
+### The wood is grown, not photographed
+
+The shotgun's stock and the grenade launcher's furniture are procedural: a wave
+of growth rings bent by noise, between the pale early wood and the dark late
+wood of a year's growth, with the roughness following the colour because the
+late wood is the harder of the two. It is baked into each weapon's own atlas
+like everything else here.
+
+**A CC0 photo texture was the brief and this is a deliberate departure.**
+ambientCG's library is the obvious source and is CC0, but its API carries no
+licence field to check against — and the rule at the top of this file is that
+a shipped texture is one whose terms someone can *name from here*. Wood that
+belongs to the project outright is freer than CC0 and needs no such claim, so
+that is what it is. Swapping in a fetched texture later is a change to
+`wood()` in the build script and a row in this table.
+
+## Also shipped — 3dmodelscc0, Free CC0 Guns & Explosives Pack
 
 | | |
 |---|---|
@@ -17,11 +77,11 @@ whose author cannot be named from this file does not belong here.
 
 | File | Original | Used as | Textures |
 |---|---|---|---|
-| `luger-pistol.glb` | Luger | the pistol | its own, resampled to 512px |
-| `pump-shotgun.glb` | Shotgun | the shotgun | **none** — see below |
-| `assault-rifle.glb` | AK-47 | the rifle | **none** — see below |
-| `rocket-launcher.glb` | Sniper | the rocket launcher | **none** — see below |
-| `pipe-bomb.glb` | Pipe_Bomb | the grenade launcher | its own, resampled to 512px |
+| `luger-pistol.glb` | Luger | nothing now — see below | its own, resampled to 512px |
+| `pump-shotgun.glb` | Shotgun | nothing now — see below | **none** — see below |
+| `assault-rifle.glb` | AK-47 | nothing now — see below | **none** — see below |
+| `rocket-launcher.glb` | Sniper | nothing now — see below | **none** — see below |
+| `pipe-bomb.glb` | Pipe_Bomb | nothing now — see below | its own, resampled to 512px |
 
 The pack is CC0 and asks for nothing, but its author asked to be linked, and
 that is the entry above. Everything in it is worth knowing about: 19 models,
@@ -42,12 +102,11 @@ python tools/prepare_weapon.py Sniper.glb    rocket-launcher.glb --strip-texture
 python tools/prepare_weapon.py Pipe_Bomb.glb pipe-bomb.glb       --textures 512
 ```
 
-**There is no rocket launcher in the pack**, so the sniper rifle stands in for
-one: it is the only long-barrelled silhouette in it, and what a first-person
-weapon has to do at this stage is *read as a different weapon from the last
-one*. The pipe bomb is a thrown explosive and stands in for the grenade
-launcher on the same basis. Both are a table edit away from the commissioned
-art when it arrives.
+**None of these is drawn any more.** Every weapon in the table now has art
+modelled for it, and the five stand-ins have been stood down. They are kept
+rather than deleted: they cost half a megabyte between them, they are the
+nearest thing to hand if a sixth weapon turns up before it has art, and each
+is one table edit from being used again.
 
 Geometry is never touched — mesh, normals and UVs come through unchanged — so
 re-running this with better maps later is a re-run and not a re-model.
@@ -78,10 +137,13 @@ through with their own maps already.
 are fields of the weapon in [`twig_bb/weapons.py`](../../weapons.py), so
 placing a new model is a table edit and never a code change.
 
-These three need **no rotation and no scaling at all**: the models are authored
-in centimetres lying along their own +Y, but the glTF export already carries the
-node scale and the Z-up-to-Y-up rotation that undo both, so they arrive in
-metres pointing down −Z — which is exactly the way the view looks. That is worth
+Nothing here needs a rotation or a scale, for two different reasons worth
+keeping apart. The imported models are authored in centimetres lying along
+their own +Y, and the glTF export already carries the node scale and the
+Z-up-to-Y-up rotation that undo both. `javelin-launcher.glb` is modelled in
+metres for this game and its export turns it so it leaves already pointing down
+−Z. Either way they arrive in metres pointing down −Z — which is exactly the
+way the view looks. That is worth
 knowing before reaching for the angles: measure where a model actually lands
 before turning it, because a source that needs no turning and one that needs
 90° apart look identical in the file. Only `modelOffset` differs between them,

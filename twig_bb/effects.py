@@ -55,10 +55,32 @@ GIBS = 'gibs'
 BURST = 'burst'
 TRAIL = 'trail'
 
-#: Particles a projectile leaves behind per second of flight.  A trail is what
-#: makes an incoming rocket readable *before* it arrives, which is the whole
-#: of what makes one survivable.
+#: Particles a projectile leaves behind per second of flight, when nothing has
+#: said how fast it is going.  A trail is what makes an incoming rocket
+#: readable *before* it arrives, which is the whole of what makes one
+#: survivable.
 TRAIL_RATE = 90.0
+
+#: How far a projectile flies between one puff of smoke and the next, in
+#: metres.  **A trail is laid along a path, not emitted over time**: at a rate
+#: per second a rocket doing 26 m/s strings its smoke out in dots a third of a
+#: metre apart -- a dotted line rather than a trail -- while a grenade rolling
+#: to a stop piles it up in one place.  Spacing by distance makes the trail
+#: read the same behind anything, at any speed, and stops when the thing does.
+#:
+#: It is set together with the trail emitter's ``size``, and the pair is the
+#: whole of whether this looks like smoke: a puff has a soft edge, so it has to
+#: be appreciably *wider* than this to close the gap to the next one.  Widen
+#: the spacing without widening the puffs and the trail beads into dots.
+TRAIL_SPACING = 0.4
+
+#: How far behind a projectile's middle its smoke is left, in metres.  A rocket
+#: trails from its nozzle, and the nozzle is a place on the model: it is
+#: therefore a fixed distance back along the heading and **not** a function of
+#: speed, which would have a fast rocket smoking from further and further
+#: behind itself.  Half the drawn length of the rocket, so it starts at the
+#: tail rather than out of the middle of the warhead.
+TRAIL_SETBACK = 0.16
 
 #: How much of the presentation to show.  Play is identical at all three.
 FULL, REDUCED, OFF = 'full', 'reduced', 'off'
@@ -88,6 +110,13 @@ SURFACE_WORDS: Dict[str, str] = {
 #: What a surface nobody has classified gets.  A puff of dust, because a plain
 #: effect reads as "that hit the wall" and no effect reads as a miss.
 DEFAULT_SURFACE_KIND = DUST
+
+
+def _backwards(velocity: Any) -> Optional[np.ndarray]:
+    """The unit vector opposite ``velocity``, or None for something stationary."""
+    heading = np.asarray(velocity, dtype=float)[:3]
+    length = float(np.linalg.norm(heading))
+    return None if length == 0.0 else -heading / length
 
 
 def surface_kind(surface: str) -> str:
@@ -152,16 +181,25 @@ def default_emitters() -> Dict[str, ParticleEmitter]:
         BURST: preset('explosion', burstOnStart=False, burst=120,
                       maxParticles=768, lifetime=0.8, speed=8.5,
                       size=0.7, endSize=0.05),
-        # Smoke behind a rocket.  Slow, alpha-blended and long-lived, which is
-        # what makes an incoming one readable before it arrives -- and that is
-        # what makes a rocket survivable rather than merely fatal.  Rate zero:
-        # this one is driven from the projectiles' positions by `trail`,
-        # because an emitter with a rate emits where *it* is and a trail has to
-        # come from wherever each rocket has got to.
-        TRAIL: preset('trail', burstOnStart=False, rate=0.0, burst=1,
-                      maxParticles=600, lifetime=0.7, speed=0.25, spread=1.0,
-                      size=0.14, endSize=0.5, alpha=0.4,
-                      color=(0.85, 0.7, 0.55), endColor=(0.3, 0.28, 0.28)),
+        # Smoke out of the back of a rocket, from §8's smoke preset: slow,
+        # alpha-blended and long-lived, which is what makes an incoming one
+        # readable before it arrives -- and that is what makes a rocket
+        # survivable rather than merely fatal.  Rate zero: this one is driven
+        # from the projectiles' positions by `trail`, because an emitter with a
+        # rate emits where *it* is and a trail has to come from wherever each
+        # rocket has got to.  The cone stays well inside a right angle so that
+        # smoke thrown backwards cannot overtake the rocket it came out of.
+        # Few, large and soft rather than many and small: a puff wider than
+        # `TRAIL_SPACING` joins up into smoke, and one narrower than it beads
+        # into a dotted line however many are spent.  A budget of 900 is about
+        # ten rockets in the air at once trailing fully, which is more than a
+        # match puts up; past that the pool runs out, which is a pool working.
+        TRAIL: preset('smoke', burstOnStart=False, rate=0.0, burst=1,
+                      maxParticles=900, lifetime=1.4, lifetimeVariation=0.35,
+                      speed=0.8, speedVariation=0.4, spread=0.6,
+                      gravity=(0.0, 0.5, 0.0), drag=1.4,
+                      size=0.90, endSize=2.2, sizeVariation=0.35, alpha=0.55,
+                      color=(0.72, 0.70, 0.68), endColor=(0.26, 0.25, 0.26)),
     }
 
 
@@ -185,7 +223,12 @@ class Effects:
         self.group = Group(children=list(self.emitters.values()))
         #: Fractional trail particles carried between frames, so a trail is
         #: the same length whatever the frame rate.
+        #: Particles owed to the trail, when it is being driven at a rate.
         self._owed = 0.0
+        #: Metres each projectile slot has flown since it last left a puff.
+        #: Per slot rather than one number, because two projectiles going
+        #: different speeds owe different amounts of smoke.
+        self._flown = np.zeros(0, dtype=float)
 
     @property
     def scale(self) -> float:
@@ -226,7 +269,8 @@ class Effects:
                                                        (0.0, 1.0, 0.0), scale)
         return 0
 
-    def trail(self, points: Any, dt: float) -> int:
+    def trail(self, points: Any, dt: float,
+              velocities: Optional[Any] = None) -> int:
         """Leave smoke behind everything in flight; returns particles born.
 
         Driven from the *positions* each frame rather than from an emitter per
@@ -234,20 +278,59 @@ class Effects:
         that may be flying: what varies is where, and ``burst_at`` is exactly
         the shape of that.
 
-        The rate is per second and is accumulated, so a projectile leaves the
-        same trail at any frame rate rather than a denser one on a faster
-        machine.
+        Given ``velocities`` as well, each projectile smokes from
+        :data:`TRAIL_SETBACK` behind itself, throws its smoke backwards, and
+        lays a puff down every :data:`TRAIL_SPACING` metres it flies -- which
+        is what a rocket does, and what stops the trail coming out of the
+        middle of the warhead in a dotted line.  Without them the smoke is left
+        where the projectile is at a rate per second, because a position on its
+        own says neither which way round the thing is nor how far it has come.
+
+        Either way the remainder is carried between frames, so a projectile
+        leaves the same trail at any frame rate rather than a denser one on a
+        faster machine.
         """
         scale = self.scale
         emitter = self.emitters.get(TRAIL)
         if scale <= 0.0 or emitter is None or not len(points):
             return 0
+        if velocities is not None:
+            return self._trailAlong(points, velocities,
+                                    max(0.0, float(dt)), scale, emitter)
         self._owed += TRAIL_RATE * max(0.0, float(dt)) * scale
         each = int(self._owed)
         if each <= 0:
             return 0
         self._owed -= each
         return sum(emitter.burst_at(point, count=each) for point in points)
+
+    def _trailAlong(self, points: Any, velocities: Any, dt: float,
+                    scale: float, emitter: Any) -> int:
+        """A puff every :data:`TRAIL_SPACING` metres, per projectile.
+
+        The metres each one has flown without smoking yet are kept per slot: at
+        a hundred frames a second a rocket covers less than one spacing in a
+        frame, and a count rounded off every frame would be zero every frame.
+        """
+        speeds = np.linalg.norm(np.asarray(velocities, dtype=float)[:, :3], axis=1)
+        if self._flown.shape[0] < speeds.shape[0]:
+            grown = np.zeros(speeds.shape[0], dtype=float)
+            grown[:self._flown.shape[0]] = self._flown
+            self._flown = grown
+        flown = self._flown[:speeds.shape[0]]
+        flown += speeds * dt * scale
+        counts = np.floor_divide(flown, TRAIL_SPACING).astype(int)
+        flown -= counts * TRAIL_SPACING
+
+        born = 0
+        for index, count in enumerate(counts):
+            if count <= 0:
+                continue
+            back = _backwards(velocities[index])
+            where = points[index] if back is None else (
+                np.asarray(points[index], dtype=float)[:3] + back * TRAIL_SETBACK)
+            born += emitter.burst_at(where, direction=back, count=int(count))
+        return born
 
     def _burst(self, kind: str, point: Sequence[float],
                normal: Sequence[float], scale: float) -> int:

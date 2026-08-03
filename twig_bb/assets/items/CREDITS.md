@@ -5,6 +5,96 @@ its author's page, whether or not its licence requires it.** That is the rule
 for all art in this project, not a courtesy extended to some of it. A model
 whose author cannot be named from this file does not belong here.
 
+## Shipped now — the rocket launcher and its ammunition
+
+| | |
+|---|---|
+| **Author** | this project |
+| **Licence** | **BSD-3-Clause**, the same terms as the rest of twig-bb (declared in [`pyproject.toml`](../../../pyproject.toml)) |
+| **Source** | [`grass-clumps/arsenal.py`](../../../../grass-clumps/arsenal.py) in this workspace |
+
+| File | Used as | Textures |
+|---|---|---|
+| `javelin-launcher-pickup.glb` | the rocket launcher pickup | its own, baked at 256px |
+| `javelin-rocket-pickup.glb` | the rocket ammunition pickup | its own, baked at 256px |
+| `sawn-off-shotgun-pickup.glb` | the shotgun pickup | its own, baked at 256px |
+| `shotgun-shell-pickup.glb` | the shell pickup | its own, baked at 256px |
+| `grenade-launcher-pickup.glb` | the grenade launcher pickup | its own, baked at 256px |
+| `grenade-round-pickup.glb` | the grenade pickup | its own, baked at 256px |
+| `sniper-rifle-pickup.glb` | the rifle pickup | its own, baked at 256px |
+| `sniper-round-pickup.glb` | the rifle ammunition pickup | its own, baked at 256px |
+| `handgun-pickup.glb` | the pistol pickup | its own, baked at 256px |
+| `handgun-cartridge-pickup.glb` | the bullet pickup | its own, baked at 256px |
+| `armour-shard-pickup.glb` | the armour shard pickup | its own, baked at 256px |
+| `armour-pickup.glb` | the armour pickup | its own, baked at 256px |
+| `body-armour-pickup.glb` | the body armour pickup | its own, baked at 256px |
+
+**A colour per weapon, not per pickup.** Red is the rocket launcher, green the
+shotgun, cyan the grenade launcher, lime the sniper and orange the handgun —
+and a weapon and its ammunition share one, so what a player learns is five
+colours rather than ten. Which of the pair it is comes from the shape floating
+inside: the weapon itself, or three of its rounds.
+
+**Armour is gold**, which is the colour the item table has always given it.
+The three tiers are one idea at three strengths and are read against each
+other: a shard is one plate of carbon fibre, fifty armour is two on a pair of
+straps, and a hundred is that carrier again with a pauldron over each shoulder.
+How much of the stuff there is, is what it is worth.
+The weave is procedural like the wood: a checker deciding which way the tow
+runs in each square, which is what a twill *is*, rather than a noise that comes
+out dark and shiny.
+
+The same script that builds the weapons builds these: each weapon, and three
+of its rounds bundled, shrunk inside a bubble the same one unit across as the
+medikit's. Re-running it after an edit is the whole update procedure.
+
+**These say which pickup they are by their shape**, so unlike the medikits they
+are not repainted at load time — `twig_bb.items.LAUNCHER_PICKUP` sets
+`tinted` false and `twig_bb.art.brighten` gives them the light an unlit map
+owes them without the paint. A launcher flattened to one colour would be a
+launcher nobody could recognise, which is the only reason to model one.
+
+### The bubbles are one mesh, in ten files
+
+Every one of them is the medikit's lattice to the vertex — 32 by 16, one unit across — and
+therefore byte-identical vertex data. The PBR pass batches instances by the
+*content* of the geometry rather than by which file it came from, so every
+launcher and every box of rockets a map places collapses into a single
+instanced draw, and the materials differing by nothing but their colour factor
+is exactly what the per-instance material array is for. Changing one bubble
+without changing the rest is what would break it, which is why one function
+with nothing to vary makes all of them.
+
+### The bubbles are read before they are believed
+
+They are **blended glazes at about a quarter opacity, the way the medikit's
+is** — not refracting films — and that is a decision rather than an
+approximation. The first version of these was physically modelled: full
+`KHR_materials_transmission`, the index of refraction of water, a real Fresnel
+rim. It is correct, and it is unusable. A level bakes its lighting and places
+no lamps at all, so a bubble that shows what is behind it and reflects the rest
+has nothing to show and nothing to reflect, and the pickup reads as a **black
+ball** from the far side of a room. The medikit has been a flat tinted shell
+since it was made and reads at any distance; the colour has to be *in* the
+glaze, not borrowed from the surroundings.
+
+So the index of refraction is 1.12 rather than water's 1.33: just enough for a
+faint rim highlight, far too little to reflect a dark room. What rim there is
+gets its colour from `KHR_materials_iridescence`, at a single film thickness of
+400 nm.
+
+**That extension is written into the `.glb` after Blender has finished with
+it.** Blender models the film on its Principled shader but its glTF exporter
+has no route from that to the extension — it is commented out of the exporter's
+own list — so `add_iridescence` in the build script adds it to the finished
+binary. Nothing else in either file is touched by hand.
+
+A real film's belts of colour would need the thickness to vary across the
+surface, which needs a thickness map, which needs UVs — and Blender exports no
+UV layer for a material that uses no texture. The interference here is
+therefore one hue that shifts with the viewing angle. Anyone adding the map
+will need to give the bubble a UV set the exporter will keep.
+
 ## Shipped now — the medikit
 
 | | |

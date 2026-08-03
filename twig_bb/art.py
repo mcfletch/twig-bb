@@ -26,7 +26,7 @@ from typing import Any, Iterator, Optional, Sequence
 
 log = logging.getLogger(__name__)
 
-__all__ = ['ASSETS', 'path_for', 'load', 'recolour', 'shapes']
+__all__ = ['ASSETS', 'brighten', 'path_for', 'load', 'recolour', 'shapes']
 
 #: Where the art that ships with this package lives.
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets')
@@ -61,6 +61,43 @@ def shapes(node: Any) -> Iterator[Any]:
     for child in getattr(node, 'children', None) or ():
         for found in shapes(child):
             yield found
+
+
+def brighten(node: Any, glow: float) -> int:
+    """Light a subtree from inside without repainting it; returns materials touched.
+
+    The half of :func:`recolour` that art which *arrived* coloured still needs.
+    A map places no dynamic lights, so every pickup needs a floor of its own or
+    it is a black shape in a corner -- but a model built to look like something
+    (a launcher in a bubble, rather than a shape whose colour is the whole of
+    what it says) must not have that shape painted over to get it.
+
+    Each material glows in **its own** colour rather than in one shared one, so
+    the model keeps its reds red and its greys grey instead of being pulled
+    towards a single hue by the lighting it carries.
+
+    **Every material, including the ones you can see through.**  A pickup's
+    shell needs the floor as much as its contents do: a level bakes its
+    lighting and places no lamps, so a shell left unlit borrows its colour from
+    surroundings that have none to give and the whole pickup reads as a black
+    ball across a room.  Whether the shell then looks *right* is a question for
+    the art -- see the glaze in the build script -- and not a reason to leave
+    it dark here.
+    """
+    amount = float(glow)
+    touched = 0
+    for shape in shapes(node):
+        material = getattr(getattr(shape, 'appearance', None), 'material', None)
+        if material is None:
+            continue
+        own = getattr(material, 'baseColor', None)
+        if own is None:
+            own = getattr(material, 'diffuseColor', (1.0, 1.0, 1.0))
+        lit = tuple(float(value) * amount for value in own)
+        if hasattr(material, 'emissiveColor'):
+            material.emissiveColor = lit
+        touched += 1
+    return touched
 
 
 def recolour(node: Any, colour: Sequence[float], glow: float = 0.0) -> int:

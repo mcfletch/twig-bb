@@ -36,13 +36,14 @@ from . import blast
 from . import bots as botsmod
 from . import combat
 from . import falling
+from . import projectiles as projectilesmod
 
 log = logging.getLogger(__name__)
 
-__all__ = ['BOT_SPEED', 'PLAYER_ID', 'bot_bodies', 'item_bodies', 'item_look',
-           'messages', 'move_items', 'move_projectiles', 'place_bots',
-           'projectile_bodies', 'shoot', 'spawn_for', 'start_match',
-           'step_bots', 'step_projectiles']
+__all__ = ['BOT_SPEED', 'PLAYER_ID', 'bot_bodies', 'heading_rotation',
+           'item_bodies', 'item_look', 'messages', 'move_items',
+           'move_projectiles', 'place_bots', 'projectile_bodies', 'shoot',
+           'spawn_for', 'start_match', 'step_bots', 'step_projectiles']
 
 #: The player's own id in the match.  A fixed string rather than a name,
 #: because a name is something a player types and an id is what the rules
@@ -346,53 +347,129 @@ def _capsule() -> List[Any]:
     ]
 
 
-#: How big a projectile is drawn, in metres.  Larger than its collision
-#: radius on purpose: what a player has to do with an incoming rocket is
-#: *see* it in time, and a body the size of its hit box is a dot.
+#: How big the fallback ball is drawn, in metres.  Larger than a projectile's
+#: collision radius on purpose: what a player has to do with an incoming rocket
+#: is *see* it in time, and a body the size of its hit box is a dot.  Each
+#: kind's own model and the size it is drawn at are in
+#: :func:`twig_bb.projectiles.default_table`, with the rest of its numbers.
 PROJECTILE_DRAW_RADIUS = 0.16
 
-#: What one looks like: hot, and bright enough to read against a dark level.
+#: What that ball looks like: hot, and bright enough to read against a dark
+#: level.
 PROJECTILE_COLOUR = (1.0, 0.62, 0.2)
+
+#: Which way the projectile model is authored, in its own frame.  glTF calls
+#: -Z forward and the model leaves Blender already pointing that way, so
+#: aiming one along its flight is a turn from here onto its velocity.
+MODEL_FORWARD = (0.0, 0.0, -1.0)
 
 #: Where a body is parked when nothing is using it.  Far below any level, so
 #: it is out of every frustum without the scene having to be edited.
 OFFSTAGE = (0.0, -10_000.0, 0.0)
 
 
-def projectile_bodies(capacity: int) -> Tuple[Group, List[Transform]]:
-    """A group of bodies for things in flight, and the transforms to move them.
+def _spark() -> Shape:
+    """A glowing ball, for when the rocket model will not load.
 
-    One body per slot in the batch, made once and parked out of sight when
-    unused: a scenegraph edited every time a rocket is fired is a scenegraph
-    rebuilt at the rate somebody holds down the trigger, and what the render
-    pass has gathered would be thrown away with it.
-
-    They are all the same sphere, which is what lets the pass collapse every
-    projectile on screen into one instanced draw without anything here asking
-    it to.
+    Something in flight that cannot be seen is a shot that reads as not having
+    been fired, so the projectile is the one piece of art with a shape of its
+    own to fall back on.
     """
     look = Appearance(material=Material(diffuseColor=PROJECTILE_COLOUR,
                                         emissiveColor=PROJECTILE_COLOUR,
                                         shininess=0.6))
-    bodies = [Transform(translation=OFFSTAGE, children=[
-        Shape(geometry=Sphere(radius=PROJECTILE_DRAW_RADIUS), appearance=look)])
-        for _slot in range(max(0, int(capacity)))]
-    return (Group(children=list(bodies)), bodies)
+    return Shape(geometry=Sphere(radius=PROJECTILE_DRAW_RADIUS), appearance=look)
 
 
-def move_projectiles(flight: Any, bodies: List[Transform]) -> None:
-    """Put each body where its projectile is, and park the rest.
+def projectile_bodies(capacity: int,
+                      table: Any = None) -> Tuple[Group, Dict[str, List[Transform]]]:
+    """Bodies for things in flight, keyed by which kind of thing they are.
 
-    The batch keeps its living entries packed at the front, so slot *n* is
-    projectile *n* and there is nothing to match up.
+    One body per slot in the batch **per kind**, made once and parked out of
+    sight when unused: a scenegraph edited every time a rocket is fired is a
+    scenegraph rebuilt at the rate somebody holds down the trigger, and what
+    the render pass has gathered would be thrown away with it.
+
+    A row per kind rather than one row that changes shape, because a rocket and
+    a grenade are different models and swapping a slot's child when a grenade
+    lands in a slot a rocket used is the same scenegraph edit by another name.
+    The cost is a handful of parked transforms, which is nothing; what it buys
+    is that nothing is ever rebuilt.
+
+    **Every slot of a kind is handed the same subtree**, the way VRML's ``USE``
+    shares one node between parents.  The render pass batches on the identity
+    of the geometry it finds, so sharing is what collapses two hundred rockets
+    into one instanced draw per part of the model -- a copy each would be two
+    hundred draws, and nothing here would have said anything different.
     """
+    if table is None:
+        table = projectilesmod.default_table()
+    slots = max(0, int(capacity))
+    bodies: Dict[str, List[Transform]] = {}
+    children: List[Transform] = []
+    for kind in table.kinds:
+        look = art.load(str(kind.model)) if str(kind.model) else None
+        if look is None:
+            look = _spark()
+        scale = (float(kind.modelScale),) * 3
+        row = [Transform(translation=OFFSTAGE, scale=scale, children=[look])
+               for _slot in range(slots)]
+        bodies[str(kind.key)] = row
+        children.extend(row)
+    return (Group(children=children), bodies)
+
+
+def heading_rotation(direction: Sequence[float]) -> Tuple[float, float, float, float]:
+    """The axis and angle that turn :data:`MODEL_FORWARD` onto ``direction``.
+
+    A rotation rather than a matrix because that is what a ``Transform`` holds.
+    Something going nowhere is left alone: a projectile with no velocity has no
+    heading to be pointed along, and spinning it to some default would be a
+    visible flick at the moment one is launched.
+    """
+    heading = np.asarray(direction, dtype=float)[:3]
+    length = float(np.linalg.norm(heading))
+    if length == 0.0:
+        return (0.0, 1.0, 0.0, 0.0)
+    heading = heading / length
+    forward = np.asarray(MODEL_FORWARD, dtype=float)
+    axis = np.cross(forward, heading)
+    angle = math.atan2(float(np.linalg.norm(axis)),
+                       float(np.dot(forward, heading)))
+    if float(np.linalg.norm(axis)) < 1e-9:
+        if angle < 1e-9:                    # already facing that way
+            return (0.0, 1.0, 0.0, 0.0)
+        # Straight backwards: every axis across the model turns it equally, so
+        # one has to be picked rather than derived.
+        across = (1.0, 0.0, 0.0) if abs(forward[0]) < 0.9 else (0.0, 1.0, 0.0)
+        axis = np.cross(forward, np.asarray(across, dtype=float))
+    axis = axis / float(np.linalg.norm(axis))
+    return (float(axis[0]), float(axis[1]), float(axis[2]), float(angle))
+
+
+def move_projectiles(flight: Any, bodies: Dict[str, List[Transform]]) -> None:
+    """Put each body where its projectile is, aim it, and park the rest.
+
+    The batch keeps its living entries packed at the front, but *its* slot
+    numbering mixes the kinds together and each kind has bodies of its own, so
+    the two are matched up by taking the next unused body of whatever kind is
+    in hand rather than by index.
+    """
+    used = {key: 0 for key in bodies}
     live = 0 if flight is None else len(flight)
-    for slot, body in enumerate(bodies):
-        if slot < live:
-            body.translation = tuple(float(value)
-                                     for value in flight.position[slot])
-        elif tuple(body.translation) != OFFSTAGE:
-            body.translation = OFFSTAGE
+    for slot in range(live):
+        kind = flight.kind_at(slot)
+        row = bodies.get(str(kind.key)) if kind is not None else None
+        if row is None or used[str(kind.key)] >= len(row):
+            continue
+        body = row[used[str(kind.key)]]
+        used[str(kind.key)] += 1
+        body.translation = tuple(float(value) for value in flight.position[slot])
+        body.rotation = heading_rotation(flight.velocity[slot])
+    for key, row in bodies.items():
+        for body in row[used[key]:]:
+            if tuple(body.translation) != OFFSTAGE:
+                body.translation = OFFSTAGE
 
 
 #: How big a pickup is drawn, in metres, and how fast it turns in radians a
@@ -433,7 +510,10 @@ def item_look(kind: Any) -> Any:
     if name:
         model = art.load(name)
         if model is not None:
-            art.recolour(model, colour, glow=ITEM_GLOW)
+            if bool(getattr(kind, 'tinted', True)):
+                art.recolour(model, colour, glow=ITEM_GLOW)
+            else:
+                art.brighten(model, ITEM_GLOW)
             scale = float(kind.modelScale)
             return Transform(
                 translation=tuple(scale * float(value)

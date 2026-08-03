@@ -148,6 +148,41 @@ class TestPaintingOneModelFourWays:
                  for shape in art.shapes(node)]
         assert before == after
 
+    def test_brightening_leaves_every_colour_where_it_was(self):
+        """For art that came coloured: it needs the light, not the paint."""
+        node = painted()
+        before = [tuple(shape.appearance.material.diffuseColor)
+                  for shape in art.shapes(node)]
+        art.brighten(node, 0.5)
+        assert [tuple(shape.appearance.material.diffuseColor)
+                for shape in art.shapes(node)] == before
+
+    def test_brightening_glows_in_each_materials_own_colour(self):
+        """One glow colour for a model of several would flatten it towards that."""
+        node = painted()
+        art.brighten(node, 0.5)
+        for shape in art.shapes(node):
+            own = tuple(shape.appearance.material.diffuseColor)
+            lit = tuple(shape.appearance.material.emissiveColor)
+            assert all(abs(a - b * 0.5) < 1e-6 for a, b in zip(lit, own))
+
+    def test_brightening_reports_what_it_touched(self):
+        assert art.brighten(painted(), 0.4) == 2
+        assert art.brighten(Group(children=[]), 0.4) == 0
+
+    def test_nothing_in_a_pickup_is_left_dark(self):
+        """Not the contents *and not the shell*.
+
+        A level bakes its lighting and places no lamps, so anything left
+        without a floor of its own has nothing to show but what is behind it —
+        and a pickup whose shell was skipped read as a black ball from across
+        a room, whatever was floating inside it.
+        """
+        node = art.load(items.LAUNCHER_PICKUP['model'])
+        art.brighten(node, 0.45)
+        for shape in art.shapes(node):
+            assert max(shape.appearance.material.emissiveColor) > 0.0, shape
+
     def test_both_of_the_medikits_materials_are_repainted(self):
         """The bubble and the cross: a coloured cross in a red bubble is two
         pickups' worth of signal disagreeing with each other."""

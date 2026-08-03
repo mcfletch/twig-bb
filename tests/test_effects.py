@@ -218,3 +218,77 @@ class TestATrail:
         shown = effects.Effects(match, intensity=effects.OFF)
         shown.trail([(0.0, 0.0, 0.0)], dt=0.5)
         assert live(shown, effects.TRAIL) == 0
+
+    def test_it_is_smoke_rather_than_light(self):
+        """Smoke blocks what is behind it; that is what makes a trail read."""
+        emitter = effects.default_emitters()[effects.TRAIL]
+        assert str(emitter.blending) == 'alpha'
+
+
+class TestSmokeComingOutOfTheBack:
+    """A rocket trails from its nozzle, not from the middle of the warhead.
+
+    With nothing said about which way one is going the trail can only come
+    from where it is; given a heading it comes from behind it, which is where
+    a viewer looking at the rocket expects to see it.
+    """
+
+    def smoke(self, shown):
+        return shown.emitters[effects.TRAIL].pool.position[
+            :live(shown, effects.TRAIL)]
+
+    def test_the_smoke_is_left_behind_the_rocket(self, shown):
+        shown.trail([(0.0, 1.0, 0.0)], dt=0.1, velocities=[(10.0, 0.0, 0.0)])
+        assert np.all(self.smoke(shown)[:, 0] < 0.0), 'smoke got ahead of the rocket'
+        assert np.allclose(self.smoke(shown)[:, 0], -effects.TRAIL_SETBACK)
+
+    def test_how_far_behind_does_not_depend_on_how_fast(self, shown):
+        """The setback is a place on the model, so speed cannot move it."""
+        shown.trail([(0.0, 0.0, 0.0)], dt=0.1, velocities=[(40.0, 0.0, 0.0)])
+        assert np.allclose(self.smoke(shown)[:, 0], -effects.TRAIL_SETBACK)
+
+    def test_the_smoke_is_thrown_backwards(self, shown):
+        shown.trail([(0.0, 0.0, 0.0)], dt=0.1, velocities=[(10.0, 0.0, 0.0)])
+        thrown = shown.emitters[effects.TRAIL].pool.velocity[
+            :live(shown, effects.TRAIL)]
+        assert np.all(thrown[:, 0] <= 0.0), 'smoke was thrown along the flight'
+
+    def test_each_rocket_trails_from_its_own_back(self, shown):
+        shown.trail([(0.0, 0.0, 0.0), (0.0, 9.0, 0.0)], dt=0.1,
+                    velocities=[(26.0, 0.0, 0.0), (0.0, 0.0, 26.0)])
+        places = self.smoke(shown)
+        assert np.any(places[:, 0] < 0.0), 'the one flying along X left nothing behind'
+        assert np.any(places[:, 2] < 0.0), 'the one flying along Z left nothing behind'
+
+    def test_something_that_has_stopped_lays_down_no_more(self, shown):
+        """A trail is left by *travelling*, so a grenade at rest stops adding to it."""
+        shown.trail([(3.0, 0.0, 0.0)], dt=0.5, velocities=[(0.0, 0.0, 0.0)])
+        assert live(shown, effects.TRAIL) == 0
+
+    def test_the_trail_is_spaced_by_distance_not_by_time(self, shown):
+        """Twice as far is twice the smoke, however long it took to get there."""
+        shown.trail([(0.0, 0.0, 0.0)], dt=1.0, velocities=[(10.0, 0.0, 0.0)])
+        ten = live(shown, effects.TRAIL)
+        assert ten == pytest.approx(10.0 / effects.TRAIL_SPACING, abs=1)
+
+    def test_a_faster_machine_does_not_get_a_denser_trail_either(self, match):
+        """The leftover distance is carried between frames, as the count was."""
+        slow, fast = effects.Effects(match), effects.Effects(match)
+        slow.trail([(0.0, 0.0, 0.0)], dt=0.1, velocities=[(26.0, 0.0, 0.0)])
+        for _ in range(10):
+            fast.trail([(0.0, 0.0, 0.0)], dt=0.01, velocities=[(26.0, 0.0, 0.0)])
+        assert abs(live(slow, effects.TRAIL) - live(fast, effects.TRAIL)) <= 1
+
+    def test_two_projectiles_at_different_speeds_each_keep_their_own_count(self, shown):
+        """One number for the pair would have the fast one pay for the slow one."""
+        for _frame in range(8):
+            shown.trail([(0.0, 0.0, 0.0), (0.0, 9.0, 0.0)], dt=0.05,
+                        velocities=[(30.0, 0.0, 0.0), (0.0, 0.0, 0.0)])
+        places = self.smoke(shown)
+        assert len(places), 'the moving one left nothing'
+        assert not np.any(places[:, 1] > 5.0), 'the stationary one left smoke'
+
+    def test_saying_nothing_about_headings_still_works(self, shown):
+        """The viewer that has not been taught about velocities yet."""
+        shown.trail([(5.0, 0.0, 0.0)], dt=0.1)
+        assert np.allclose(self.smoke(shown)[:, 0], 5.0)
