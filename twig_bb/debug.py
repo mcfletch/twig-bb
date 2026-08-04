@@ -192,17 +192,27 @@ def combat_provider(context: Any) -> Any:
 
 
 def _submerged(context: Any, nav: Any) -> Any:
-    """Which liquid the camera is in, or False for none.
+    """Which liquid the avatar is in, or False for none.
 
     False rather than an empty string, because the row's usual answer is a
     plain no and a blank value reads as a provider that failed.
+
+    The camera first, since that is what the view is showing, and the feet
+    after it: a swimmer lifting themselves out of a pool has their eye in the
+    air and the rest of them still in the water (see
+    :func:`twig_bb.viewer.update_submerged`), and naming the liquid is what
+    this row is for.
     """
     if not getattr(nav, 'submerged', False):
         return False
     volumes = getattr(context, '_liquids', None)
     if volumes is None:
         return True
-    return volumes.kind_at(nav.camera_position()) or True
+    kind = volumes.kind_at(nav.camera_position())
+    feet = getattr(nav, 'feet_position', None)
+    if not kind and feet is not None:
+        kind = volumes.kind_at(feet())
+    return kind or True
 
 
 def _camera_position(context: Any) -> Optional[Tuple[float, float, float]]:

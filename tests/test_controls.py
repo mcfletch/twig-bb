@@ -76,6 +76,13 @@ class TestDeclaration:
                         controls.PREVIOUS_WEAPON):
             assert command in names
 
+    def test_every_weapon_in_the_loadout_has_a_number_key(self, table,
+                                                          bindings):
+        """A weapon with no key is a weapon most players never find."""
+        names = [str(binding.command) for binding in bindings.bindings]
+        for weapon in table.weapons:
+            assert controls.slot_command(int(weapon.slot)) in names, weapon.key
+
     def test_every_command_carries_a_label_for_the_binding_page(self, bindings):
         for binding in bindings.bindings:
             assert str(binding.label)
@@ -120,6 +127,47 @@ class TestSampling:
         bindings.binding(controls.NEXT_WEAPON).keys = []
         key(state, ']')
         assert controls.NEXT_WEAPON not in bindings.triggered(state)
+
+
+class TestZooming:
+    """Held like the trigger, because it is a thing you look *through*.
+
+    A toggle would be the wrong shape: a player zooms for the second it takes
+    to line a shot up and wants the wide view back the instant the finger
+    lifts, and a scope left on by accident is a player who cannot see anyone
+    walk up to them.
+    """
+
+    def test_it_is_declared(self, bindings):
+        assert controls.ZOOM in [str(one.command) for one in bindings.bindings]
+
+    def test_it_is_on_the_right_mouse_button(self, bindings):
+        """Where every game in this genre puts it."""
+        assert '<mouse-1>' in bindings.keys_for(controls.ZOOM)
+
+    def test_holding_it_keeps_it_zoomed(self, bindings):
+        state = InputState()
+        button(state, 1)
+        assert bindings.zooming(state) is True
+        assert bindings.zooming(state) is True
+
+    def test_letting_go_gives_the_view_back(self, bindings):
+        state = InputState()
+        button(state, 1)
+        button(state, 1, down=0)
+        assert bindings.zooming(state) is False
+
+    def test_it_is_not_reported_as_a_one_shot_command(self, bindings):
+        """Or holding it would count as a selection, once a frame."""
+        state = InputState()
+        button(state, 1)
+        assert controls.ZOOM not in bindings.triggered(state)
+
+    def test_it_can_be_rebound_like_anything_else(self, bindings):
+        state = InputState()
+        bindings.binding(controls.ZOOM).keys = ['v']
+        key(state, 'v')
+        assert bindings.zooming(state) is True
 
 
 class TestBindingPage:

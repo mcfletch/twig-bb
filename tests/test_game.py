@@ -634,6 +634,52 @@ class TestDrawingAPickupAsItsModel:
         assert painted[1] == pytest.approx((0.0, 0.0, 1.0))
 
 
+class TestWhatABurstDoesToSomebodyStandingOnIt:
+    """A rocket landing at somebody's feet, over a floor that is really there.
+
+    The rest of the burst rules are tested against open space, which is the one
+    place a rocket never goes off: every shot that is not a direct hit ends on
+    a surface, and a burst centred *on* geometry has to be able to see out of
+    it.  Fired rather than placed, so the point the rules are handed is the
+    point flying produces.
+    """
+
+    def fire(self, at, standing, aim=None):
+        from twig_bb import projectiles
+        world = floor()
+        found = arena.Arena(weapons=weapons.default_table(), fragLimit=15,
+                            timeLimit=10.0)
+        found.add(game.PLAYER_ID, position=(0.0, 0.0, 0.0), name='You')
+        found.add('bot0', position=standing, bot=True, name='Bot')
+        flight = projectiles.Projectiles(projectiles.default_table())
+        eye = np.array([0.0, avatar.EYE_HEIGHT, 0.0])
+        flight.launch(flight.table.by_key(projectiles.ROCKET), origin=eye,
+                      direction=np.asarray(at, dtype='d') - eye,
+                      owner=game.PLAYER_ID)
+        for _ in range(300):
+            if game.step_projectiles(world, found, flight, 1.0 / 60.0):
+                break
+        return found
+
+    def test_it_hurts_them(self):
+        found = self.fire(at=(2.0, 0.0, 0.0), standing=(2.0, 0.0, 1.2))
+        assert found.combatant('bot0').health < arena.STARTING_HEALTH
+
+    def test_it_throws_them(self):
+        found = self.fire(at=(2.0, 0.0, 0.0), standing=(2.0, 0.0, 1.2))
+        assert float(np.linalg.norm(found.combatant('bot0').push)) > 0.0
+
+    def test_one_at_your_own_feet_throws_you_up(self):
+        """A rocket jump: the whole of why this genre has a rocket launcher."""
+        found = self.fire(at=(1.0, 0.0, 0.0), standing=(30.0, 0.0, 0.0))
+        push = found.combatant(game.PLAYER_ID).push
+        assert float(push[1]) > 0.0
+
+    def test_and_costs_you_for_it(self):
+        found = self.fire(at=(1.0, 0.0, 0.0), standing=(30.0, 0.0, 0.0))
+        assert found.combatant(game.PLAYER_ID).health < arena.STARTING_HEALTH
+
+
 class TestDrawingWhatIsInFlight:
     """A body per slot, parked out of sight when nothing is using it.
 

@@ -331,9 +331,9 @@ def movement_modes() -> List[Any]:
     an arena map is played with the mouse.  Walking with `q`/`e` stays one `m`
     away for anyone who would rather not have the pointer taken.
 
-    ``SwimMode`` is declared even though nothing yet reports being submerged:
-    it is world-imposed, so it never appears in the walk/fly cycle, and it
-    starts working the moment liquid volumes feed ``platform.submerged``.
+    ``SwimMode`` is world-imposed, so it never appears in the walk/fly cycle:
+    the map's liquid volumes feed ``platform.submerged`` through
+    :func:`update_submerged` and the mode takes over from there.
     """
     return [
         movemodes.FPSMode(
@@ -358,17 +358,37 @@ def movement_modes() -> List[Any]:
 
 
 def update_submerged(nav: Any, volumes: Any) -> None:
-    """Tell the navigator whether the camera is under a liquid surface.
+    """Tell the navigator whether it is in a liquid.  ``SwimMode`` watches this.
 
-    The eye rather than the capsule centre: what decides whether a player is
-    swimming is where they are looking from, and it is the reading that matches
-    what the view shows.  ``SwimMode`` watches this and imposes itself, so
-    nothing here selects a mode.
+    **A swim starts at the eye and ends at the feet**, and the two readings are
+    what makes a pool something a player can get out of again.  Going in, the
+    eye is right: the liquid closing over your head is what takes walking away
+    from you, and reading the feet would put somebody paddling in the shallows
+    into a swim.  Coming out, the eye is a trap: it reaches the surface a
+    head's height before the feet do, so ending the swim there drops the body
+    back into the water the moment it breaks through, and the feet can never
+    rise past that depth.  A pool whose rim stands above its water -- which is
+    the ordinary shape of one -- is then impossible to climb out of.
+
+    So the swim holds until the body is clear of the liquid altogether, which
+    leaves the swimmer able to lift themselves to the surface and step out over
+    a rim.  What the *view* does is a separate question, read from the eye
+    where it belongs: see :func:`twig_bb.underwater.update`.
+
+    A platform with no body to ask about -- a plain camera -- is read by its
+    eye alone.
     """
     if nav is None:
         return
-    nav.submerged = bool(volumes is not None
-                         and volumes.contains(nav.camera_position()))
+    if volumes is None:
+        nav.submerged = False
+        return
+    if volumes.contains(nav.camera_position()):
+        nav.submerged = True
+        return
+    feet = getattr(nav, 'feet_position', None)
+    nav.submerged = bool(getattr(nav, 'submerged', False)
+                         and feet is not None and volumes.contains(feet()))
 
 
 def apply_mode(nav: Any, mode: Any) -> None:
@@ -533,6 +553,9 @@ class TwigContext(OverlayMixin, BaseContext):
         self._walking = False
         self._free_manager = getattr(self, 'movementManager', None)
         self._nav: Optional[PhysicsViewPlatform] = None
+        #: The unsighted field of view, in radians, read from the platform on
+        #: the first frame; see :meth:`_sight`.
+        self._fov: Optional[float] = None
         self._pushes: Optional[jumppads.PushSystem] = None
         self._liquids: Any = None
         self._clock = FrameClock()
@@ -1078,6 +1101,32 @@ class TwigContext(OverlayMixin, BaseContext):
         firing = self.weaponBindings.firing(state)
         if commands or firing:
             self._runCommands(commands, firing)
+        self._sight(self.weaponBindings.zooming(state))
+
+    def _sight(self, zooming: bool) -> None:    # pragma: no cover - GL
+        """Set the frustum to whatever the player is looking through.
+
+        Written every frame from what is *currently* in hand rather than when
+        the button is pressed, so a weapon switch, a death and an empty
+        magazine all give the wide view back without any of them having to
+        know that a scope exists.  The frustum is the only thing that changes:
+        a zoom that also slowed the mouse would be two settings pretending to
+        be one, and the reticule follows on its own because it is drawn from
+        the same field of view (see :func:`view_fov`).
+        """
+        platform = self.getViewPlatform()
+        if platform is None:
+            return
+        if self._fov is None:
+            # Whatever the view was built with, taken before anything here has
+            # narrowed it, so a settings screen that widens the view later is
+            # what a rifle comes back to.
+            self._fov = view_fov(platform)
+        wanted = weapontable.field_of_view(
+            self.weapons.by_key(self.player.selected), zooming, self._fov)
+        if abs(view_fov(platform) - wanted) > 1e-6:
+            platform.setFrustum(fieldOfView=wanted)
+            self.triggerRedraw(1)
 
     def physicsWorld(self) -> Any:
         """The physics world once walking has begun, else None.
@@ -1243,8 +1292,7 @@ class TwigContext(OverlayMixin, BaseContext):
             return
         platform = self.getViewPlatform()
         hud.update(self.player, now=hudclock(), viewport=self.getViewPort(),
-                   field_of_view=getattr(platform, 'fieldOfView',
-                                         hud_default_fov()))
+                   field_of_view=view_fov(platform))
         me = self.arena.combatant(game.PLAYER_ID)
         if me is not None:
             # From the match rather than from the player's own record: frags
@@ -1585,6 +1633,26 @@ def hud_default_fov() -> float:
     frame that fails.
     """
     return math.pi / 2.0
+
+
+def view_fov(platform: Any) -> float:
+    """The vertical field of view a platform is drawing with, in **radians**.
+
+    The platform keeps its frustum as OpenGL wants it -- degrees, aspect,
+    near, far -- and everything that reasons about what is on the screen wants
+    the angle the projection was built from.  Chiefly the reticule: it is
+    drawn at the radius a shot may actually land within
+    (:func:`twig_bb.weapons.spread_pixels`), so a cone of fire in degrees
+    becomes pixels through *this* angle, and a player sighting through a rifle
+    sees the reticule open exactly as much as the view has narrowed.
+
+    A platform that has not been built yet answers :func:`hud_default_fov`,
+    for the reason that function gives.
+    """
+    frustum = getattr(platform, 'frustum', None)
+    if not frustum:
+        return hud_default_fov()
+    return math.radians(float(frustum[0]))
 
 
 #: Keys that open a screen or take a screenshot, and the handler each runs.

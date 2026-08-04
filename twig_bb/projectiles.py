@@ -163,11 +163,18 @@ def default_table() -> ProjectileTable:
         # is the only thing that distinguishes aiming one from lobbing it in
         # the general direction.  Armour still saves you, which is what makes
         # armour worth the detour.
+        # And both bursts are worth dodging on their own.  A launcher whose
+        # splash has to land on somebody is only a slow rifle: what these
+        # weapons ask a player to do is aim at the floor beside an opponent
+        # rather than at the opponent, and that trade is worth taking only if
+        # the floor beside them costs a third of a life.  The exponent is what
+        # decides that, more than the damage is -- much above 1 and everything
+        # but a hit at the feet is a puff of smoke.
         Projectile(
             key=ROCKET, speed=26.0, gravity=0.0, radius=0.14,
             fuse=0.0, lifetime=6.0, bounce=0.0,
-            damage=110.0, splashDamage=60.0, splashRadius=4.0,
-            knockback=9.5, selfDamage=0.5,
+            damage=110.0, splashDamage=85.0, splashRadius=4.0,
+            splashFalloff=1.15, knockback=11.0, selfDamage=0.45,
             model='weapons/javelin-rocket.glb', modelScale=1.6),
         Projectile(
             key=GRENADE, speed=16.0, gravity=14.0, radius=0.12,
@@ -175,7 +182,7 @@ def default_table() -> ProjectileTable:
             # the fuse is a decision about *timing* rather than a range limit.
             fuse=2.2, lifetime=6.0, bounce=0.42,
             damage=110.0, splashDamage=80.0, splashRadius=4.5,
-            knockback=8.0, selfDamage=0.6,
+            splashFalloff=1.15, knockback=10.0, selfDamage=0.55,
             # The 40 mm round the launcher fires, drawn at three times life so
             # a tumbling grenade is something a player can pick out and run
             # away from rather than a speck.
@@ -194,6 +201,27 @@ class Detonation:
     target: str = ''
     #: The surface normal where it landed, which is what an effect faces along.
     normal: Optional[np.ndarray] = None
+
+
+def _clear_of(kind: Projectile, found: Any) -> np.ndarray:
+    """Where a round that met ``found`` has its warhead: a radius off it.
+
+    A projectile is a sphere of :attr:`Projectile.radius` and the cast reports
+    where its *nose* touched, so its middle -- which is where the burst is --
+    is that far back along the surface normal.  The normal from a cast always
+    faces back along the ray, so this always moves towards the shooter and a
+    burst is never pushed through the wall it landed on.
+
+    A centimetre and a half of geometry buys much more than it looks like.  The
+    burst asks whether it can see each person near it, and a point sitting
+    exactly on a triangle is on both sides of that triangle at once: the cast
+    out of it meets the same triangle at no distance at all, whenever the
+    rounding happens to fall that way, and everybody in the room is reported to
+    be behind cover.  A rocket at somebody's feet then costs them nothing and
+    moves them nowhere.
+    """
+    return (np.asarray(found.point, dtype='d')
+            + np.asarray(found.normal, dtype='d') * float(kind.radius))
 
 
 class Projectiles:
@@ -348,8 +376,8 @@ class Projectiles:
         self._arm(index)
         target = bodies.get(found.body, '')
         if target or float(kind.bounce) <= 0.0:
-            self._detonate(arena, index, kind, found.point, found.normal,
-                           target, gone)
+            self._detonate(arena, index, kind, _clear_of(kind, found),
+                           found.normal, target, gone)
             return True
         self._bounce(index, kind, found)
         return False

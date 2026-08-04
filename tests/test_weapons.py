@@ -89,6 +89,133 @@ class TestSpread:
         assert weapon.spread_at(9.0) == pytest.approx(5.0)
 
 
+class TestDamageAtRange:
+    """What a hit costs is a function of how far it travelled.
+
+    Three numbers say it -- how far full damage carries, how far it takes to
+    fade, and what is left at the end -- because a weapon's *range* is most of
+    what tells it apart from the weapon beside it, and a table of flat numbers
+    made every hitscan weapon the same weapon at a different rate of fire.
+    """
+
+    def test_a_weapon_that_declares_no_fade_does_not_fade(self):
+        """The default, so a weapon has range only when it says so."""
+        weapon = weapons.Weapon(damage=20.0)
+        assert weapon.damage_at(0.0) == pytest.approx(20.0)
+        assert weapon.damage_at(300.0) == pytest.approx(20.0)
+
+    def test_inside_the_full_range_it_is_undiminished(self):
+        weapon = weapons.Weapon(damage=50.0, fullRange=6.0, fadeRange=30.0,
+                                fadedDamage=10.0)
+        assert weapon.damage_at(0.0) == pytest.approx(50.0)
+        assert weapon.damage_at(6.0) == pytest.approx(50.0)
+
+    def test_beyond_the_fade_range_it_is_whatever_is_left(self):
+        weapon = weapons.Weapon(damage=50.0, fullRange=6.0, fadeRange=30.0,
+                                fadedDamage=10.0)
+        assert weapon.damage_at(30.0) == pytest.approx(10.0)
+        assert weapon.damage_at(400.0) == pytest.approx(10.0)
+
+    def test_between_them_it_falls_evenly(self):
+        weapon = weapons.Weapon(damage=50.0, fullRange=6.0, fadeRange=30.0,
+                                fadedDamage=10.0)
+        assert weapon.damage_at(18.0) == pytest.approx(30.0)
+
+    def test_nothing_left_at_the_far_end_is_allowed(self):
+        """A shotgun: past its reach the pellets arrive and cost nothing."""
+        weapon = weapons.Weapon(damage=14.0, fullRange=6.0, fadeRange=22.0,
+                                fadedDamage=0.0)
+        assert weapon.damage_at(25.0) == 0.0
+
+    def test_a_fade_that_ends_before_it_starts_is_no_fade(self):
+        """A table half-edited must not quietly invert the curve."""
+        weapon = weapons.Weapon(damage=50.0, fullRange=30.0, fadeRange=6.0,
+                                fadedDamage=10.0)
+        assert weapon.damage_at(50.0) == pytest.approx(50.0)
+
+
+class TestHowTheLoadoutIsMeantToPlay:
+    """The design, stated as what a fight costs rather than as field values.
+
+    Each of these is a sentence somebody could say about the weapon -- *the
+    shotgun kills in one up close and does nothing across the level* -- and
+    the numbers in the table are whatever makes them true.  Written this way
+    round because it is the sentences that are the design; retuning is meant
+    to break a claim about the game, not an assertion that 34 is still 34.
+    """
+
+    def hits_to_kill(self, key, metres):
+        weapon = weapons.default_table().by_key(key)
+        each = weapon.damage_at(metres) * max(1, int(weapon.pellets))
+        return math.inf if each <= 0 else math.ceil(100.0 / each)
+
+    def test_a_pistol_kills_in_two_at_arms_length(self):
+        assert self.hits_to_kill('pistol', 2.0) <= 2
+
+    def test_a_pistol_kills_in_three_across_a_room(self):
+        assert self.hits_to_kill('pistol', 14.0) <= 3
+
+    def test_a_pistol_takes_half_a_dozen_across_the_level(self):
+        assert 5 <= self.hits_to_kill('pistol', 45.0) <= 6
+
+    def test_a_shotgun_kills_in_one_at_close_quarters(self):
+        """Every pellet lands at that range: the cone is centimetres wide."""
+        assert self.hits_to_kill('shotgun', 3.0) == 1
+
+    def test_a_shotgun_is_a_handful_of_shots_at_middle_distance(self):
+        """Before the cone is counted, which takes more of them still."""
+        assert 3 <= self.hits_to_kill('shotgun', 14.0) <= 5
+
+    def test_a_shotgun_does_nothing_at_all_across_the_level(self):
+        assert weapons.default_table().by_key('shotgun').damage_at(30.0) == 0.0
+
+    def test_a_rifle_kills_in_one_at_any_range_it_can_see(self):
+        """Its whole argument: the shot is hard to line up and it ends the fight."""
+        for metres in (2.0, 40.0, 150.0, 390.0):
+            assert self.hits_to_kill('rifle', metres) == 1
+
+
+class TestLookingThroughTheRifle:
+    """The zoom, which is the rifle's other half.
+
+    A weapon that kills in one at any range has to be hard to *aim* or it is
+    the only weapon anybody carries; at four hundred metres a body is a pixel
+    or two, and without something to look through the rifle is not accurate,
+    it is a lottery.  The field of view is the weapon's own number, so the one
+    weapon that has a scope is the one weapon the table says has one.
+    """
+
+    def test_the_rifle_narrows_the_view(self):
+        rifle = weapons.default_table().by_key('rifle')
+        assert 0.0 < float(rifle.zoomFieldOfView) < 45.0
+
+    def test_nothing_else_does(self):
+        for weapon in weapons.default_table().weapons:
+            if str(weapon.key) != 'rifle':
+                assert float(weapon.zoomFieldOfView) == 0.0, weapon.key
+
+    def test_zooming_with_the_rifle_up_narrows_the_frustum(self):
+        rifle = weapons.default_table().by_key('rifle')
+        wide = math.radians(90.0)
+        assert weapons.field_of_view(rifle, True, wide) < wide
+
+    def test_not_zooming_leaves_the_view_alone(self):
+        rifle = weapons.default_table().by_key('rifle')
+        wide = math.radians(90.0)
+        assert weapons.field_of_view(rifle, False, wide) == wide
+
+    def test_zooming_with_anything_else_up_does_nothing(self):
+        """So the button is dead in the hand rather than wrong in the hand."""
+        wide = math.radians(90.0)
+        for key in ('pistol', 'shotgun', 'rocket', 'grenade'):
+            weapon = weapons.default_table().by_key(key)
+            assert weapons.field_of_view(weapon, True, wide) == wide
+
+    def test_holding_nothing_at_all_is_the_wide_view(self):
+        wide = math.radians(90.0)
+        assert weapons.field_of_view(None, True, wide) == wide
+
+
 class TestReticule:
     def test_the_reticule_widens_with_the_weapon_s_spread(self):
         table = weapons.default_table()

@@ -287,8 +287,9 @@ class TestWhatAShotSays:
 class TestWhatAShotCosts:
 
     def test_a_hit_takes_the_weapons_damage(self):
+        """A weapon that does not fade costs the same wherever it lands."""
         found = match()
-        gun = rifle()
+        gun = weapons.Weapon(key='test', damage=30.0, pellets=1)
         combat.fire(world(), found, 'player', gun,
                     origin=(0, 0, 0), direction=(1, 0, 0))
         assert found.combatant('bot0').health == \
@@ -314,6 +315,52 @@ class TestWhatAShotCosts:
             combat.fire(world(), found, 'player', rifle(),
                         origin=(0, 0, 0), direction=(1, 0, 0))
         assert found.score('player') == 1
+
+
+class TestWhatDistanceCostsAShot:
+    """A trace is worth less the further it flew, and the weapon says by how much.
+
+    The rule belongs to the shot rather than to the weapon table alone,
+    because the distance is something only the trace knows: it is measured
+    from the muzzle to what was actually met, which is the capsule's near
+    side and not the middle of whoever is standing there.
+    """
+
+    def shot(self, gun, metres):
+        """Fire at somebody standing ``metres`` away; returns what it cost."""
+        found = arena.Arena(weapons=weapons.default_table())
+        found.add('player', position=(0.0, 0.0, 0.0), name='You')
+        found.add('bot0', position=(float(metres), 0.0, 0.0), bot=True,
+                  name='Bot')
+        combat.fire(world(), found, 'player', gun,
+                    origin=(0, 0, 0), direction=(1, 0, 0))
+        return arena.STARTING_HEALTH - found.combatant('bot0').health
+
+    def test_inside_the_full_range_it_costs_everything(self):
+        gun = weapons.default_table().by_key('pistol')
+        assert self.shot(gun, 3.0) == pytest.approx(float(gun.damage), abs=1)
+
+    def test_further_out_it_costs_less(self):
+        gun = weapons.default_table().by_key('pistol')
+        assert self.shot(gun, 45.0) < self.shot(gun, 3.0)
+
+    def test_past_the_fade_range_a_shotgun_costs_nothing(self):
+        """It still arrives, and it is still heard; it just does no harm."""
+        assert self.shot(weapons.default_table().by_key('shotgun'), 30.0) == 0
+
+    def test_a_shot_that_does_no_harm_is_still_an_impact(self):
+        """The pellets land somewhere, and something has to draw and play that."""
+        found = arena.Arena(weapons=weapons.default_table())
+        found.add('player', position=(0.0, 0.0, 0.0), name='You')
+        found.add('bot0', position=(30.0, 0.0, 0.0), bot=True, name='Bot')
+        hits = combat.fire(world(), found, 'player',
+                           weapons.default_table().by_key('shotgun'),
+                           origin=(0, 0, 0), direction=(1, 0, 0))
+        assert [hit for hit in hits if hit.target == 'bot0']
+
+    def test_a_weapon_that_does_not_fade_costs_the_same_anywhere(self):
+        gun = weapons.default_table().by_key('rifle')
+        assert self.shot(gun, 300.0) == self.shot(gun, 2.0)
 
 
 class TestWhoIsUnderTheCrosshair:
@@ -407,17 +454,31 @@ class TestHowManyHitsAKillTakes:
                 return shot
         return None
 
+    def due(self, key, gap):
+        """How many hits the table says it takes, at that range.
+
+        ``damage_at`` is asked about the gap between the two of them while the
+        shot is measured to the near side of the capsule -- a third of a metre
+        of difference, which is orders of magnitude less than one hit is worth
+        at any of these ranges.
+        """
+        gun = weapons.default_table().by_key(key)
+        each = int(gun.damage_at(gap)) * max(1, int(gun.pellets))
+        return -(-arena.STARTING_HEALTH // each)                # round up
+
     @pytest.mark.parametrize('gap', RANGES)
     def test_the_pistol_takes_what_its_damage_says(self, gap):
-        gun = weapons.default_table().by_key('pistol')
-        due = -(-arena.STARTING_HEALTH // int(gun.damage))       # round up
-        assert self.hits_to_kill('pistol', gap) == due
+        assert self.hits_to_kill('pistol', gap) == self.due('pistol', gap)
 
     @pytest.mark.parametrize('gap', RANGES)
     def test_the_rifle_does_too(self, gap):
-        gun = weapons.default_table().by_key('rifle')
-        due = -(-arena.STARTING_HEALTH // int(gun.damage))
-        assert self.hits_to_kill('rifle', gap) == due
+        assert self.hits_to_kill('rifle', gap) == self.due('rifle', gap)
+
+    @pytest.mark.parametrize('gap', RANGES)
+    def test_and_the_pistol_takes_more_of_them_the_further_off_it_is(self, gap):
+        """The falloff, seen from the end a player experiences it at."""
+        assert self.hits_to_kill('pistol', gap) \
+            >= self.hits_to_kill('pistol', 3.0)
 
     def test_the_pistol_is_not_the_weakest_thing_in_the_table(self):
         """Per second, which is what a fight is measured in."""
@@ -456,12 +517,14 @@ class TestAWeaponThatFiresSeveralPellets:
         assert len(hits) == gun.pellets
 
     def test_each_pellet_does_its_own_damage(self):
+        """Eight of them, each costing what one costs at the range it flew."""
         found = match()
         gun = self.shotgun()
-        combat.fire(world(), found, 'player', gun,
-                    origin=(0, 0, 0), direction=(1, 0, 0), spread=0.0)
-        assert found.combatant('bot0').health == \
-            arena.STARTING_HEALTH - int(gun.damage) * gun.pellets
+        hits = combat.fire(world(), found, 'player', gun,
+                           origin=(0, 0, 0), direction=(1, 0, 0), spread=0.0)
+        assert hits[0].damage > 0
+        assert arena.STARTING_HEALTH - found.combatant('bot0').health == \
+            gun.pellets * hits[0].damage
 
     def test_spread_scatters_the_pellets(self):
         """Otherwise every pellet lands in the same place and the cone is a lie."""
@@ -521,13 +584,18 @@ class TestPuttingPeopleInTheWorldAndTakingThemOut:
                     if int(w.collider_shape[body]) >= 0]
 
     def test_a_staged_body_is_where_the_combatant_is(self):
-        """Reused bodies have to be *moved*, not merely switched back on."""
+        """Reused bodies have to be *moved*, not merely switched back on.
+
+        Something survivable rather than the rifle, which ends the match on
+        the first shot and leaves nothing alive to be staged twice.
+        """
         w = world()
         found = match()
-        combat.fire(w, found, 'player', rifle(), origin=(0, 0, 0),
+        gun = weapons.Weapon(key='test', damage=10.0, pellets=1)
+        combat.fire(w, found, 'player', gun, origin=(0, 0, 0),
                     direction=(1, 0, 0))
         found.combatant('bot0').position = np.array([0.0, 0.0, 10.0])
-        hits = combat.fire(w, found, 'player', rifle(), origin=(0, 0, 0),
+        hits = combat.fire(w, found, 'player', gun, origin=(0, 0, 0),
                            direction=(0, 0, 1))
         assert [hit.target for hit in hits] == ['bot0']
 

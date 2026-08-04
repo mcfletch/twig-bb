@@ -90,6 +90,52 @@ class TestFallingOffWithDistance:
             float(rocket.splashDamage) * 0.5, abs=2)
 
 
+class TestABurstBeingWorthDodging:
+    """How much a *near miss* costs, which is the whole of what splash is for.
+
+    A launcher whose burst has to land on somebody to matter is a launcher
+    that is only a slow rifle: what the weapon actually asks of a player is to
+    aim at the floor beside them, and that trade is only worth taking if the
+    floor beside them hurts.  The numbers here are the design, so they are
+    stated as what a player experiences -- a share of a life, and a shove
+    bigger than a jump -- rather than as whatever the table currently says.
+    """
+
+    def near_miss(self, kind, metres):
+        """What a burst ``metres`` from somebody's chest takes off them."""
+        found = match((float(metres), 0.0, 0.0))
+        blast.burst(world(), found, point=(0, blast.CHEST_HEIGHT, 0),
+                    kind=kind, by='player')
+        return hurt(found, 'bot0')
+
+    def test_a_rocket_two_metres_off_costs_a_third_of_a_life(self, rocket):
+        assert self.near_miss(rocket, 2.0) >= arena.STARTING_HEALTH / 3.0
+
+    def test_a_grenade_two_metres_off_does_too(self):
+        grenade = projectiles.default_table().by_key(projectiles.GRENADE)
+        assert self.near_miss(grenade, 2.0) >= arena.STARTING_HEALTH / 3.0
+
+    def test_a_grenade_at_your_feet_throws_you_higher_than_a_jump(self):
+        """The same claim the rocket carries, because it is the same burst.
+
+        A grenade that went off underfoot and left the player standing where
+        they were reads as a dud, however much health it took.
+        """
+        grenade = projectiles.default_table().by_key(projectiles.GRENADE)
+        jump = float(np.sqrt(2.0 * 9.81 * 64 * 0.0254))
+        found = match()
+        blast.burst(world(), found, point=(0, 0.0, 0), kind=grenade,
+                    by='player')
+        assert float(found.combatant('player').push[1]) > jump
+
+    def test_a_grenade_jump_is_survivable_at_full_health(self):
+        grenade = projectiles.default_table().by_key(projectiles.GRENADE)
+        found = match()
+        blast.burst(world(), found, point=(0, 0.0, 0), kind=grenade,
+                    by='player')
+        assert found.combatant('player').alive
+
+
 class TestCover:
     """A rocket round a corner must not kill."""
 

@@ -257,6 +257,33 @@ class TestWhichLiquidThePlayerIsIn:
     def test_the_liquid_is_named(self):
         assert self.submerged_in('lava') == 'lava'
 
+    def test_a_swimmer_at_the_surface_is_named_by_their_body(self):
+        """The eye leaves the water a head's height before the body does.
+
+        A swimmer lifting themselves out spends those moments with the camera
+        in the air and the rest of them in the pool, and the row is there to
+        name the liquid rather than to say "something".
+        """
+        import numpy as np
+
+        from twig_bb import liquids
+
+        class Surfacing:
+            submerged = True
+
+            def camera_position(self):
+                return (5.0, 6.0, 5.0)
+
+            def feet_position(self):
+                return (5.0, 4.0, 5.0)
+
+        pool = liquids.LiquidVolumes([
+            liquids.LiquidVolume(mins=np.array((0, 0, 0), 'd'),
+                                 maxs=np.array((10, 5, 10), 'd'), kind='water')])
+        viewer = Viewer(_nav=Surfacing(), _liquids=pool)
+        twigdebug.install(viewer)
+        assert rows(viewer, 'Player')['submerged'] == 'water'
+
     def test_being_under_with_no_volumes_read_still_says_so(self):
         class Swimming:
             submerged = True

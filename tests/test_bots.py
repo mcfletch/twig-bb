@@ -283,6 +283,50 @@ class TestReacting:
         assert not think(brain, found, dt=10.0, times=5).fired
 
 
+class TestABotObeysTheWeaponsFireRate:
+    """A bot may not shoot faster than the thing in its hands will fire.
+
+    Its ``decisionInterval`` is how often it *thinks*, and the hardest one
+    thinks twenty times a second; the weapon's ``fireInterval`` is how often
+    it can shoot, and the rifle's is a second and a half.  With nothing
+    holding the two together a bot empties a one-shot-kill weapon into
+    somebody in the frame they walk into view, which is not a difficult
+    opponent, it is a hitscan wall.
+    """
+
+    def brain(self, difficulty='nightmare'):
+        return bots.Bot('bot0', difficulty=difficulty, seed=1,
+                        weapons=weapons.default_table(),
+                        projectiles=projectiles.default_table())
+
+    def shots(self, brain, found, seconds=3.0, dt=0.05):
+        """How many times it pulls the trigger over ``seconds``."""
+        w, taken = world(), 0
+        brain.facing = np.array([-1.0, 0.0, 0.0])
+        for _ in range(int(seconds / dt)):
+            if brain.think(w, found, dt).fired:
+                taken += 1
+        return taken
+
+    def test_it_fires_no_faster_than_the_weapon_it_chose(self):
+        found = match('nightmare', distance=10.0)
+        brain = self.brain()
+        seconds = 3.0
+        taken = self.shots(brain, found, seconds=seconds)
+        chosen = weapons.default_table().by_key(
+            think(self.brain(), found, dt=5.0, times=2).weapon)
+        assert taken <= seconds / float(chosen.fireInterval) + 1
+
+    def test_it_still_fires_at_all(self):
+        """The gate must not become a bot that never shoots."""
+        assert self.shots(self.brain(), match('nightmare', distance=10.0)) > 0
+
+    def test_a_bot_with_no_table_is_not_stopped_by_one(self):
+        """Nothing said what it is holding, so nothing says how fast it fires."""
+        brain = bots.Bot('bot0', difficulty='nightmare', seed=1)
+        assert self.shots(brain, match('nightmare')) > 0
+
+
 class TestAiming:
 
     def test_it_aims_at_what_it_can_see(self):
@@ -491,6 +535,23 @@ class TestChoosingAWeapon:
         found = match(difficulty='easy', distance=1.5)
         weapon = think(careless, found, dt=5.0, times=2).weapon
         assert str(weapons.default_table().by_key(weapon).projectile)
+
+    def test_it_does_not_choose_a_weapon_that_cannot_reach(self):
+        """A shotgun across a level is a bot standing in the open for nothing."""
+        table = weapons.WeaponTable(weapons=[
+            weapons.default_table().by_key(key) for key in
+            ('pistol', 'shotgun')])
+        brain = bots.Bot('bot0', difficulty='hard', seed=1, weapons=table)
+        assert think(brain, match(distance=40.0), dt=5.0, times=2).weapon \
+            == 'pistol'
+
+    def test_and_does_choose_it_where_it_is_the_better_one(self):
+        table = weapons.WeaponTable(weapons=[
+            weapons.default_table().by_key(key) for key in
+            ('pistol', 'shotgun')])
+        brain = bots.Bot('bot0', difficulty='hard', seed=1, weapons=table)
+        assert think(brain, match(distance=3.0), dt=5.0, times=2).weapon \
+            == 'shotgun'
 
     def test_the_safe_range_is_the_projectiles_own_radius(self):
         """Not a constant: a bigger burst has to be kept further away."""

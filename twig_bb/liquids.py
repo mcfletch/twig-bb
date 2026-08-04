@@ -1,10 +1,11 @@
 """Where a map's water, slime and lava are, so a swimmer can be in one.
 
 A liquid is a *volume*, not a surface: its faces are drawn, but what decides
-whether the avatar is swimming is whether the camera is inside the space they
-bound.  The two families record that space differently and neither records it
-as a box, so both are read through the leaves of the BSP tree, whose bounds are
-already axis-aligned and stored:
+whether the avatar is swimming is whether the body is inside the space they
+bound -- see :func:`twig_bb.viewer.update_submerged` for which part of the body
+is asked, going in and coming out.  The two families record that space
+differently and neither records it as a box, so both are read through the
+leaves of the BSP tree, whose bounds are already axis-aligned and stored:
 
 * version 38 puts a contents word on every leaf (``SPEC-BSP38 §4.7``), and
   ``§9.4`` names water, slime and lava as the liquids;

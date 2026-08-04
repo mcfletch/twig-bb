@@ -117,18 +117,19 @@ class TestAmmunition:
         assert player.ammo_for(table.by_key('pistol')) == player.ammo['bullets']
 
     def test_firing_costs_what_the_weapon_says(self, player, table):
+        """Its own ``ammoPerShot``, so retuning the table retunes this."""
         rifle = table.by_key('rifle')
         player.give('rifle')
         player.ammo['cells'] = 10
         assert player.spend(rifle) is True
-        assert player.ammo['cells'] == 8
+        assert player.ammo['cells'] == 10 - int(rifle.ammoPerShot)
 
     def test_a_weapon_cannot_fire_without_the_ammunition(self, player, table):
         rifle = table.by_key('rifle')
-        player.ammo['cells'] = 1
+        player.ammo['cells'] = int(rifle.ammoPerShot) - 1
         assert player.can_fire(rifle) is False
         assert player.spend(rifle) is False
-        assert player.ammo['cells'] == 1
+        assert player.ammo['cells'] == int(rifle.ammoPerShot) - 1
 
     def test_ammunition_is_capped_when_it_is_picked_up(self, player):
         player.give_ammo('bullets', 10_000)

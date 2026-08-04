@@ -151,15 +151,26 @@ def _landed(arena: Any, bodies: dict, shooter: str, weapon: Any, found: Any,
     A body staged for this shot is a person and everything else is the level,
     which is why the staging table answers the whole question: nothing has to
     ask the physics world what kind of thing it just reported.
+
+    **How far it flew is what decides what it costs**, through the weapon's own
+    :meth:`~twig_bb.weapons.Weapon.damage_at`.  Measured here rather than
+    from where the two of them are standing, because the trace is the only
+    thing that knows: it stops at the near side of a capsule, and a weapon that
+    fades sharply would otherwise disagree with itself by the width of a body.
+    A hit that costs nothing is still a hit -- it is drawn, it is heard, and it
+    says a shotgun has been fired at somebody from too far away, which is worth
+    knowing from both ends.
     """
     target = bodies.get(found.body)
     style = None if target is not None or surfaces is None \
         else surfaces.style_at(found)
     taken = 0 if target is None else arena.damage(
-        target, float(weapon.damage), by=shooter, point=found.point)
+        target, weapon.damage_at(float(found.distance)), by=shooter,
+        point=found.point)
     arena.impact(point=found.point, normal=found.normal,
                  surface='' if style is None else style.name,
-                 target=NOBODY if target is None else target, by=shooter)
+                 target=NOBODY if target is None else target, by=shooter,
+                 weapon=str(weapon.key))
     return Hit(target=NOBODY if target is None else target, point=found.point,
                normal=found.normal, damage=taken, surface=style)
 

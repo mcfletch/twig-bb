@@ -67,10 +67,22 @@ class Weapon(node.Node):
     startingAmmo = field.newField('startingAmmo', 'SFInt32', 1, 40)
     #: Seconds between shots.
     fireInterval = field.newField('fireInterval', 'SFFloat', 1, 0.4)
-    #: Damage one shot does at the point it lands, before any falloff.
+    #: Damage one trace does where it lands, out to :attr:`fullRange`.
     damage = field.newField('damage', 'SFFloat', 1, 20.0)
     #: How many projectiles or traces one shot sends: a shotgun's pellets.
     pellets = field.newField('pellets', 'SFInt32', 1, 1)
+
+    #: How far ``damage`` carries undiminished, how far it takes to fade, and
+    #: what is left at that distance and beyond — metres, metres, and health.
+    #: **Range is most of what tells one hitscan weapon from another**: without
+    #: it a pistol is a shotgun with a different rate of fire, and every fight
+    #: in the level is fought at whatever distance the player happens to be
+    #: standing.  A ``fadeRange`` at or inside ``fullRange`` — which is the
+    #: default, both zero — is a weapon that hits equally hard anywhere, which
+    #: is what a rifle wants and what a half-edited table falls back to.
+    fullRange = field.newField('fullRange', 'SFFloat', 1, 0.0)
+    fadeRange = field.newField('fadeRange', 'SFFloat', 1, 0.0)
+    fadedDamage = field.newField('fadedDamage', 'SFFloat', 1, 0.0)
 
     #: Which entry of :mod:`twig_bb.projectiles`' table this weapon throws,
     #: or empty for a **hitscan** weapon whose shot arrives instantly.  This
@@ -89,12 +101,35 @@ class Weapon(node.Node):
     #: The reticule drawn while this weapon is selected.
     crosshair = field.newField('crosshair', 'SFNode', 1, node.NULL)
 
+    #: The vertical field of view this weapon can be sighted through, in
+    #: **degrees**, or 0 for one that cannot.  A weapon that kills at any
+    #: range it can see has to be hard to *aim*, or it is the only weapon
+    #: anybody carries: at three hundred metres a body covers a pixel or two,
+    #: and a rifle with nothing to look through is not accurate, it is a
+    #: lottery.  Held rather than toggled — see :data:`twig_bb.controls.ZOOM`.
+    zoomFieldOfView = field.newField('zoomFieldOfView', 'SFFloat', 1, 0.0)
+
     #: Which entry of :mod:`twig_bb.combatsound`'s table this weapon is
     #: heard as.  Empty is the table's generic report, which is what makes a
     #: new weapon audible before anyone has designed a sound for it; a key
     #: that names nothing falls back to the same, because a silent weapon
     #: reads as a broken trigger.
     fireSound = field.newField('fireSound', 'SFString', 1, '')
+
+    #: What one of its rounds sounds like **arriving**, on the level and on a
+    #: person.  Empty is the table's generic pair, which is what an unnamed
+    #: weapon and every future one get.
+    #:
+    #: A round landing is as much this weapon's sound as its report is: a
+    #: rifle arrives with a chunk and a pistol with a ping, and a table with
+    #: one impact sound in it makes every weapon land the same way however
+    #: differently they fire.  **Whatever a weapon names, hitting a person has
+    #: to stay louder and higher-priority than hitting a wall** — that is the
+    #: sound a player acts on and the one that must survive a firefight
+    #: running the voice pool dry — and there is a test over the whole table
+    #: that says so.
+    impactSound = field.newField('impactSound', 'SFString', 1, '')
+    fleshSound = field.newField('fleshSound', 'SFString', 1, '')
 
     #: How the weapon moves when it is fired: back towards the eye in
     #: **metres**, up in **degrees**, and the **seconds** it takes to settle.
@@ -133,6 +168,31 @@ class Weapon(node.Node):
         rest = float(self.restSpread)
         return rest + (float(self.maxSpread) - rest) * fraction
 
+    def damage_at(self, distance: float) -> float:
+        """What one trace costs after travelling ``distance`` metres.
+
+        Linear between :attr:`fullRange` and :attr:`fadeRange`, and flat
+        outside them.  Straight rather than curved because this is a number a
+        player has to be able to predict from having been shot by it twice:
+        anything an exponent adds is felt as the weapon being inconsistent.
+
+        A weapon whose fade ends at or before its full range is one that does
+        not fade at all, which is the default and is also what a table caught
+        half-edited does — the safe answer being the weapon's own damage
+        rather than nothing.
+        """
+        near, far = float(self.fullRange), float(self.fadeRange)
+        full = float(self.damage)
+        if far <= near:
+            return full
+        travelled = max(0.0, float(distance))
+        if travelled <= near:
+            return full
+        faded = float(self.fadedDamage)
+        if travelled >= far:
+            return faded
+        return full + (faded - full) * (travelled - near) / (far - near)
+
 
 class WeaponTable(node.Node):
     """Every weapon this game knows about, in the order they are shown."""
@@ -164,6 +224,23 @@ def model_path(weapon: Weapon) -> str:
     return path_for(str(weapon.model))
 
 
+def field_of_view(weapon: Optional[Weapon], zooming: bool,
+                  default: float) -> float:
+    """The vertical field of view the player is looking through, in radians.
+
+    ``default`` is the view's own, and is the answer for everything except a
+    weapon that declares a :attr:`~Weapon.zoomFieldOfView` while its owner is
+    holding the zoom down.  Asked *per frame* from what is currently in hand,
+    so switching weapon while sighted gives the wide view back with nothing
+    having to remember to cancel anything — and so does dying, and so does
+    running out of that weapon.
+    """
+    if weapon is None or not zooming:
+        return float(default)
+    narrow = float(weapon.zoomFieldOfView)
+    return math.radians(narrow) if narrow > 0.0 else float(default)
+
+
 def spread_pixels(degrees: float, viewport_height: int,
                   field_of_view: float) -> float:
     """A cone half-angle, in degrees, as a radius in pixels on the screen.
@@ -193,35 +270,43 @@ def reticule_spread(weapon: Weapon, fraction: float, viewport_height: int,
 
 
 def default_table() -> WeaponTable:
-    """A fresh copy of the stand-in loadout.
+    """A fresh copy of the loadout, which is where this game's design is written.
 
-    Three weapons chosen to differ in the ways the HUD has to show: a tight
-    cross that barely opens, a ring that opens a long way, and a fast weapon
-    eating two cells a shot.  The art is CC0 firearms lying along +Y in their
-    own space, which is what the pitch here is undoing; their exporter already
-    scaled centimetres to metres, so the scale is 1.  Between them the reticule, the ammunition
-    readout and the weapon bar can all be seen working before §7's weapons
-    exist.  Each has a model of its own, so switching weapon changes something
-    on screen.
+    **Five weapons that differ by range before they differ by anything else.**
+    A pistol worth three times as much in somebody's face as down a corridor;
+    a shotgun that kills outright inside five metres and cannot touch anybody
+    past seventeen; a rifle that kills in one wherever it can see, once every
+    second and a half; and two launchers whose burst is worth a third of a life
+    two metres away, so they are aimed at the floor beside somebody rather than
+    at them.  Without the ranges they are one weapon at five rates of fire, and
+    every fight in the level is fought at whatever distance the two players
+    happen to be standing.
 
-    **The numbers are ours; the models are placeholders for art that has not
-    been commissioned.**  Two of the five stand in for a weapon the CC0 pack
-    does not contain -- a sniper rifle for the rocket launcher, a pipe bomb for
-    the grenade launcher -- and three of them (shotgun, rifle, rocket) had
-    their texture maps stripped for the repository and are drawn in a plain
-    metallic material.  Every one of those is a field of the table, so better
-    art replaces it without touching code.
+    Every number is ours -- there is nothing to match and nothing to look up --
+    which is why they are written as sentences about play and the fields are
+    whatever makes those true.  The same is done to the tests in
+    ``tests/test_weapons.py``, so retuning breaks a claim about the game rather
+    than an assertion that a number is still itself.
 
     A function rather than a constant, because a table is authored data with
     every field writable: a game (or a test) adjusting one weapon's spread
     should not adjust it for every other table in the process.
     """
     return WeaponTable(weapons=[
+        # The three that trace a line, and they are told apart by **range**
+        # before anything else.  Without that they are one weapon at three
+        # rates of fire, and every fight in the level is fought at whatever
+        # distance the players happen to be standing.
         Weapon(
             key='pistol', title='PISTOL', slot=1,
             ammoType='bullets', ammoPerShot=1, startingAmmo=60,
             fireInterval=0.35,
-            damage=15.0, restSpread=0.6, maxSpread=2.5,
+            # Two shots in somebody's face, three across a room, half a dozen
+            # down a corridor.  It is the weapon a player always has, so it
+            # has to stay worth firing at any range and be worth *replacing*
+            # at every one of them.
+            damage=52.0, fullRange=4.0, fadeRange=40.0, fadedDamage=18.0,
+            restSpread=0.6, maxSpread=2.5,
             recoilKick=0.030, recoilRise=3.5, recoilRecovery=0.14,
             crosshair=Crosshair(shape=CROSS, gap=5, length=7, thickness=2),
             fireSound='fire-pistol',
@@ -232,21 +317,49 @@ def default_table() -> WeaponTable:
             key='shotgun', title='SHOTGUN', slot=2,
             ammoType='shells', ammoPerShot=1, startingAmmo=25,
             fireInterval=0.9,
-            damage=12.0, pellets=8, restSpread=3.5, maxSpread=6.0,
+            # A room-length weapon and nothing else: eight pellets at fourteen
+            # each will kill outright inside five metres, and past seventeen
+            # they arrive and cost nothing at all.  The falloff is *per
+            # pellet*, so the cone thinning the pattern out and the range
+            # taking the sting out of it compound -- which is why the middle
+            # distance costs four or five shots rather than the two the
+            # arithmetic alone would suggest.
+            damage=14.0, pellets=8,
+            fullRange=5.0, fadeRange=17.0, fadedDamage=0.0,
+            restSpread=3.5, maxSpread=6.0,
             recoilKick=0.075, recoilRise=7.0, recoilRecovery=0.30,
             crosshair=Crosshair(shape=CIRCLE, gap=9, thickness=2),
             fireSound='fire-shotgun',
             model='weapons/sawn-off-shotgun.glb', modelScale=1.0,
             modelOffset=(0.19, -0.19, -0.40),
         ),
+        # The opposite weapon in every respect: one shot, one kill, at any
+        # range it can see, and a second and a half between shots to pay for
+        # it.  What holds it in check is the *cost of missing* -- a shot that
+        # misses is a second and a half of standing still while somebody who
+        # heard it closes -- and that only works while the interval is long
+        # enough to be a decision.  Ten rounds, because at one kill each that
+        # is ten kills.  Armour still saves a target from it, which is what
+        # armour is for and the reason the number is a little over a life
+        # rather than far over it.
         Weapon(
             key='rifle', title='RIFLE', slot=3,
-            ammoType='cells', ammoPerShot=2, startingAmmo=120,
-            fireInterval=0.12,
-            damage=8.0, restSpread=1.2, maxSpread=4.5,
-            recoilKick=0.018, recoilRise=2.0, recoilRecovery=0.09,
+            ammoType='cells', ammoPerShot=1, startingAmmo=10,
+            fireInterval=1.5,
+            damage=120.0,
+            # No cone at all at rest: at three hundred metres a tenth of a
+            # degree is a body's width, so a rifle with a resting spread is a
+            # rifle that cannot do the one thing it is for.  It opens if it is
+            # fired faster than it can be, which it cannot be.
+            restSpread=0.0, maxSpread=2.0,
+            zoomFieldOfView=24.0,
+            recoilKick=0.080, recoilRise=6.5, recoilRecovery=0.45,
             crosshair=Crosshair(shape=CROSS_DOT, gap=4, length=5, thickness=2),
-            fireSound='fire-rifle',
+            # The only weapon that names its own impact: a round this heavy
+            # arriving is a chunk, and the generic ping made a shot that ends
+            # a fight sound like a stone hitting a window.
+            fireSound='fire-rifle', impactSound='impact-rifle',
+            fleshSound='flesh-rifle',
             model='weapons/sniper-rifle.glb', modelScale=1.0,
             modelOffset=(0.17, -0.20, -0.52),
         ),

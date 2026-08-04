@@ -329,6 +329,22 @@ def test_the_gaze_rule_agrees_with_the_walk_direction(tmp_path):
     assert viewer.gaze(nav) == pytest.approx(nav._world_dir(1.0, 0.0), abs=1e-6)
 
 
+class _NullInput:
+    """Nobody touching anything: the input a mode is driven with by default."""
+
+    def held(self, *names):
+        return False
+
+    def pressed(self, *names):
+        return False
+
+    def modifiers(self, name):
+        return (0, 0, 0)
+
+    def mouse_delta(self):
+        return (0.0, 0.0)
+
+
 class _Look:
     """Ctrl held with an arrow: what the look bindings are declared against."""
 
@@ -1037,6 +1053,193 @@ def test_updating_without_volumes_is_harmless(tmp_path):
     viewer.update_submerged(None, None)
 
 
+# -- where the water starts and where it lets go ------------------------------
+
+class _Body:
+    """A platform that knows where its eye and its feet are."""
+
+    def __init__(self, eye, feet, submerged=False):
+        self._eye, self._feet = eye, feet
+        self.submerged = submerged
+
+    def camera_position(self):
+        return self._eye
+
+    def feet_position(self):
+        return self._feet
+
+
+def _pool_volumes(surface=0.0, floor=-2.0):
+    """One pool, wide enough that only the height decides these tests."""
+    from twig_bb import liquids
+    return liquids.LiquidVolumes([liquids.LiquidVolume(
+        mins=np.array([-10.0, floor, -10.0]),
+        maxs=np.array([10.0, surface, 10.0]))])
+
+
+def test_swimming_starts_when_the_water_closes_over_the_eye():
+    body = _Body(eye=(0.0, -0.1, 0.0), feet=(0.0, -1.3, 0.0))
+    viewer.update_submerged(body, _pool_volumes())
+    assert body.submerged
+
+
+def test_wading_with_your_head_out_is_not_swimming():
+    """Feet in the shallows and the eye in the air is somebody walking."""
+    body = _Body(eye=(0.0, 0.9, 0.0), feet=(0.0, -0.3, 0.0))
+    viewer.update_submerged(body, _pool_volumes())
+    assert not body.submerged
+
+
+def test_a_swimmer_whose_eye_breaks_the_surface_is_still_in_the_water():
+    """The eye reaches the surface a body's height before the feet do.
+
+    Ending the swim there pins the eye to the surface: the body sinks back the
+    moment it stops swimming, so the feet can never rise past a head's depth
+    and every pool with a rim above the water is a trap.
+    """
+    body = _Body(eye=(0.0, 0.4, 0.0), feet=(0.0, -0.8, 0.0), submerged=True)
+    viewer.update_submerged(body, _pool_volumes())
+    assert body.submerged
+
+
+def test_a_swimmer_whose_feet_leave_the_water_is_out_of_it():
+    body = _Body(eye=(0.0, 1.6, 0.0), feet=(0.0, 0.4, 0.0), submerged=True)
+    viewer.update_submerged(body, _pool_volumes())
+    assert not body.submerged
+
+
+def test_a_platform_with_no_body_is_read_by_its_eye_alone():
+    """A plain camera has no feet to ask about, and still has to work."""
+    class _Camera:
+        submerged = True
+
+        def camera_position(self):
+            return (0.0, 5.0, 0.0)
+
+    camera = _Camera()
+    viewer.update_submerged(camera, _pool_volumes())
+    assert not camera.submerged
+
+
+# -- getting out of a pool ----------------------------------------------------
+
+#: The pit, as a map builds one: a deck with a square hole in it, the water
+#: stopping a little below the deck, and the floor a swimmer's height further
+#: down.  These are the proportions of the pool at 26,-7,-13 in `oa_spirit3`.
+POOL_HALF = 1.5
+POOL_FLOOR = -2.0
+POOL_SURFACE = -0.2
+
+
+def _quad(points, corners):
+    """Add one rectangle's two triangles to ``points``, and index them."""
+    first = len(points)
+    points.extend(corners)
+    return [(first, first + 1, first + 2), (first, first + 2, first + 3)]
+
+
+def _pool_world():
+    """A deck at y=0 with a pit in the middle of it, as one static trimesh."""
+    from omi_physics import model
+    from omi_physics.world import PhysicsWorld
+
+    half, floor, edge = POOL_HALF, POOL_FLOOR, 8.0
+    points, triangles = [], []
+    spans = [(-edge, -half), (half, edge)]
+    for low, high in spans:                     # the deck, front and back
+        triangles += _quad(points, [(-edge, 0.0, low), (edge, 0.0, low),
+                                    (edge, 0.0, high), (-edge, 0.0, high)])
+    for low, high in spans:                     # and to the left and right
+        triangles += _quad(points, [(low, 0.0, -half), (high, 0.0, -half),
+                                    (high, 0.0, half), (low, 0.0, half)])
+    triangles += _quad(points, [(-half, floor, -half), (half, floor, -half),
+                                (half, floor, half), (-half, floor, half)])
+    for sign in (-1.0, 1.0):                    # the pit's four walls
+        triangles += _quad(points, [(-half, floor, sign * half),
+                                    (half, floor, sign * half),
+                                    (half, 0.0, sign * half),
+                                    (-half, 0.0, sign * half)])
+        triangles += _quad(points, [(sign * half, floor, -half),
+                                    (sign * half, floor, half),
+                                    (sign * half, 0.0, half),
+                                    (sign * half, 0.0, -half)])
+    for sign in (-1.0, 1.0):                    # a wall round the room, so a
+        triangles += _quad(points, [(-edge, 0.0, sign * edge),   # player who
+                                    (edge, 0.0, sign * edge),    # gets out and
+                                    (edge, 4.0, sign * edge),    # keeps walking
+                                    (-edge, 4.0, sign * edge)])  # stays in it
+        triangles += _quad(points, [(sign * edge, 0.0, -edge),
+                                    (sign * edge, 0.0, edge),
+                                    (sign * edge, 4.0, edge),
+                                    (sign * edge, 4.0, -edge)])
+    world = PhysicsWorld(gravity=model.Gravity(gravity=9.81, direction=(0, -1, 0)))
+    shape = world.add_shape(model.Shape.trimesh(np.array(points, dtype='d'),
+                                                np.array(triangles, dtype='i')))
+    world.add_body(model.Motion(type=model.STATIC),
+                   collider=model.Collider(shape=shape), position=(0, 0, 0))
+    return world
+
+
+class _Holding(_NullInput):
+    """The keys a player is leaning on, for as long as the test runs."""
+
+    def __init__(self, *keys):
+        self.keys = set(keys)
+
+    def held(self, *names):
+        return any(name in self.keys for name in names)
+
+
+def _swim_out(seconds=12.0, keys=('w', ' ')):
+    """Drop a player in the pool, hold ``keys``, and say where they end up.
+
+    The whole path a player's own keys take: the modes decide which of them
+    applies from what the liquid volumes say, and the character controller
+    moves the capsule against the real pit.
+    """
+    from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
+    from twig_bb import liquids
+
+    volumes = liquids.LiquidVolumes([liquids.LiquidVolume(
+        mins=np.array([-POOL_HALF, POOL_FLOOR, -POOL_HALF]),
+        maxs=np.array([POOL_HALF, POOL_SURFACE, POOL_HALF]))])
+    platform = PhysicsViewPlatform(_pool_world(), viewer.character_capabilities(),
+                                   position=(0.0, POOL_FLOOR + 1.0, 0.0))
+    platform.bind((0.0, POOL_FLOOR + 1.0, 0.0))
+    platform.yaw = np.pi                        # forward is +z
+    modes = {mode.name: mode for mode in viewer.movement_modes()}
+    inputs, dt, current = _Holding(*keys), 1.0 / 60.0, None
+    for _frame in range(int(seconds / dt)):
+        viewer.update_submerged(platform, volumes)
+        wanted = modes['swim'] if modes['swim'].enter_when(platform) else modes['fps']
+        if wanted is not current:
+            viewer.apply_mode(platform, wanted)
+            current = wanted
+        current.update(dt, inputs, platform)
+        platform.update(dt)
+    return platform
+
+
+def test_a_swimmer_starts_out_swimming():
+    """The guard on the test below: it has to begin in the water."""
+    platform = _swim_out(seconds=1.0 / 60.0)
+    assert platform.submerged
+
+
+def test_a_player_can_swim_out_of_a_pool_sunk_below_its_deck():
+    """Forward and the rise key, which is all a player has to get out with.
+
+    A pool whose rim stands above the water is the ordinary shape of one, and
+    a player who can fall in but not climb out is stuck for the rest of the
+    match.
+    """
+    platform = _swim_out()
+    feet = platform.feet_position()
+    assert feet[1] == pytest.approx(0.0, abs=0.1), 'not standing on the deck'
+    assert feet[2] > POOL_HALF, 'still over the pit'
+    assert platform.character.grounded
+
+
 def test_a_companion_key_naming_no_registered_pack_is_ignored(tmp_path, monkeypatch):
     """A registry edit that leaves a dangling key must not break a load."""
     maps_root = tmp_path / 'pack'
@@ -1206,20 +1409,6 @@ class _ModePlatform:
 
     def jump(self):
         pass
-
-
-class _NullInput:
-    def held(self, *names):
-        return False
-
-    def pressed(self, *names):
-        return False
-
-    def modifiers(self, name):
-        return (0, 0, 0)
-
-    def mouse_delta(self):
-        return (0.0, 0.0)
 
 
 # -- the jump diagnostic ------------------------------------------------------
@@ -1672,8 +1861,9 @@ class TestTheMouseFiresInTheGame:
         made.hud = _MessageSink()
         made._inputState = InputState()
         made.getInputState = lambda: made._inputState
+        made._fov = None
         fired = []
-        for name in ('_sampleWeapons', '_runCommands'):
+        for name in ('_sampleWeapons', '_runCommands', '_sight'):
             setattr(made, name,
                     getattr(viewer.TwigContext, name).__get__(made))
         made._shoot = lambda: fired.append(1)
@@ -1713,6 +1903,82 @@ class TestTheMouseFiresInTheGame:
         del fired[:]
         made._sampleWeapons()
         assert not fired
+
+
+class TestTheMouseSightsTheRifle:
+    """The other button, through the same sampler: it narrows the frustum.
+
+    The whole of the zoom on the window's side is that the field of view the
+    view is drawn with follows what is in the player's hand -- so what is
+    checked is the platform's own frustum, which is what the projection is
+    built from and what the reticule is scaled through.
+    """
+
+    def context(self, key='rifle'):
+        from OpenGLContext.events.inputstate import InputState
+        made = _Headless(None)
+        made.config = viewer.build_parser().parse_args(['map.bsp'])
+        made.weapons = weapons.default_table()
+        made.player = player.PlayerState.carrying(made.weapons)
+        made.player.selected = key
+        made.weaponBindings = viewer.controls.WeaponBindings()
+        made.hud = _MessageSink()
+        made._fov = None
+        made._inputState = InputState()
+        made.getInputState = lambda: made._inputState
+        for name in ('_sampleWeapons', '_runCommands', '_sight'):
+            setattr(made, name,
+                    getattr(viewer.TwigContext, name).__get__(made))
+        made._shoot = lambda: None
+        return made
+
+    def press(self, made, down=1):
+        from OpenGLContext.events.mouseevents import MouseButtonEvent
+        event = MouseButtonEvent()
+        event.button = viewer.controls.RIGHT_BUTTON
+        event.state = down
+        made._inputState.process(event)
+
+    def test_holding_it_narrows_the_view(self):
+        made = self.context()
+        wide = viewer.view_fov(made.platform)
+        self.press(made)
+        made._sampleWeapons()
+        assert viewer.view_fov(made.platform) < wide
+
+    def test_letting_go_gives_the_view_back(self):
+        made = self.context()
+        wide = viewer.view_fov(made.platform)
+        self.press(made)
+        made._sampleWeapons()
+        self.press(made, down=0)
+        made._sampleWeapons()
+        assert viewer.view_fov(made.platform) == pytest.approx(wide)
+
+    def test_switching_weapon_while_sighted_gives_it_back_too(self):
+        """Nothing has to remember to cancel it: it is read from the hand."""
+        made = self.context()
+        wide = viewer.view_fov(made.platform)
+        self.press(made)
+        made._sampleWeapons()
+        made.player.selected = 'pistol'
+        made._sampleWeapons()
+        assert viewer.view_fov(made.platform) == pytest.approx(wide)
+
+    def test_a_weapon_with_no_sight_does_nothing(self):
+        made = self.context(key='shotgun')
+        wide = viewer.view_fov(made.platform)
+        self.press(made)
+        made._sampleWeapons()
+        assert viewer.view_fov(made.platform) == pytest.approx(wide)
+
+    def test_the_near_and_far_planes_are_left_alone(self):
+        """A frustum is four numbers and only one of them is the zoom."""
+        made = self.context()
+        made.platform.setFrustum(near=0.05, far=9000.0)
+        self.press(made)
+        made._sampleWeapons()
+        assert made.platform.frustum[2:] == (0.05, 9000.0)
 
 
 class TestAShotGoesWhereTheCameraLooks:

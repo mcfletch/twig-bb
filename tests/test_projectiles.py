@@ -394,6 +394,56 @@ class TestSayingWhatHappened:
         assert gone and gone[0].by == 'bot0'
 
 
+class TestWhereABurstIsCentred:
+    """Clear of what the round met, by the radius it met it at.
+
+    A warhead is at its own radius from a wall when its nose touches it, and
+    the difference matters far more than a centimetre and a half should: the
+    burst that follows asks whether it can *see* each person near it, and a
+    point sitting exactly on a triangle is on both sides of it at once.  Half
+    the time the cast out of it meets that triangle at no distance and reports
+    the whole room to be behind cover, which is a rocket that lands at
+    somebody's feet and does nothing whatever.
+    """
+
+    def clearance(self, kind, w, found, flight, origin, direction):
+        """How far the burst ended up off the plane it landed on."""
+        flight.launch(kind, origin=origin, direction=direction, owner='player')
+        for _ in range(200):
+            gone = flight.step(w, found, dt=1.0 / 60.0)
+            if gone:
+                return (gone[0].point, gone[0].normal)
+        raise AssertionError('nothing went off')
+
+    def test_a_rocket_on_the_floor_is_a_radius_above_it(self, flight, rocket):
+        w = world()
+        floor(w)
+        point, normal = self.clearance(rocket, w, match(), flight,
+                                       origin=(0, 1.6, 0), direction=(1, -1, 0))
+        assert float(point[1]) == pytest.approx(float(rocket.radius))
+
+    def test_a_rocket_on_a_wall_is_a_radius_out_from_it(self, flight, rocket):
+        w = world()
+        wall(w, x=3.0)
+        point, normal = self.clearance(rocket, w, match(), flight,
+                                       origin=(0, 1, 0), direction=(1, 0, 0))
+        assert 3.0 - float(point[0]) == pytest.approx(float(rocket.radius))
+
+    def test_a_grenade_that_ran_out_of_fuse_in_the_air_is_where_it_was(
+            self, flight, grenade):
+        """Nothing to be clear of, so nothing is moved."""
+        w = world()
+        found = match()
+        flight.launch(grenade, origin=(0, 40.0, 0), direction=(1, 0, 0),
+                      owner='player')
+        for _ in range(400):
+            gone = flight.step(w, found, dt=1.0 / 60.0)
+            if gone:
+                break
+        assert gone and gone[0].normal is None
+        assert float(gone[0].point[1]) < 40.0    # it fell, and stayed fallen
+
+
 #: What a busy fight's worth of projectiles may cost, in milliseconds a tick.
 #: Well inside a 16.7 ms frame, because the projectiles are one of a dozen
 #: things a frame does.

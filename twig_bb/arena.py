@@ -142,6 +142,13 @@ class Impact:
     target: str = ''
     #: Whose shot it was.
     by: str = ''
+    #: Which weapon it came out of, by key, or empty for one that named none.
+    #: Here because **a round arriving is as much the weapon's sound as the
+    #: report is** — a rifle round lands with a chunk and a pistol round with
+    #: a ping — and an event that said only *something hit stone* could not
+    #: tell those apart.  A key rather than the weapon, because this record is
+    #: meant to be written to a replay and sent over a network.
+    weapon: str = ''
 
     @property
     def on_somebody(self) -> bool:
@@ -388,10 +395,11 @@ class Arena:
 
     def impact(self, point: Sequence[float], normal: Sequence[float],
                surface: str = '', target: str = NOBODY,
-               by: str = NOBODY) -> None:
+               by: str = NOBODY, weapon: str = '') -> None:
         """Say a shot met something.  See :class:`Impact`."""
         self.events.append(Impact(point=_point(point), normal=_heading(normal),
-                                  surface=str(surface), target=target, by=by))
+                                  surface=str(surface), target=target, by=by,
+                                  weapon=str(weapon)))
 
     def shove(self, target: str, velocity: Sequence[float]) -> None:
         """Add an impulse to somebody, in metres per second.

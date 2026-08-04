@@ -63,6 +63,11 @@ FIELD_OF_VIEW = 100.0
 #: the back door, which is exactly what this file exists to prevent.
 PERCEPTION_INTERVAL = 0.1
 
+#: Seconds since the last shot that a fresh mind starts with, which is longer
+#: than any weapon's ``fireInterval``: a bot arrives with a loaded weapon, and
+#: what delays its first shot is its reaction time and nothing else.
+LOADED = 1e6
+
 #: Metres a bot tries to keep between itself and what it is fighting.  Close
 #: enough to be a threat, far enough that it is not standing on you.
 PREFERRED_RANGE = 6.0
@@ -269,6 +274,12 @@ class Bot:
         # arriving is not the same thing as shooting.
         self.since_decision = -self._wobble.random() \
             * float(self.skill.decisionInterval)
+        #: Seconds since it last pulled the trigger, against which its
+        #: weapon's own ``fireInterval`` is measured.  Starting long enough
+        #: ago that the first shot waits for the reaction time and nothing
+        #: else -- coming back holding a spent rocket launcher would be a
+        #: rule nobody could see and nobody asked for.
+        self.since_shot = LOADED
         #: Where it walks when there is nothing to fight, and how long is left
         #: of holding that heading.  Held rather than redrawn every tick: a
         #: bot picking a fresh angle sixty times a second does not wander, it
@@ -354,6 +365,7 @@ class Bot:
         """
         step = max(0.0, float(dt))
         self.since_decision += step
+        self.since_shot += step
         me = arena.combatant(self.id)
         if me is None or not me.alive:
             self.reset()
@@ -391,10 +403,32 @@ class Bot:
         aim = self._swung(self._aimed(self._led(heading, weapon, gap)))
         self.facing = aim
         ready = self.watching >= float(self.skill.reactionTime)
-        fired = bool(ready and self.skill.fights and self._decided())
+        fired = bool(ready and self.skill.fights and self._loaded(weapon)
+                     and self._decided())
+        if fired:
+            self.since_shot = 0.0
         return Command(id=self.id, aim=aim, target=self.target, fired=fired,
                        weapon='' if weapon is None else str(weapon.key),
                        move=self._approach(arena, me, heading))
+
+    def _loaded(self, weapon: Any) -> bool:
+        """Whether the weapon it has chosen is ready to fire again.
+
+        **How often a bot thinks and how often its weapon fires are two
+        different clocks**, and only the first of them is a difficulty.  The
+        hardest bot decides twenty times a second; a rocket launcher fires
+        rather less often than that, and a bot held to nothing but its own
+        decision rate empties whatever it is holding into the first person it
+        sees, in the frame it sees them.  What is difficult about a good
+        opponent is that it aims well and commits quickly -- not that it has a
+        different rifle from the one the player picked up.
+
+        A bot with no weapon table has nothing to be held to, and fires at its
+        own rate as before.
+        """
+        if weapon is None:
+            return True
+        return self.since_shot >= float(weapon.fireInterval)
 
     # -- which weapon, and where to point it ------------------------------
     def _chosen(self, gap: float) -> Any:
@@ -413,7 +447,7 @@ class Bot:
         for weapon in self.weapons.weapons:
             if not self._usable(weapon, gap):
                 continue
-            if best is None or self._worth(weapon) > self._worth(best):
+            if best is None or self._worth(weapon, gap) > self._worth(best, gap):
                 best = weapon
         return best if best is not None else self._anything()
 
@@ -435,17 +469,19 @@ class Bot:
         return (safe_range(kind, float(self.skill.blastSense))
                 <= gap <= reach(kind))
 
-    def _worth(self, weapon: Any) -> float:
-        """How much a bot would rather have this weapon than another.
+    def _worth(self, weapon: Any, gap: float) -> float:
+        """How much a bot would rather have this weapon at this range.
 
         A splash weapon outranks a trace, and between two of a kind the one
-        that does more.  Crude on purpose: what makes a bot difficult is its
-        aim and its timing, and a bot agonising over a loadout is a bot
-        standing still.
+        that does more **where the target actually is**: a shotgun across a
+        level costs nothing at all, and a bot that chose it there would stand
+        in the open firing at somebody it could not hurt.  Crude on purpose
+        beyond that: what makes a bot difficult is its aim and its timing, and
+        a bot agonising over a loadout is a bot standing still.
         """
         kind = self._thrown(weapon)
         if kind is None:
-            return float(weapon.damage) * float(weapon.pellets)
+            return weapon.damage_at(gap) * float(weapon.pellets)
         return 1000.0 + float(kind.splashDamage)
 
     def _thrown(self, weapon: Any) -> Any:

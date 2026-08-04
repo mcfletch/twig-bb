@@ -305,7 +305,11 @@ def default_table() -> ItemTable:
         ItemKind(key='shells', title='SHELLS', ammo=10, ammoType='shells',
                  classnames=['ammo_shells'], colour=(0.8, 0.5, 0.3),
                  **SHELL_PICKUP),
-        ItemKind(key='cells', title='CELLS', ammo=50, ammoType='cells',
+        # Ten, where the other ammunition kinds hand out thirty and fifty:
+        # every one of these is a kill outright, so a box of fifty would be
+        # fifty kills lying on the floor.  What holds the rifle in check is
+        # how many rounds a level puts in front of you.
+        ItemKind(key='cells', title='CELLS', ammo=10, ammoType='cells',
                  classnames=['ammo_cells', 'ammo_lightning', 'ammo_slugs',
                              'ammo_nails', 'ammo_nailgun'],
                  colour=(0.4, 0.7, 1.0), **SNIPER_ROUND_PICKUP),
@@ -324,7 +328,7 @@ def default_table() -> ItemTable:
                  classnames=['weapon_shotgun'], colour=(0.8, 0.5, 0.3),
                  **SHOTGUN_PICKUP),
         ItemKind(key='weapon-rifle', title='RIFLE', weapon='rifle',
-                 ammo=50, ammoType='cells', respawn=20.0,
+                 ammo=5, ammoType='cells', respawn=20.0,
                  classnames=['weapon_railgun', 'weapon_lightning',
                              'weapon_plasmagun', 'weapon_chaingun',
                              'weapon_nailgun'],

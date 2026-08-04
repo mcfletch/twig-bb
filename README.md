@@ -107,6 +107,7 @@ this lives.
 | `1`–`5` | choose a weapon |
 | `[` `]`, mouse wheel | previous / next weapon held |
 | left mouse button, or ctrl | fire (held) — down the middle of the reticule, wherever you are looking; **and what brings you back when you are dead** |
+| right mouse button, or `z` | sight (held) — narrows the view for a weapon that has a scope, which is the rifle |
 | tab | the scoreboard (held) — everybody's frags and deaths |
 | alt + `f` | developer overlay — frame rate, loop timing, draw counts, where you are |
 | `F2` | save a screenshot — `twig-bb-<date>-<time>.png`, in the directory you launched from |
@@ -314,12 +315,17 @@ that consumes it.
 | `ammoPerShot` | rounds | what one pull of the trigger costs |
 | `startingAmmo` | rounds | how much of that pile a player begins with |
 | `fireInterval` | seconds | the shortest gap between shots |
-| `damage` | health | what one **hitscan** trace takes off; ignored for a projectile weapon, whose damage is the projectile's |
+| `damage` | health | what one **hitscan** trace takes off inside `fullRange`; ignored for a projectile weapon, whose damage is the projectile's |
+| `fullRange` | metres | how far `damage` carries undiminished |
+| `fadeRange` | metres | how far a trace has to fly to be worth `fadedDamage`; **at or inside `fullRange` means no falloff at all**, which is the default |
+| `fadedDamage` | health | what one trace costs at `fadeRange` and beyond — zero for a weapon with a hard limit, like the shotgun |
 | `pellets` | count | traces or projectiles one shot sends — a shotgun's eight |
+| `zoomFieldOfView` | degrees | the view it can be sighted through while the sight key is held; **zero is a weapon with no scope** |
 | `projectile` | a key, or empty | **empty is hitscan.** Otherwise the entry of the projectile table it throws |
 | `restSpread`, `maxSpread` | degrees of cone half-angle | how wide the shot can land, at rest and firing continuously |
 | `crosshair` | a node | the reticule drawn while it is held; it opens by the spread above |
-| `fireSound` | a key | which entry of the sound table it is heard as |
+| `fireSound` | a key | which entry of the sound table its **report** is |
+| `impactSound`, `fleshSound` | keys | what one of its rounds sounds like **arriving**, on the level and on a person; empty is the table's generic pair |
 | `recoilKick` | metres | how far back the weapon in hand is thrown by a shot |
 | `recoilRise` | degrees | how far its muzzle lifts with the same shot |
 | `recoilRecovery` | seconds | how long the two above take to settle back to nothing |
@@ -347,6 +353,24 @@ A rocket and a grenade differ in **three** of those numbers — gravity, bounce
 and fuse — and in nothing else: two weapons needing two code paths would mean
 the table was not carrying the design.
 
+### What the five are for
+
+Range is what tells them apart, and it is written in the table rather than left
+to a player to discover:
+
+| Weapon | Kills in | Where |
+|---|---|---|
+| Pistol | 2 hits close, 3 across a room, 6 down a corridor | everywhere, weakly; it is what you always have |
+| Shotgun | 1 shot inside five metres, four or five at the middle | nothing at all past seventeen metres |
+| Rifle | 1 hit | any range it can see, at a shot every second and a half, with ten rounds |
+| Rocket launcher | 1 direct hit, or a third of a life two metres off | anywhere its burst can reach you, including round nothing at all |
+| Grenade launcher | the same burst, arriving where a straight line cannot | round corners and over cover |
+
+The rifle's price is the interval and the ammunition: a shot that misses is a
+second and a half of standing still while whoever heard it closes, and a level
+puts ten rounds in front of you rather than fifty. Armour still saves a target
+from it, which is what armour is for.
+
 **You spawn with one weapon and go and find the rest.** It is whichever sits on
 slot 1 — the pistol — with that weapon's own `startingAmmo`, and everything else
 is placed around the level for you to walk to: see
@@ -355,8 +379,8 @@ what you had collected is what a death costs, and the circuit is worth running
 again.
 
 `startingAmmo` is per weapon rather than one number for all of them — eight
-rockets against a hundred and twenty rifle cells — because sixty of everything
-makes a rocket launcher a rifle with a bigger bang. It is read in both places
+rockets and ten rifle rounds against sixty pistol bullets — because sixty of
+everything makes a rocket launcher a pistol with a bigger bang. It is read in both places
 that hand ammunition out: what you spawn holding, and what a weapon pickup
 arrives with. Slot 1 is read from the table too, so a variant that retunes the
 table changes what a player starts with by editing the table and nothing else.
@@ -365,33 +389,24 @@ table changes what a player starts with by editing the table and nothing else.
 match uses it: it is what `twig-bb-hud` wants, where the point is to show every
 weapon on the bar.
 
-**The models are stand-ins, and the gap is real.** The weapons play as their
-table says — behaviour, reticule, where the shot leaves from — and what is on
-screen is a placeholder for art this project has not commissioned or built yet
-([§7](PROJECT-PLAN.md)).
+**Each weapon is modelled for this game**, in metres, at life size, and every
+one of them is the weapon it is meant to be: a launcher, a sawn-off shotgun, an
+M79-style grenade launcher, a sniper rifle and a handgun, cartoon-shaped so
+they read in the hand rather than photoreal. They are built by
+[`grass-clumps/arsenal.py`](../grass-clumps/arsenal.py), which makes the
+geometry, the materials and the maps from nothing every time it runs and writes
+them straight into
+[`twig_bb/assets/weapons/`](twig_bb/assets/weapons/) — so re-running it after an
+edit is the whole update procedure.
 
-Each weapon has a model of its own, so a number key visibly does something, but
-only two of the five are recognisable as what they are. They are CC0 firearms
-from 3dmodelscc0's
-[Guns & Explosives pack](https://3dmodelscc0.itch.io/free-cc0-guns-explosives-pack)
+The wear is procedural and then baked, because none of it survives a glTF
+export as nodes: paint chipped off the edges, scratches down the flanks, grime
+in the hollows, and a wood grain grown rather than photographed, flattened into
+the three maps of a glTF metallic/roughness material.
 
-- Pistol -- a Luger pistol
-- Shotgun -- pump shotgun
-- Rifle -- currently an AK-47
-- Rocket Launcher -- custom rocket launcher for this project
-- Grenade Launcher -- a pipe bomb
-
-Two things follow, and both are worth knowing before you judge what you see:
-
-- **Three of them carry no texture.** Each source model is 8–10 MB of 2048px
-  PBR maps, and [`tools/prepare_weapon.py`](tools/prepare_weapon.py) either
-  resamples those or strips them. The pistol and the pipe bomb kept theirs,
-  resampled; the shotgun, rifle and rocket launcher were stripped and are drawn
-  in a plain metallic material, which on screen is a pale grey shape with the
-  right silhouette and no detail.
-- **Two of them are the wrong weapon.** A sniper rifle in hand is the rocket
-  launcher and a pipe bomb is the grenade launcher, because a launcher is what
-  a pack of firearms does not contain.
+The CC0 firearms this started with are still in the directory and none of them
+is drawn any more; what they were and why they were replaced is in the credits
+below.
 
 Every piece of geometry, its author and a link to their page are in
 [`twig_bb/assets/weapons/CREDITS.md`](twig_bb/assets/weapons/CREDITS.md),
@@ -747,9 +762,18 @@ maps this feature is for.
 ## Water, slime and lava
 
 They are **volumes**, not floors. Liquid surfaces are left out of the collision
-mesh, so you fall in; the volumes come from the BSP leaves, and the eye being
-inside one is what decides you are swimming. Across the fifty OpenArena levels
-that is **1926 pools of water, 760 of lava and 27 of slime** in 29 maps.
+mesh, so you fall in; the volumes come from the BSP leaves, and being inside one
+is what decides you are swimming. Across the fifty OpenArena levels that is
+**1926 pools of water, 760 of lava and 27 of slime** in 29 maps.
+
+**A swim starts at your eye and ends at your feet.** The liquid closing over
+your head is what takes walking away from you, so that is where it begins —
+paddling in the shallows is walking, not swimming. It holds until your whole
+body is clear of the liquid, which is what lets you haul yourself out: your eye
+reaches the surface a head's height before your feet do, and a swim that ended
+there would drop you back in every time you broke the surface, leaving any pool
+with a rim above its water impossible to climb out of. Hold forward and the
+rise key (space) to get out of one.
 
 Being under one changes three things.
 
@@ -872,6 +896,24 @@ cover mean something. A shotgun sends eight traces scattered over the cone the
 crosshair is drawing, so the reticule tells the truth about where a shot may
 land.
 
+**How far a trace flew is what decides what it costs.** Each weapon declares
+the range its damage carries undiminished, the range by which it has faded, and
+what is left at the far end — so a pistol is worth three times as much in
+somebody's face as it is down a corridor, and a shotgun past seventeen metres
+arrives, is heard, and does nothing. It is measured to what the trace actually
+met rather than between the two of you, because the trace stops at the near
+side of a body. **The rifle declares no fade at all**, which is its whole
+argument: one hit anywhere it can see, a second and a half between shots, and
+ten rounds. It is also the one weapon with a scope — hold the right mouse
+button and the view narrows to 24°. The reticule is drawn through whatever
+field of view the frame was, so what it says about where a shot may land stays
+true while you are sighted rather than becoming a picture of the wide view.
+
+**The right mouse button is held, not toggled**: a scope left on by accident is
+a player who cannot see anyone walk up to them. Switching weapon, dying and
+running out all give the wide view back on their own, because what the frustum
+follows is whatever is in your hand this frame.
+
 The other two **throw something**. A rocket flies flat and fast and bursts on
 contact; a grenade arcs, bounces, and goes off on a fuse. Both are stepped as
 one batch of numbers rather than as physics bodies, and both are **swept** —
@@ -887,9 +929,22 @@ means a rocket round a corner does not kill. Only those inside the radius are
 tested against geometry at all — a cast for everybody in the match would cost
 more the busier the fight got.
 
+**A near miss is meant to hurt**, and the curve is what decides that rather
+than the damage: two metres off costs a third of a life for either launcher.
+Without that a launcher is only a slow rifle, because what these weapons ask of
+you is to aim at the floor beside somebody rather than at them.
+
+The burst is centred where the round's *middle* was — one collision radius back
+along the surface it met — rather than on the surface itself. Fifteen
+centimetres of geometry, and it is the difference between a rocket at somebody's
+feet and nothing happening at all: a point sitting exactly on a triangle is on
+both sides of it, so the cast asking "can this burst see you" meets that same
+triangle at no distance and reports the whole room to be behind cover.
+
 It also **shoves** what it hurts, and it shoves the person who fired it. That is
 the feature and not an oversight: a rocket at your own feet throws you, which is
-a rocket jump, and the self-damage (`selfDamage`, half a rocket's splash) is
+a rocket jump, and the self-damage (`selfDamage`, a little under half a
+rocket's splash) is
 what makes taking one a decision rather than free movement. `selfDamage` scales
 the damage and *not* the shove — you are thrown exactly as hard as anybody else
 standing there, or your own rocket would lift you less than a plain jump does. The shove goes into
@@ -1000,6 +1055,16 @@ have is a pickup for the ammunition inside it and leaves your hands alone.
 Whatever you are holding is what is drawn in front of you: `1`–`5`, the wheel,
 a pickup and a respawn all move the same one thing.
 
+**It pops when you take it**, and it pops *where it was* rather than in your
+ears: somebody else clearing the armour off the far side of the level is worth
+knowing about and worth being able to point at. The sound is a bubble going,
+which is what the pickups are — a rising tone, because a cavity that is closing
+gets smaller and something smaller rings higher, and a falling one would read
+as a drop of water. It is the only bright thing the game makes, so it carries
+through a firefight without being loud; it does not outrank a hit on a person
+when there are more sounds than voices, because good news can wait a frame and
+*did I hit them* cannot.
+
 An item nobody can use **stays on the floor** — walking over a medikit at full
 health does not destroy it for everybody else — and one that is taken comes back
 after its own interval, which the map may override with a `wait` key. Timed
@@ -1067,12 +1132,80 @@ emitted whether anything is drawing them or not — which is what makes it safe
 for two players to set differently.
 
 **The sounds are ours, and they are arithmetic rather than files.** Every one is
-synthesised through OpenGLContext's `audio.synth` from numbers declared in
+synthesised through `omi_audio.synth` from numbers declared in
 `twig_bb.combatsound`, so the game ships with a full complement of sound, no
 audio files, and nothing to check under
 [CLEAN-ROOM](../CLEAN-ROOM.md). A voice may name a file instead, which is how
 commissioned or CC0 content would replace a synthesised stand-in: a table edit.
 A sound that will not resolve is a silent shot and never a crash.
+
+Each voice declares which of two **shapes** it is made from. An `impact` is
+noise under a decay: bright however long it rings, which is what a crack, a
+snap and a ping are, and it is what a round *arriving* sounds like. A `rumble`
+is noise with the top rolled off over a tone that falls as it goes, saturated
+until it growls — the bottom of the range, where a motor and a detonation
+belong. Its numbers — `cutoff`, `pitch`, `pitchEnd`, `tone`, `drive` and
+`attack` — are fields of the voice like everything else.
+
+`cutoff` and `floor` are where a rumble's noise rolls away above and below, and
+the two together are a **band** — which is what anything hollow is. A tube
+rings around a pitch and has almost nothing underneath it, and that is the
+whole difference between the pop of a mortar and a thump.
+
+A voice may also declare an **echo** — how loud the first return is, how far
+behind it arrives, and where a return loses its top and its bottom (`echo`,
+`echoDelay`, `echoDamping`, `echoThinning`) — or a **room**, which is `reverb`
+and `reverbSeconds`. They are not two strengths of one thing. Discrete returns
+are heard as *repeats*, a clap and then another clap; a room is heard as one
+sound going on, dense and darkening as the air takes the top out of it. Over a
+short bright report the first reads as applause and only the second reads as a
+place.
+
+**Every weapon firing is a rumble**, because a report is a small explosion and
+how much of one is the first thing anybody hears. What separates them is how
+much of each is the *charge* and how much is the *round leaving*:
+
+| | Sounds like | Where it sits |
+|---|---|---|
+| Shotgun | an explosion that barely holds together | lowest of the lot; three fifths below 100 Hz, and less than half of it at any pitch at all |
+| Pistol | a bang rather than a ping | almost all charge — two thirds below 400 Hz, one per cent above 4 kHz |
+| Rifle | a hard, sharp crack with a valley behind it | the only bright thing in the loadout: the crack is over in fifty milliseconds and the room it leaves goes on for two seconds, darkening from 5 kHz to 1.8 as it dies |
+| Grenade launcher | the pop of a mortar | a hollow band around 230 Hz, with the bottom taken off as well as the top: a tube coughs rather than thumps |
+| Rocket launcher | a motor lighting | a roar with no pitch in it, taking a moment to catch; meant to be heard behind you |
+| A burst | the deepest thing there is | a second of tail to take cover during |
+| Picking something up | a bubble going | the **only** bright thing in the table: a rising pop, so the one piece of good news cuts through a firefight without being loud |
+
+**Weight comes from `tilt`, not from `tone`,** and this is the trap worth
+naming because both of the sounds here that got it wrong got it wrong the same
+way. A low sine under a hard attack is a *drum*, and one that falls as it goes
+is a drum being tuned — which is what a listener hears whenever the tone is
+carrying the bottom end, however small its share. A rifle built that way is a
+tom; a rocket built that way is an instrument playing a descending note. `tilt`
+leans the *noise* toward the bottom instead, which is what a blast and a motor
+actually are, and both of those voices now have no tone in them at all.
+
+The rifle is the one weapon whose sound is mostly the *round* rather than the
+charge: it leaves faster than sound, so what a listener gets is the whip of
+that and then the report coming back off whatever is around. It has almost no
+weight low down and does not want any — **a short bottom-weighted noise burst
+with a hard attack is a drum**, which is the less obvious half of the same
+trap, and it took three passes to stop building one. What says *high-powered*
+about it is not the bottom of the spectrum but the two seconds of room behind
+it.
+
+It also names **its own impacts**, and it is the only weapon that does: a round
+that heavy arriving is a *chunk*, and the generic ping made a shot that ends a
+fight sound like a stone hitting a window. Everything else keeps the generic
+pair, which is where the pistol's ping now lives — the small calibre is heard
+when it lands rather than when it fires.
+
+**Two recordings were measured to get the pistol and the rifle there**, and
+nothing was copied from either: what came across is a handful of numbers —
+how the energy of one report is shared between the bottom, the middle and the
+top, at the crack and again in the tail — and our arithmetic was aimed at them.
+The recordings are not in this repository and carry no licence into it. Ours
+land at 491 Hz against a measured 475 for the pistol's crack, and 3.6 kHz
+against 3.6 for the rifle's, with 17% of its power below 400 Hz against 18%.
 
 ### The difficulties
 
@@ -1100,7 +1233,16 @@ A bot also will not throw something it cannot reach you with. A grenade falls at
 fourteen metres a second squared and a bot aims straight down the line to its
 target, so past about eight metres a flat throw is in the floor before it
 arrives; the limit comes from the projectile's own speed, gravity, fuse and
-lifetime, so retuning the table moves it.
+lifetime, so retuning the table moves it. It will not choose a weapon that
+cannot hurt you where you are standing, either — a shotgun across a level is a
+bot in the open firing at somebody it cannot reach.
+
+**And no bot fires faster than the weapon in its hands.** How often it thinks
+and how often its weapon shoots are two clocks, and only the first of them is a
+difficulty: the hardest bot decides twenty times a second, and held to nothing
+but that it would empty a rocket launcher into you in the frame you walked into
+view. What makes a hard bot hard is that it aims well and commits quickly, not
+that it is holding a different rifle from the one you picked up.
 
 `near-passive` is both a real setting — company while you look around a level —
 and the fixture navigation is checked against, because a bot that walks and does

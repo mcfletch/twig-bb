@@ -31,7 +31,8 @@ from OpenGLContext.move.modes import KeyBinding
 
 __all__ = [
     'WeaponBindings', 'Controls', 'Event', 'apply_commands',
-    'FIRE', 'NEXT_WEAPON', 'PREVIOUS_WEAPON', 'slot_command', 'slot_of',
+    'FIRE', 'HELD', 'NEXT_WEAPON', 'PREVIOUS_WEAPON', 'ZOOM',
+    'slot_command', 'slot_of',
 ]
 
 #: Command names.  Selecting weapon *n* is ``weapon.n`` so the commands follow
@@ -40,6 +41,17 @@ __all__ = [
 FIRE = 'fire'
 NEXT_WEAPON = 'weapon.next'
 PREVIOUS_WEAPON = 'weapon.previous'
+#: Sighting through whatever is in hand, for the weapon that can be.  Held
+#: rather than toggled: a player zooms for the second it takes to line a shot
+#: up and wants the wide view back the moment their finger lifts, and a scope
+#: left on by accident is a player who cannot see anyone walk up to them.
+ZOOM = 'zoom'
+
+#: The commands that are *states* rather than events, sampled with ``held``
+#: and never reported by :meth:`WeaponBindings.triggered`.  Holding one for a
+#: second would otherwise be sixty commands, and each of them would be looked
+#: up as a weapon selection.
+HELD = (FIRE, ZOOM)
 
 #: Number keys weapons are offered on, in order.
 SLOT_KEYS = ('1', '2', '3', '4', '5', '6', '7', '8', '9')
@@ -50,6 +62,9 @@ SLOT_KEYS = ('1', '2', '3', '4', '5', '6', '7', '8', '9')
 #: does nothing at all: no shot, no sound, no ammunition going down, and
 #: nothing to diagnose from inside it.
 LEFT_BUTTON = 0
+#: And the right one sights, for the same reason: it is where a player's other
+#: finger already is, and where every game in this genre puts it.
+RIGHT_BUTTON = 1
 
 
 def slot_command(slot: int) -> str:
@@ -76,10 +91,11 @@ class WeaponBindings(node.Node):
     PROTO = 'WeaponBindings'
     name = field.newField('name', 'SFString', 1, 'weapons')
     bindings = field.newField('bindings', 'MFNode', 1, list)
-    #: How many number keys to declare.  More than the loadout has is harmless
-    #: -- a command for a weapon nobody carries simply never fires -- and it is
-    #: what lets §7 add a weapon without touching the binding defaults.
-    slots = field.newField('slots', 'SFInt32', 1, 4)
+    #: How many number keys to declare.  **All of them**, because more than the
+    #: loadout has is harmless -- a command for a weapon nobody carries simply
+    #: never fires -- and fewer is a weapon with no key at all, which is what
+    #: the loadout's fifth entry had until this said nine.
+    slots = field.newField('slots', 'SFInt32', 1, len(SLOT_KEYS))
 
     def __init__(self, **named: Any) -> None:
         super(WeaponBindings, self).__init__(**named)
@@ -94,6 +110,8 @@ class WeaponBindings(node.Node):
             # because a key is what a keyboard-only setup has.
             KeyBinding(command=FIRE, label=_('Fire'),
                        keys=[button_name(LEFT_BUTTON), '<control>', '<ctrl>']),
+            KeyBinding(command=ZOOM, label=_('Sight'),
+                       keys=[button_name(RIGHT_BUTTON), 'z']),
             KeyBinding(command=NEXT_WEAPON, label=_('Next weapon'),
                        keys=[']']),
             KeyBinding(command=PREVIOUS_WEAPON, label=_('Previous weapon'),
@@ -119,19 +137,33 @@ class WeaponBindings(node.Node):
 
     def firing(self, state: Any) -> bool:
         """Whether the fire command is down right now."""
-        keys = self.keys_for(FIRE)
+        return self.down(state, FIRE)
+
+    def zooming(self, state: Any) -> bool:
+        """Whether the player is sighting right now."""
+        return self.down(state, ZOOM)
+
+    def down(self, state: Any, command: str) -> bool:
+        """Whether a held command's keys are down right now.
+
+        An unbound command is never down, rather than being down because
+        ``held()`` was asked about nothing at all.
+        """
+        keys = self.keys_for(command)
         return bool(keys) and bool(state.held(*keys))
 
     def triggered(self, state: Any) -> List[str]:
         """The one-shot commands pressed since this was last asked.
 
         In declared order, and each consumed by the reading, so a key held
-        across ten frames selects a weapon once.
+        across ten frames selects a weapon once.  The :data:`HELD` commands
+        are left out: they are states, and one of them held for a second would
+        otherwise arrive here sixty times.
         """
         found = []
         for binding in self.bindings:
             command = str(binding.command)
-            if command == FIRE:
+            if command in HELD:
                 continue
             keys = [str(key) for key in binding.keys]
             if keys and state.pressed(*keys):
