@@ -1,0 +1,113 @@
+name: tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+  # `release.yml` runs this on every push to main and then decides whether the
+  # version is worth publishing, so main is covered from there rather than by a
+  # `push:` trigger here -- which would run the whole matrix twice per push.
+  workflow_call:
+
+env:
+  # A hosted runner has no display and none of the fetched map archives, so the
+  # `gl` and `sample` cases are deselected rather than left to fail: the first
+  # wants a live OpenGL context, the second wants a `.bsp` under `tmp/`. What
+  # remains is the parsers, the geometry, the arena rules, the combat model and
+  # the HUD layout -- the great majority of the suite, and all of it headless.
+  # The `gl` cases are covered by running the suite on a machine with a GPU;
+  # see the testing section of README.md.
+  MARKERS: not gl and not sample
+
+jobs:
+  test:
+    name: ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # PyOpenGL finds the GL and GLU libraries through ctypes at import time,
+      # so they have to exist even for the tests that never open a context.
+      - name: Install the GL shared libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libglu1-mesa
+
+      # OpenGLContext 3.0 is not on PyPI, and the newest release there predates
+      # the scenegraph, movement and HUD modules this package imports, so it
+      # comes from source. Everything else -- PyOpenGL, PyVRML97, simpleparse,
+      # omi_audio, omi_physics -- resolves from PyPI as an ordinary dependency.
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "OpenGLContext @ git+https://github.com/mcfletch/openglcontext@main"
+          python -m pip install -e ".[dev]"
+
+      # The floor is a floor, not a target: it fails the run if a change drops
+      # coverage off a cliff, and says nothing about a percentage point either
+      # way. The headless suite currently measures well above it.
+      - name: Run the headless suite
+        run: |
+          python -m pytest -m "$MARKERS" \
+            --cov=twig_bb --cov-report=term-missing --cov-fail-under=95
+
+  # Reported, not required: a regression against a CPython prerelease is worth
+  # seeing on the next push and is not a reason to hold up a merge or a release.
+  # `continue-on-error` is what keeps a failure here visible without failing the
+  # run, which is why this is a job of its own rather than another matrix row --
+  # the checks list then says plainly which results are binding.
+  prerelease:
+    name: 3.14 (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+      - name: Install the GL shared libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libglu1-mesa
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "OpenGLContext @ git+https://github.com/mcfletch/openglcontext@main"
+          python -m pip install -e ".[dev]"
+      - name: Run the headless suite
+        run: python -m pytest -m "$MARKERS"
+
+  # ruff and mypy are declared in the `dev` extra, so they gate a merge here
+  # rather than being configured in pyproject.toml and run nowhere. One
+  # interpreter is enough: neither tool's result depends on the row it ran on.
+  lint:
+    name: lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The dependencies as well as the tools: mypy is configured against the
+      # numpy stubs, and checking without them installed would be checking a
+      # different codebase from the one that ships.
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "OpenGLContext @ git+https://github.com/mcfletch/openglcontext@main"
+          python -m pip install -e ".[dev]"
+      - name: ruff
+        run: python -m ruff check .
+      # The package only -- the tests reach into scenegraph internals that carry
+      # no annotations, and typing those to silence the checker would describe
+      # the test rather than the code under it.
+      - name: mypy
+        run: python -m mypy twig_bb
