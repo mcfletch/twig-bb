@@ -1,9 +1,10 @@
 #! /usr/bin/env python
 """Turn a source weapon model into one small enough to commit.
 
-Art arrives from a CC0 pack as a `.glb` with 2048x2048 PBR maps embedded --
-eight or nine megabytes for one gun, which is not a thing to put in a source
-repository for a *stand-in*.  This trims one to something proportionate:
+The route for a model this project did not build.  Art arrives as a `.glb` with
+2048x2048 PBR maps embedded -- eight or nine megabytes for one gun, which is not
+a thing to put in a source repository.  This trims one to something
+proportionate:
 
     python tools/prepare_weapon.py in.glb out.glb --textures 512
     python tools/prepare_weapon.py in.glb out.glb --strip-textures
@@ -14,8 +15,8 @@ Two jobs, and which one is wanted depends on the source:
   side.  A weapon held at the edge of the screen or seen across a room does not
   resolve 2048 pixels of rust, and 512 is already generous.
 * ``--strip-textures`` removes them altogether and leaves a plain metallic
-  material.  For a model whose maps are *wrong* -- the batch conversion of the
-  pack this project uses bound one model's textures onto eleven others -- a
+  material.  For a model whose maps are *wrong* -- a batch conversion binding
+  one model's textures onto another is a common way for a pack to arrive -- a
   clean grey gun is honest and reads better than a rifle wearing a landmine.
 
 Neither touches the geometry: the mesh, its normals and its UVs come through
@@ -35,14 +36,14 @@ import os
 import sys
 from typing import Any, Dict, List, Optional, Tuple
 
-#: What a stand-in's maps are resampled to unless told otherwise.  Big enough
-#: that a weapon held at the camera still reads, small enough to commit.
+#: What an imported model's maps are resampled to unless told otherwise.  Big
+#: enough that a weapon held at the camera still reads, small enough to commit.
 DEFAULT_TEXTURE_SIZE = 512
 
 #: The material a stripped model is given: dark, half metallic, fairly rough --
 #: blued steel rather than chrome.  A high metallic with a low roughness under
 #: an environment probe reads as a mirror, and a mirror-finish rifle looks like
-#: a mistake rather than like a stand-in.
+#: a mistake rather than like blocked-out art.
 STRIPPED_BASE_COLOR = (0.30, 0.30, 0.32, 1.0)
 STRIPPED_METALLIC = 0.5
 STRIPPED_ROUGHNESS = 0.55
@@ -51,7 +52,7 @@ STRIPPED_ROUGHNESS = 0.55
 #: dynamic lights -- it is lit by the lightmaps its author baked -- so a weapon
 #: held in front of the camera is lit by almost nothing and renders as a
 #: silhouette.  The obvious fix, a light riding the camera, lights the *map*
-#: as well, and washing out the baked lighting to show a stand-in is the wrong
+#: as well, and washing out the baked lighting to show one gun is the wrong
 #: trade.  A small emissive floor is per-material: it touches this model and
 #: nothing else in the world.  Small enough not to glow in a lit room.
 DEFAULT_FILL = 0.07

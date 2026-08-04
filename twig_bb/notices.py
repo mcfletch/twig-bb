@@ -175,19 +175,14 @@ def content_notices(packs: Optional[Sequence[AssetPack]] = None) -> str:
 def _shipped_art() -> List[str]:
     """The art that ships *with* the program, credited whether or not asked.
 
-    CC0 requires nothing and our own work requires nothing.  Crediting both
-    anyway is the rule for every piece of geometry here, and it costs a few
-    lines: a reader should not have to work out which files carry an obligation
-    and which do not.
+    Our own work requires nothing.  Crediting it anyway is the rule for every
+    piece of geometry here, and it costs a few lines: a reader should not have
+    to work out which files carry an obligation and which do not.
     """
     return [
         'Art included with this program',
         '',
-        '  Stand-in weapons — CC0 1.0',
-        '    3dmodelscc0, Free CC0 Guns & Explosives Pack',
-        '    https://3dmodelscc0.itch.io/',
-        '',
-        '  The medikit — BSD-3-Clause',
+        '  The weapons, the pickups and the medikit — BSD-3-Clause',
         '    Mike C. Fletcher, modelled for this project',
         '',
     ]

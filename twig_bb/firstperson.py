@@ -96,9 +96,10 @@ def view_rig(hand: 'WeaponHand') -> Transform:
     lit by almost nothing.  The obvious fix -- a fill light riding the camera --
     was tried and measured, and it brightened the *map* more than the weapon
     (+61 against +26 on a test capture): a flashlight washing out the baked
-    lighting to show a stand-in is the wrong trade.  The weapon carries a small
+    lighting to show one gun is the wrong trade.  The weapon carries a small
     emissive floor in its own material instead, which touches that model and
-    nothing else in the world.  See ``tools/prepare_weapon.py``.
+    nothing else in the world.  It is baked in when the model is built; see
+    ``twig_bb/assets/weapons/CREDITS.md``.
     """
     return Transform(children=[hand.group])
 

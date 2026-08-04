@@ -53,14 +53,15 @@ a BSD library.
 
 | | |
 |---|---|
-| Stand-in weapons | **CC0 1.0** — 3dmodelscc0, [Free CC0 Guns & Explosives Pack](https://3dmodelscc0.itch.io/free-cc0-guns-explosives-pack) · author's page: <https://3dmodelscc0.itch.io/> |
-| The medikit | **BSD-3-Clause** — Mike C. Fletcher, modelled for this project |
+| The weapons and what they throw | **BSD-3-Clause** — Mike C. Fletcher, modelled for this project |
+| The pickups and the medikit | **BSD-3-Clause** — Mike C. Fletcher, modelled for this project |
 
-CC0 asks for nothing, and neither does our own work. Both are credited anyway,
-because that is the rule for every piece of geometry here whether or not its
-licence demands it — the next person to read those directories should not have
-to guess which files carry an obligation. What was done to the models, and why
-some of the weapons ship without textures, is recorded in
+**Every model here is this project's own**, so nothing in the geometry carries
+an obligation onto anyone who redistributes twig-bb. It is credited anyway,
+because that is the rule for every piece of art here whether or not its licence
+demands it — the next person to read those directories should not have to guess
+which files carry one. How the models are built, and what makes them readable in
+a map that places no lights, is recorded in
 [`twig_bb/assets/weapons/CREDITS.md`](twig_bb/assets/weapons/CREDITS.md)
 and [`twig_bb/assets/items/CREDITS.md`](twig_bb/assets/items/CREDITS.md).
 

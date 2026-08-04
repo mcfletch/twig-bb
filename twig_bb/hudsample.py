@@ -24,12 +24,10 @@ Keys::
     F2                  screenshot
     w a s d, mouse      walk and look
 
-The weapons are **CC0 stand-ins** -- a Luger, a pump shotgun and an assault
-rifle from 3dmodelscc0's firearms pack, credited in
+The weapons are **this project's own**, modelled for it and credited in
 [assets/weapons/CREDITS.md](assets/weapons/CREDITS.md).  Each is named by the
-weapon table as data, so §7's commissioned art replaces one with a table edit;
-where it sits in the hand is data too (`--weapon <key>` is how those numbers
-get dialled in).
+weapon table as data, so re-modelling one is a table edit; where it sits in the
+hand is data too (`--weapon <key>` is how those numbers get dialled in).
 
 **The weapon is held by nesting, not by arithmetic.**  One transform carries the
 camera's pose and another carries the weapon's offset inside it, so "in the

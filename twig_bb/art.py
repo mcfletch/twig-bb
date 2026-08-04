@@ -90,7 +90,7 @@ def brighten(node: Any, glow: float) -> int:
         material = getattr(getattr(shape, 'appearance', None), 'material', None)
         if material is None:
             continue
-        own = getattr(material, 'baseColor', None)
+        own: Any = getattr(material, 'baseColor', None)
         if own is None:
             own = getattr(material, 'diffuseColor', (1.0, 1.0, 1.0))
         lit = tuple(float(value) * amount for value in own)

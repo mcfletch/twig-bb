@@ -44,8 +44,18 @@ class TestTheContentHalf:
         assert 'A brand new pack' in text and 'CC0' in text
 
     def test_the_shipped_art_is_credited_too(self):
-        """CC0 asks for nothing; it is credited anyway, as the rule here is."""
-        assert '3dmodelscc0' in notices.content_notices()
+        """Our own work asks for nothing; it is credited anyway."""
+        text = notices.content_notices()
+        assert 'BSD-3-Clause' in text
+        assert 'Mike C. Fletcher' in text
+
+    def test_no_art_is_credited_that_is_not_shipped(self):
+        """An acknowledgement for art nobody ships is a claim about nothing.
+
+        It reads as though the program contains something it does not, which
+        is the failure this screen exists to prevent, pointing the other way.
+        """
+        assert '3dmodelscc0' not in notices.content_notices()
 
 
 class TestTheCodeHalf:

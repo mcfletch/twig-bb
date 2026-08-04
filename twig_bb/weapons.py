@@ -15,9 +15,9 @@ switching that node rather than branching in the drawing code, and a weapon
 whose accuracy falls off while firing shows that by widening its own reticule.
 
 **The model is data too.**  ``model`` names a file under
-:data:`twig_bb.art.ASSETS`, so replacing the blocked-out stand-in with §7's
-commissioned asset is an edit to this table and not a code change.  The
-stand-ins that ship with us are CC0; their provenance is in
+:data:`twig_bb.art.ASSETS`, so re-modelling a weapon is an edit to this table
+and not a code change.  Every model that ships with us is this project's own and
+BSD; how each is built is in
 [assets/weapons/CREDITS.md](assets/weapons/CREDITS.md).
 """
 

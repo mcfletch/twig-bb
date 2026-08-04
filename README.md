@@ -291,7 +291,7 @@ The widgets themselves are OpenGLContext's
 ([docs/hud.html](../openglcontext/docs/hud.html)), because a crosshair and a bar
 meter are the same in every game; what is here is what the numbers *mean*.
 
-### Weapons, and what is a stand-in
+### Weapons, and what they are made of
 
 `twig-bb-hud` puts the whole HUD on screen over a small lit room with a
 first-person weapon in your hands — the fastest way to see any of the above, and
@@ -404,16 +404,13 @@ export as nodes: paint chipped off the edges, scratches down the flanks, grime
 in the hollows, and a wood grain grown rather than photographed, flattened into
 the three maps of a glTF metallic/roughness material.
 
-The CC0 firearms this started with are still in the directory and none of them
-is drawn any more; what they were and why they were replaced is in the credits
-below.
-
 Every piece of geometry, its author and a link to their page are in
 [`twig_bb/assets/weapons/CREDITS.md`](twig_bb/assets/weapons/CREDITS.md),
-which is the rule for all art here and is enforced by a test. CC0 is why they
-may be committed at all: a public-domain dedication with no conditions, unlike
-the share-alike OpenArena content, which is fetched to a user cache and never
-vendored. Replacing any of it is a table edit rather than a code change:
+which is the rule for all art here and is enforced by a test — as is the
+converse, that nothing is credited the game does not ship. All of it is ours and
+BSD, which is why it may be committed at all, unlike the share-alike OpenArena
+content, which is fetched to a user cache and never vendored. Replacing any of
+it is a table edit rather than a code change:
 `model`, `modelScale`, `modelOffset` and `modelYaw` are fields of the weapon,
 so better art is a row in the table and a file in
 [`twig_bb/assets/weapons/`](twig_bb/assets/weapons/).
@@ -688,6 +685,39 @@ so a fixed millisecond bound would fail for a reason nothing here can fix.
 Loosening it instead would leave a number that no longer means "fits in a
 frame", which is the only thing it is for. **Run one suite at a time** if you
 want those numbers to mean anything.
+
+### On CI
+
+[`.github/workflows/test.yml`](.github/workflows/test.yml) runs on every pull
+request: the suite on CPython 3.10 through 3.13 with a coverage floor of 95%,
+`ruff check` and `mypy twig_bb`. A 3.14 row runs alongside and is advisory, so a
+regression against a CPython prerelease is reported without holding up a merge.
+
+A hosted runner has no display and none of the fetched maps, so CI deselects the
+`gl` and `sample` cases with `-m "not gl and not sample"`. Those run on a machine
+with a GPU, from the commands above.
+
+OpenGLContext is installed from source in CI. The releases on PyPI predate the
+scenegraph, movement and HUD modules this package imports, so `>=3.0.0a1` in
+`pyproject.toml` names the version that actually satisfies the imports, and CI
+takes it from its repository until a 3.0 release is published there.
+
+### Cutting a release
+
+[`.github/workflows/release.yml`](.github/workflows/release.yml) runs those same
+checks on every push to `main`, then compares `__version__` in
+[`twig_bb/__init__.py`](twig_bb/__init__.py) against PyPI. If the version is
+already published the run stops there; if it is new and the checks are green, the
+sdist and wheel are built and uploaded.
+
+**Bumping the version is what cuts a release.** A push that leaves it alone is an
+ordinary CI run. Nothing is published from a red build — PyPI versions are
+immutable, and a release number burned on a broken build cannot be reused.
+
+Uploading uses PyPI trusted publishing, so no API token is stored. It needs a
+publisher registered on the PyPI project for this repository with workflow
+`release.yml` and **the environment field left blank**: the OIDC claim carries no
+environment, and a publisher that names one will not match.
 
 ## Where this is going
 

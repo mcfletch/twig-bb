@@ -164,7 +164,7 @@ class TestPaintingOneModelFourWays:
         for shape in art.shapes(node):
             own = tuple(shape.appearance.material.diffuseColor)
             lit = tuple(shape.appearance.material.emissiveColor)
-            assert all(abs(a - b * 0.5) < 1e-6 for a, b in zip(lit, own))
+            assert all(abs(a - b * 0.5) < 1e-6 for a, b in zip(lit, own, strict=True))
 
     def test_brightening_reports_what_it_touched(self):
         assert art.brighten(painted(), 0.4) == 2

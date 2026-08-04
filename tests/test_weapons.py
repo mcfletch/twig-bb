@@ -229,7 +229,7 @@ class TestReticule:
         assert weapons.reticule_spread(weapon, 1.0, 1080, math.radians(90)) == 0
 
 
-class TestTheStandInModels:
+class TestTheWeaponModels:
     """A weapon you switch to that looks identical reads as a broken key."""
 
     def test_no_two_weapons_share_a_model(self):
@@ -284,13 +284,32 @@ class TestEveryModelIsCredited:
         for weapon in weapons.default_table().weapons:
             assert os.path.basename(str(weapon.model)) in text
 
-    def test_the_author_is_linked_and_the_licence_named(self):
+    def drawn_models(self):
+        """Every model in this directory something asks to be drawn."""
+        import os
+        from twig_bb import projectiles
+        named = [str(weapon.model) for weapon in weapons.default_table().weapons]
+        named += [str(kind.model) for kind in projectiles.default_table().kinds]
+        return {os.path.basename(name) for name in named if name}
+
+    def test_no_model_ships_that_nothing_draws(self):
+        """Art nobody draws is weight in the repository and a licence to check.
+
+        The two tables above are the whole of what asks for a weapon model --
+        what is held, and what is thrown -- so a file here that neither names
+        is one to delete rather than to carry.
+        """
+        import os
+        shipped = {os.path.basename(path) for path in self.shipped_models()}
+        assert shipped == self.drawn_models()
+
+    def test_the_licence_and_the_source_are_named(self):
         text = self.credits()
-        assert 'https://3dmodelscc0.itch.io/' in text
-        assert 'CC0' in text
+        assert 'BSD' in text
+        assert 'arsenal.py' in text
 
     def test_the_models_are_small_enough_to_belong_in_a_repository(self):
-        """Source art carries 2048px maps; a stand-in has no business doing so."""
+        """Source art carries 2048px maps; a game model has no business doing so."""
         import os
         for path in self.shipped_models():
             megabytes = os.path.getsize(path) / 1e6
