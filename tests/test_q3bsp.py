@@ -18,11 +18,16 @@ def test_the_header_identifies_a_version_46_map(write_map):
     assert bsp.version == 46
 
 
-def test_a_version_38_map_is_refused_by_the_v46_reader(write_map):
-    """SPEC-BSP46 §2.2: the two families' directories are not interchangeable."""
-    path = write_map(38, bspbuilder.v38_quad())
+def test_a_foreign_version_is_refused_by_the_v46_reader(tmp_path):
+    """SPEC-BSP46 §1.2, §2.2: the reader accepts one version, and a directory
+    for another family is not interchangeable with its own."""
+    # A version 38 header (magic + version + a 19-entry directory) is enough:
+    # the reader must reject the version before it trusts any lump.
+    header = bspbuilder.MAGIC + struct.pack('<i', 38) + b'\x00' * (19 * 8)
+    path = tmp_path / 'foreign.bsp'
+    path.write_bytes(header)
     with pytest.raises(MalformedBSP):
-        q3bsp.load(path)
+        q3bsp.load(str(path))
 
 
 def test_the_directory_has_seventeen_entries(write_map):
@@ -110,7 +115,7 @@ def test_meshverts_are_offsets_from_a_faces_first_vertex(write_map):
 
 
 def test_the_entity_lump_is_parsed_into_entities(write_map):
-    """SPEC-BSP46 §5.1: the v38 entity syntax, unchanged."""
+    """SPEC-BSP46 §5.1: the Quake-lineage entity syntax, unchanged."""
     lumps = bspbuilder.v46_quad()
     lumps['entities'] = bspbuilder.entity_text([
         {'classname': 'worldspawn', 'message': 'A Map'},

@@ -3,16 +3,12 @@
 A liquid is a *volume*, not a surface: its faces are drawn, but what decides
 whether the avatar is swimming is whether the body is inside the space they
 bound -- see :func:`twig_bb.viewer.update_submerged` for which part of the body
-is asked, going in and coming out.  The two families record that space
-differently and neither records it as a box, so both are read through the
-leaves of the BSP tree, whose bounds are already axis-aligned and stored:
-
-* version 38 puts a contents word on every leaf (``SPEC-BSP38 §4.7``), and
-  ``§9.4`` names water, slime and lava as the liquids;
-* version 46 puts no contents word on a leaf at all (``SPEC-BSP46 §4.4.1``) --
-  contents live on brushes, whose values ``§E.1`` deliberately does not state --
-  so a leaf is a liquid when one of the brushes it holds is textured with a
-  material carrying a liquid ``surfaceparm`` (``SPEC-Q3SHADER §2.2``).
+is asked, going in and coming out.  Version 46 records that space through the
+brushes a leaf holds: it puts no contents word on a leaf at all
+(``SPEC-BSP46 §4.4.1``) -- contents live on brushes, whose values ``§E.1``
+deliberately does not state -- so a leaf is a liquid when one of the brushes it
+holds is textured with a material carrying a liquid ``surfaceparm``
+(``SPEC-Q3SHADER §2.2``).
 
 The result is a set of boxes in scene space.  A leaf's box is the leaf's own
 bound rather than the liquid's exact shape, which is conservative at the edges
@@ -35,29 +31,21 @@ from typing import Any, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from . import combat, q2bsp
+from . import combat
 from .worldgeometry import to_scene_points
 
 log = logging.getLogger(__name__)
 
 #: The three liquids, spelled as ``SPEC-Q3SHADER §2.2``'s ``surfaceparm``
-#: spells them, so one vocabulary serves both families.
+#: spells them.
 WATER = 'water'
 SLIME = 'slime'
 LAVA = 'lava'
 
-#: Every liquid, as the union ``SPEC-BSP38 §9.4`` states rather than a named
-#: constant the spec does not define.
-LIQUID_CONTENTS = q2bsp.CONTENTS_WATER | q2bsp.CONTENTS_SLIME | q2bsp.CONTENTS_LAVA
-
-#: Which contents bit is which liquid, **worst first**.  A version 38 leaf may
-#: carry several (``SPEC-BSP38 §9.1``) and a swimmer needs to hear about the
-#: one that will hurt them, not the one that happens to be listed first.
-CONTENTS_KIND = (
-    (q2bsp.CONTENTS_LAVA, LAVA),
-    (q2bsp.CONTENTS_SLIME, SLIME),
-    (q2bsp.CONTENTS_WATER, WATER),
-)
+#: The liquids **worst first**.  A body may span several, and a swimmer needs to
+#: hear about the one that will hurt them, not the one that happens to be found
+#: first.
+LIQUID_SEVERITY = (LAVA, SLIME, WATER)
 
 
 #: Health per second each liquid costs somebody standing in it.  **Ours**, and
@@ -150,8 +138,8 @@ class LiquidVolumes:
         way round from :meth:`kind_at`.  Innermost-wins is the more specific
         answer about one point; a body reaching through a sheet of water into
         the lava below it is in the lava, and being told it is swimming is the
-        answer that gets it killed.  Which is worse is :data:`CONTENTS_KIND`'s
-        order, the same one a version 38 leaf of two liquids is read by.
+        answer that gets it killed.  Which is worse is :data:`LIQUID_SEVERITY`'s
+        order.
         """
         if not self._volumes:
             return ''
@@ -160,7 +148,7 @@ class LiquidVolumes:
         if not crossed.any():
             return ''
         found = {self._volumes[at].kind for at in np.flatnonzero(crossed)}
-        for _bit, kind in CONTENTS_KIND:
+        for kind in LIQUID_SEVERITY:
             if kind in found:
                 return kind
         return self._volumes[int(np.argmax(crossed))].kind
@@ -183,41 +171,22 @@ class LiquidVolumes:
 
 
 def from_map(loaded: Any) -> LiquidVolumes:
-    """Every liquid volume of a loaded map, whichever family it came from."""
-    reader = _v38_liquid_leaves if loaded.version == 38 else _v46_liquid_leaves
+    """Every liquid volume of a loaded map."""
     return LiquidVolumes(_volume(mins, maxs, kind)
-                         for mins, maxs, kind in reader(loaded))
+                         for mins, maxs, kind in _v46_liquid_leaves(loaded))
 
 
 def _volume(mins: Sequence[float], maxs: Sequence[float],
             kind: str) -> LiquidVolume:
     """A map-space bound as a scene-space box.
 
-    The axis convention negates a coordinate (``SPEC-BSP38 §3.2``), so the two
+    The axis convention negates a coordinate (``SPEC-BSP46 §3.2``), so the two
     corners can come back the wrong way round and the box would contain nothing
     at all; they are re-ordered after the transform rather than before it.
     """
     corners = to_scene_points(np.array([mins, maxs], dtype='f'))
     return LiquidVolume(mins=corners.min(axis=0).astype('d'),
                         maxs=corners.max(axis=0).astype('d'), kind=kind)
-
-
-def _contents_kind(contents: int) -> str:
-    """Which liquid a version 38 contents word names (``SPEC-BSP38 §9.4``)."""
-    for bit, kind in CONTENTS_KIND:
-        if contents & bit:
-            return kind
-    return ''
-
-
-def _v38_liquid_leaves(loaded: Any) -> Iterable[Tuple[Any, Any, str]]:
-    """Bounds and kind of every version 38 leaf whose contents are a liquid."""
-    leaves = loaded.bsp.leafs
-    if not len(leaves):
-        return
-    liquid = (leaves['contents'] & LIQUID_CONTENTS) != 0
-    for leaf in leaves[liquid]:
-        yield (leaf['mins'], leaf['maxs'], _contents_kind(int(leaf['contents'])))
 
 
 def _v46_liquid_leaves(loaded: Any) -> Iterable[Tuple[Any, Any, str]]:

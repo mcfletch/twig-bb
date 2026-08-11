@@ -1,16 +1,14 @@
-"""How a surface looks, expressed once for every map family.
+"""How a surface looks, expressed independently of the material scripts.
 
 A :class:`SurfaceStyle` is the single vocabulary in which translucency,
 masking, double-sidedness, scrolling, sky, shininess and lightmapping are
-stated.  Each family's reader translates its own flags or material scripts into
-one of these, so nothing downstream — batching, materials, the scene builder,
-the collision mesh — ever branches on which family a map came from.
+stated.  The reader translates a texture name's material script into one of
+these, so nothing downstream — batching, materials, the scene builder, the
+collision mesh — ever branches on how the surface was described.
 
-The version 38 translation lives here because it is a pure reading of
-``SPEC-BSP38 §8.1`` — the stock Quake 2 bits, which are the only ones this
-viewer reads.  The Quake 3 translation is script-driven and lives in
-:mod:`twig_bb.q3shader`, since ``SPEC-BSP46 §6.2`` records no flag values
-for that family and the viewer interprets none.
+The translation is script-driven and lives in :mod:`twig_bb.q3shader`, since
+``SPEC-BSP46 §6.2`` records no flag values on a surface and the viewer
+interprets none.
 """
 
 from __future__ import annotations
@@ -18,13 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import Any, Tuple
 
-from . import q2bsp
-from .surfaceanim import SurfaceAnimation, flowing_animation
-
-# SPEC-BSP38 §8.1: TRANS33 draws at roughly one-third opacity and TRANS66 at
-# roughly two-thirds.
-OPACITY_TRANS33 = 1.0 / 3.0
-OPACITY_TRANS66 = 2.0 / 3.0
+from .surfaceanim import SurfaceAnimation
 
 # Alpha below which a masked texel is discarded.  SPEC-Q3SHADER §2.3:
 # `alphaFunc GE128` keeps a texel whose alpha is at least 128 of 255.
@@ -83,28 +75,20 @@ class SurfaceStyle:
     solid: bool = True
     #: True where the surface bounds a liquid volume -- water, slime or lava.
     liquid: bool = False
-    #: True where a material script *defined* this surface.  A version 46 name
-    #: with no definition is not an error (``SPEC-Q3SHADER §3.2``) — it is used
-    #: as a plain texture path — but it is also a surface that has silently
-    #: lost whatever the script said about it, including its animation.  A
-    #: still pool of lava then reads as a broken animator rather than as
-    #: content the user does not have, so this is carried in order to be
-    #: *reported*.  Always true for version 38, which has no script layer at
-    #: all and so nothing to be missing.
+    #: True where a material script *defined* this surface.  A name with no
+    #: definition is not an error (``SPEC-Q3SHADER §3.2``) — it is used as a
+    #: plain texture path — but it is also a surface that has silently lost
+    #: whatever the script said about it, including its animation.  A still
+    #: pool of lava then reads as a broken animator rather than as content the
+    #: user does not have, so this is carried in order to be *reported*.
     scripted: bool = True
-    #: *Which* liquid, where the family says: `water`, `slime` or `lava`,
-    #: empty otherwise.  Separate from :attr:`liquid` because the two families
-    #: know different amounts: version 46 names the liquid in the material
-    #: script (``SPEC-Q3SHADER §2.2``), while version 38 keeps the kind on the
-    #: *leaf* rather than on the face (``SPEC-BSP38 §9.4``) and a surface there
-    #: can say only that it bounds one.  A style that guessed would make every
-    #: version 38 pool the same colour and hurt the same amount.
+    #: *Which* liquid the material script names: `water`, `slime` or `lava`,
+    #: empty otherwise (``SPEC-Q3SHADER §2.2``).  Separate from :attr:`liquid`
+    #: because what tints the view and how much it hurts both depend on it.
     liquidKind: str = ''
     #: What the surface does over time: scrolling texture coordinates, vertex
     #: deformation, a colour wave, a frame cycle.  ``SPEC-Q3SHADER §2.4``
-    #: describes them; :mod:`twig_bb.surfaceanim` evaluates them.  Both
-    #: families produce one of these, so nothing downstream branches on which
-    #: map format asked for the movement.
+    #: describes them; :mod:`twig_bb.surfaceanim` evaluates them.
     animation: SurfaceAnimation = field(default_factory=SurfaceAnimation)
 
     def __post_init__(self) -> None:
@@ -140,52 +124,3 @@ class SurfaceStyle:
                 # Two surfaces that move differently cannot share a draw call,
                 # however alike the rest of them is.
                 self.animation)
-
-
-def style_from_quake2_flags(name: str, flags: int) -> SurfaceStyle:
-    """Read a version 38 texinfo surface-flags word into a style.
-
-    Only the stock Quake 2 bits of ``SPEC-BSP38 §8.1`` are read.  ``§8.4``
-    requires unrecognised bits to be ignored rather than rejected, which falls
-    out of testing only the bits named there — and covers the additions §8.2
-    records for engines this viewer no longer targets.
-
-    The warp flag also marks the surface as a liquid: version 38 keeps its
-    contents on brushes and leaves rather than on a face (``SPEC-BSP38 §9.1``),
-    so the warp a compiler puts on the faces of a water, slime or lava volume
-    is what a face-based reader has to go by.  A liquid does not block a player
-    -- ``§9.4`` names solid, playerclip and window as what does -- so it is left
-    out of the collision mesh and swum through instead.
-
-    ``SPEC-BSP38 §7.8`` decides the lightmap: a warped, sky or nodraw surface
-    carries none, and a translucent one is drawn blended and unlit for the same
-    reason ``SPEC-Q3SHADER §2.2`` gives in the other family.  Nothing here sets
-    ``double_sided``: version 38 has no flag for it.
-    """
-    sky = bool(flags & q2bsp.SURF_SKY)
-    warping = bool(flags & q2bsp.SURF_WARP)
-    nodraw = bool(flags & q2bsp.SURF_NODRAW)
-    opacity = 1.0
-    if flags & q2bsp.SURF_TRANS33:
-        opacity = OPACITY_TRANS33
-    elif flags & q2bsp.SURF_TRANS66:
-        opacity = OPACITY_TRANS66
-    return SurfaceStyle(
-        name=name,
-        draw=not nodraw,
-        sky=sky,
-        opacity=opacity,
-        scrolling=bool(flags & q2bsp.SURF_FLOWING),
-        # A flowing surface is expressed as the same value object a `.shader`
-        # script produces, so the renderer never learns which family asked.
-        animation=(flowing_animation() if flags & q2bsp.SURF_FLOWING
-                   else SurfaceAnimation()),
-        warping=warping,
-        liquid=warping,
-        solid=not warping,
-        lightmapped=not (sky or warping or nodraw or opacity < 1.0),
-        emissive=bool(flags & q2bsp.SURF_LIGHT),
-        # Sky is never written into a shadow map: it is a hole showing the
-        # backdrop, not a surface (SPEC-BSP38 §8.1).
-        casts_shadow=not sky,
-    )

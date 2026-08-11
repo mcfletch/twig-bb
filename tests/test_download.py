@@ -21,8 +21,8 @@ def _archive(entries):
     return buffer.getvalue()
 
 
-def _map_archive(name='maps/test.bsp', version=38):
-    lumps = bspbuilder.v38_quad() if version == 38 else bspbuilder.v46_quad()
+def _map_archive(name='maps/test.bsp', version=46):
+    lumps = bspbuilder.v46_quad()
     return _archive({name: bspbuilder.build(version, lumps),
                      'scripts/test.shader': b'textures/a/b { }\n'})
 
@@ -72,8 +72,8 @@ def test_an_archive_with_no_map_may_be_unpacked_as_resources(tmp_path):
 def test_one_map_of_several_can_be_chosen_by_name(tmp_path):
     target = tmp_path / 'pack.pk3'
     target.write_bytes(_archive({
-        'maps/one.bsp': bspbuilder.build(38, bspbuilder.v38_quad()),
-        'maps/two.bsp': bspbuilder.build(38, bspbuilder.v38_quad())}))
+        'maps/one.bsp': bspbuilder.build(46, bspbuilder.v46_quad()),
+        'maps/two.bsp': bspbuilder.build(46, bspbuilder.v46_quad())}))
     path = download.unpack(str(target), str(tmp_path / 'out'), map_name='two')
     assert path.endswith('two.bsp')
 
@@ -81,8 +81,8 @@ def test_one_map_of_several_can_be_chosen_by_name(tmp_path):
 def test_several_maps_with_no_choice_lists_them(tmp_path):
     target = tmp_path / 'pack.pk3'
     target.write_bytes(_archive({
-        'maps/alpha.bsp': bspbuilder.build(38, bspbuilder.v38_quad()),
-        'maps/beta.bsp': bspbuilder.build(38, bspbuilder.v38_quad())}))
+        'maps/alpha.bsp': bspbuilder.build(46, bspbuilder.v46_quad()),
+        'maps/beta.bsp': bspbuilder.build(46, bspbuilder.v46_quad())}))
     with pytest.raises(download.AmbiguousMap) as error:
         download.unpack(str(target), str(tmp_path / 'out'))
     assert 'alpha' in str(error.value) and 'beta' in str(error.value)
@@ -91,7 +91,7 @@ def test_several_maps_with_no_choice_lists_them(tmp_path):
 def test_a_name_that_matches_nothing_lists_what_is_there(tmp_path):
     target = tmp_path / 'pack.pk3'
     target.write_bytes(_archive({
-        'maps/alpha.bsp': bspbuilder.build(38, bspbuilder.v38_quad())}))
+        'maps/alpha.bsp': bspbuilder.build(46, bspbuilder.v46_quad())}))
     with pytest.raises(download.AmbiguousMap) as error:
         download.unpack(str(target), str(tmp_path / 'out'), map_name='nope')
     assert 'alpha' in str(error.value)
@@ -127,7 +127,7 @@ def test_a_bare_map_file_needs_no_unpacking(tmp_path):
     maps = tmp_path / 'maps'
     maps.mkdir()
     target = maps / 'plain.bsp'
-    target.write_bytes(bspbuilder.build(38, bspbuilder.v38_quad()))
+    target.write_bytes(bspbuilder.build(46, bspbuilder.v46_quad()))
     assert download.resolve_target(str(target)) == str(target)
 
 
@@ -372,7 +372,7 @@ def test_the_full_pack_key_also_names_a_map():
 def test_a_url_is_not_a_pack_target():
     """``https:`` looks like a prefix and must not be read as one."""
     assert download.parse_pack_target('https://example.com/a.pk3') is None
-    assert download.parse_pack_target('maps/ctf-curvy.bsp') is None
+    assert download.parse_pack_target('maps/oa_dm1.bsp') is None
     assert download.parse_pack_target('nosuchpack:map') is None
 
 

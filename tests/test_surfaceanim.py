@@ -400,8 +400,8 @@ class TestSurfaceAnimation:
         assert anim.SurfaceAnimation().alpha_at(3.0) == pytest.approx(1.0)
 
 
-class TestQuake2Scrolling:
-    """Version 38's ``SURF_FLOWING`` is the same idea with no script."""
+class TestSteadyScrolling:
+    """A steady scroll with no script behind it, built by ``flowing_animation``."""
 
     def test_a_flowing_surface_becomes_a_scroll(self):
         animation = anim.flowing_animation()

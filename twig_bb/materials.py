@@ -1,15 +1,11 @@
 """Resolve texture names to images, and surface styles to PBR materials.
 
-Two lookups live here.  **Where a name's image is** differs by family: a
-version 38 texinfo name is a bare path under a `textures/` root with no
-extension (``SPEC-BSP38 §6.4``), while a version 46 name is already rooted at
-the archive (``SPEC-BSP46 §6.1``, ``§7.3``).  Either way the extension the name
-arrives with is advisory and the supported ones are tried in turn
+Two lookups live here.  **Where a name's image is**: a version 46 name is
+already rooted at the archive (``SPEC-BSP46 §6.1``, ``§7.3``), and the extension
+it arrives with is advisory, so the supported ones are tried in turn
 (``SPEC-Q3SHADER §1.6``).
 
-**What a style becomes** does not differ: a :class:`SurfaceStyle` maps onto one
-``PBRMaterial`` whatever family produced it, which is the point of having the
-shared style at all.
+**What a style becomes**: a :class:`SurfaceStyle` maps onto one ``PBRMaterial``.
 
 The baked lightmap is wired in here too.  A lightmap holds light, not colour:
 its luxels are linear samples and must not be sRGB-decoded, which is why the
@@ -36,15 +32,7 @@ log = logging.getLogger(__name__)
 #: ``SPEC-BSP46 §7.3``).
 TEXTURE_EXTENSIONS = ('.tga', '.jpg', '.png', '.jpeg')
 
-#: ``SPEC-BSP38 §6.4`` names a `.wal` as the stock version 38 asset; it is
-#: palette-indexed and the palette is separate content this viewer does not
-#: carry, so its absence is reported rather than silently rendered blank.
-UNDECODED_EXTENSIONS = ('.wal', '.pcx')
-
-#: ``SPEC-BSP38 §6.4`` -- a version 38 name is relative to this root.
-TEXTURE_ROOT = 'textures/'
-
-#: Size assumed for a texture whose image is absent.  ``SPEC-BSP38 §6.2``
+#: Size assumed for a texture whose image is absent.  ``SPEC-BSP46 §6.2``
 #: normalises UVs by the image's real dimensions, so this only affects the
 #: tiling scale of surfaces whose content is missing.
 FALLBACK_TEXTURE_SIZE = (64, 64)
@@ -77,7 +65,7 @@ LIGHT_VARIANT = re.compile(r'^(.+)_\d+k?$', re.IGNORECASE)
 class MaterialLibrary:
     """Texture lookup and PBR material construction for one map's content."""
 
-    def __init__(self, roots: Sequence[str], family: str = 'quake2',
+    def __init__(self, roots: Sequence[str], family: str = 'quake3',
                  lightmap_strength: float = DEFAULT_LIGHTMAP_STRENGTH) -> None:
         self.roots = [os.path.abspath(root) for root in roots]
         self.family = family
@@ -100,7 +88,7 @@ class MaterialLibrary:
         :meth:`_light_variant`.
         """
         candidate = self._candidate(name)
-        found = self._search(candidate, TEXTURE_EXTENSIONS, warn=True)
+        found = self._search(candidate, TEXTURE_EXTENSIONS)
         if found is None:
             found = self._light_variant(candidate)
         return found
@@ -128,36 +116,17 @@ class MaterialLibrary:
     def _candidate(self, name: str) -> str:
         """The extension-less path a name resolves against.
 
-        A version 38 name is bare and is prefixed with the texture root
-        (``SPEC-BSP38 §6.4``); a version 46 name already carries its own
-        (``SPEC-BSP46 §6.1``).
+        A version 46 name already carries its own root (``SPEC-BSP46 §6.1``).
         """
-        stem = os.path.splitext(name.replace('\\', '/'))[0]
-        if self.family == 'quake2' and not stem.startswith(TEXTURE_ROOT):
-            stem = TEXTURE_ROOT + stem
-        return stem
+        return os.path.splitext(name.replace('\\', '/'))[0]
 
-    def _search(self, relative: str, extensions: Sequence[str],
-                warn: bool = False) -> Optional[str]:
+    def _search(self, relative: str, extensions: Sequence[str]) -> Optional[str]:
         """First existing file for ``relative`` + each extension, in each root.
 
         The search itself is :class:`~twig_bb.contentsearch.ContentSearch`,
-        shared with every other kind of asset a map names.  What is added here
-        is the report of an image that *is* present in a format this viewer
-        cannot decode, which is a different thing from an absent one and is
-        worth telling the user apart.
+        shared with every other kind of asset a map names.
         """
-        found = self._files.find(relative, extensions)
-        if found is None and warn:
-            self._warn_undecoded(relative)
-        return found
-
-    def _warn_undecoded(self, relative: str) -> None:
-        """Report an image that exists in a format this viewer cannot decode."""
-        path = self._files.find(relative, UNDECODED_EXTENSIONS)
-        if path is not None:
-            log.warning('%s needs a palette this viewer does not carry; '
-                        'the surface will be untextured', path)
+        return self._files.find(relative, extensions)
 
     # -- images ----------------------------------------------------------
     def image(self, name: str) -> Any:
@@ -168,7 +137,7 @@ class MaterialLibrary:
         return self._images[name]
 
     def texture_size(self, name: str) -> Tuple[int, int]:
-        """``(width, height)`` of a texture's image (``SPEC-BSP38 §6.2``)."""
+        """``(width, height)`` of a texture's image (``SPEC-BSP46 §6.2``)."""
         image = self.image(name)
         if image is None:
             return FALLBACK_TEXTURE_SIZE

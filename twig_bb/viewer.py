@@ -1,9 +1,9 @@
 #! /usr/bin/env python
-"""Walk through a Quake 2 / Quake 3 map.
+"""Walk through a Quake 3 map.
 
 Usage::
 
-    twig-bb arena/maps/ctf-curvy.bsp
+    twig-bb maps/oa_dm1.bsp
     twig-bb some-map.pk3
     twig-bb https://example.com/some-map.pk3
     twig-bb openarena:oa_dm1          # from a content pack
@@ -485,7 +485,7 @@ def choose_spawn(loaded: maploader.LoadedMap,
     return centre, 0.0
 
 
-class TwigContext(OverlayMixin, BaseContext):
+class TwigContext(OverlayMixin , BaseContext):
     """The viewer window: a loaded map, a walking camera, and jump pads.
 
     :class:`~OpenGLContext.ui.overlay.OverlayMixin` comes first so its event
@@ -1762,8 +1762,8 @@ def load_map(options: argparse.Namespace,
     chance to draw.
 
     A map whose textures turn out to be missing is loaded a second time with
-    the pack added, since the texture sizes feed the version 38 UV projection
-    (``SPEC-BSP38 §6.2``) and so cannot be patched in afterwards.
+    the pack added, since the geometry, materials and atlas are built from the
+    content available at load time and cannot be patched in afterwards.
     """
     path = resolve_map_target(options, target)
     loaded = _load(options, path)
@@ -1785,8 +1785,9 @@ def _load(options: argparse.Namespace, path: str) -> maploader.LoadedMap:
 def _backdrop() -> Background:
     """What shows through a map's sky surfaces.
 
-    ``SPEC-BSP38 §8.1``: a sky surface is a hole the sky is shown through, and
-    the geometry builder leaves those holes undrawn, so this is what fills them.
+    ``SPEC-Q3SHADER §2.2``: a sky surface is a hole the sky is shown through,
+    and the geometry builder leaves those holes undrawn, so this is what fills
+    them.
     A dim sky rather than a bright one: these are mostly interiors lit by their
     own baked lighting, and a bright backdrop reads as a hole in the wall.
     """

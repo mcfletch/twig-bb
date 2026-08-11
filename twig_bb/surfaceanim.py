@@ -733,18 +733,12 @@ class SurfaceAnimation:
         return self.animmap.frame(time)
 
 
-#: How fast a version 38 `SURF_FLOWING` surface slides, in texture widths per
-#: second.  That family has no script and no number: the flag says *that* the
-#: surface flows and nothing more (``SPEC-BSP38 §8.1``), so the rate is **a
+#: How fast a plain flowing surface slides, in texture widths per second.  A
+#: script that says only *that* a surface flows carries no rate, so this is **a
 #: choice**, picked to read as a conveyor rather than as a blur.
 FLOWING_RATE = -0.25
 
 
 def flowing_animation() -> SurfaceAnimation:
-    """The animation a version 38 flowing surface gets.
-
-    One scroll along S.  Expressing it as the same value object the scripts
-    produce is what keeps everything downstream -- batching, materials, the
-    renderer -- free of any knowledge of which family a map came from.
-    """
+    """A steady scroll along S, for a surface that flows but names no rate."""
     return SurfaceAnimation(tcmods=(TCModScroll(FLOWING_RATE, 0.0),))

@@ -1,15 +1,12 @@
 """The viewer's command line, spawn placement and navigation rules.
 
-The window itself is exercised by the GL test at the end; everything above it
-is arranged so it can be checked without one.
+Everything here is arranged so it can be checked without a live GL window.
 """
 
 from __future__ import annotations
 
 import os
-import subprocess
 import types
-import sys
 
 import numpy as np
 import pytest
@@ -22,14 +19,12 @@ from twig_bb import (
     projectiles, rules, viewer, weapons,
 )
 
-VENV_PYTHON = sys.executable
-
 
 def _map(tmp_path, lumps=None, name='ctf-test.bsp'):
     maps = tmp_path / 'maps'
     maps.mkdir(parents=True, exist_ok=True)
     path = maps / name
-    path.write_bytes(bspbuilder.build(38, lumps or bspbuilder.v38_quad(size=512.0)))
+    path.write_bytes(bspbuilder.build(46, lumps or bspbuilder.v46_quad(size=512.0)))
     return str(path)
 
 
@@ -71,7 +66,7 @@ def test_walking_is_on_by_default_and_can_be_turned_off():
 # -- spawn placement ----------------------------------------------------------
 
 def test_the_avatar_starts_at_a_spawn_point(tmp_path):
-    lumps = bspbuilder.v38_quad(size=512.0)
+    lumps = bspbuilder.v46_quad(size=512.0)
     lumps['entities'] = bspbuilder.entity_text([
         {'classname': 'worldspawn'},
         {'classname': 'info_player_deathmatch', 'origin': '128 256 64'}])
@@ -90,7 +85,7 @@ def test_a_map_with_no_spawn_still_places_the_avatar_inside_it(tmp_path):
 
 
 def test_the_spawn_index_selects_among_several(tmp_path):
-    lumps = bspbuilder.v38_quad(size=512.0)
+    lumps = bspbuilder.v46_quad(size=512.0)
     lumps['entities'] = bspbuilder.entity_text([
         {'classname': 'info_player_deathmatch', 'origin': '0 0 0'},
         {'classname': 'info_player_deathmatch', 'origin': '256 0 0'}])
@@ -164,7 +159,7 @@ def test_the_collision_world_holds_the_map_as_one_static_mesh(tmp_path):
 
 
 def test_a_map_with_nothing_solid_has_no_collision_world(tmp_path):
-    lumps = bspbuilder.v38_quad(flags=0)
+    lumps = bspbuilder.v46_quad()
     loaded = maploader.load(_map(tmp_path, lumps))
     for batch in loaded.world.batches:
         batch.style = batch.style.replace(solid=False)
@@ -183,41 +178,6 @@ def test_the_jump_pad_impulse_reaches_the_character(tmp_path):
     nav.apply_impulse(np.array([0.0, 7.0, 0.0]))
     assert nav.character.vy == pytest.approx(7.0)    # replaced, not added
     assert not nav.character.grounded
-
-
-# -- the window ---------------------------------------------------------------
-
-@pytest.mark.gl
-@pytest.mark.slow
-def test_the_viewer_renders_a_map_and_captures_it(tmp_path, arena_map):
-    """The whole path: load, build a PBR scene, render on the core profile."""
-    out = tmp_path / 'shot.png'
-    result = subprocess.run(
-        [VENV_PYTHON, '-m', 'twig_bb.viewer', arena_map,
-         '--capture', str(out), '--frames', '6', '--capture-delay', '0.2',
-         '--no-physics'],
-        capture_output=True, text=True, timeout=300,
-        env=dict(os.environ, OPENGLCONTEXT_PROFILE='core',
-                 OPENGLCONTEXT_BACKEND='glfw'))
-    assert out.exists(), 'no capture written:\n%s\n%s' % (result.stdout, result.stderr)
-    from PIL import Image
-    pixels = np.asarray(Image.open(str(out)))
-    assert pixels.any(), 'the captured frame is entirely black'
-
-
-@pytest.mark.gl
-@pytest.mark.slow
-def test_the_viewer_walks_a_map_under_physics(tmp_path, arena_map):
-    """Walk mode must survive a real window, not only the unit tests."""
-    out = tmp_path / 'walk.png'
-    result = subprocess.run(
-        [VENV_PYTHON, '-m', 'twig_bb.viewer', arena_map,
-         '--capture', str(out), '--frames', '10', '--capture-delay', '0.5',
-         '--physics'],
-        capture_output=True, text=True, timeout=300,
-        env=dict(os.environ, OPENGLCONTEXT_PROFILE='core',
-                 OPENGLCONTEXT_BACKEND='glfw'))
-    assert out.exists(), 'no capture written:\n%s\n%s' % (result.stdout, result.stderr)
 
 
 # -- the core-texture pack ----------------------------------------------------

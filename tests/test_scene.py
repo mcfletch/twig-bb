@@ -11,7 +11,7 @@ from twig_bb.worldgeometry import GeometryBuilder
 
 
 def _library(tmp_path):
-    return MaterialLibrary([str(tmp_path)], family='quake2')
+    return MaterialLibrary([str(tmp_path)])
 
 
 def _world(*styles, page=-1):

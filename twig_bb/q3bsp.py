@@ -4,16 +4,13 @@ Every layout and constant here cites ``SPEC-BSP46``, whose own provenance is a
 published format reference, this project's earlier BSD reader, and the bytes of
 sample maps.  No engine source was consulted for any of it.
 
-The two families share a container but not a directory: v46 has 17 lumps where
-v38 has 19, and an index means something different in each (``SPEC-BSP46
-§2.2``).  Two lump readers therefore exist rather than one parameterised one.
+The container has 17 lumps, each meaning something different by index
+(``SPEC-BSP46 §2.2``); this module reads that directory.
 
 Deliberately absent: any interpretation of the surface-flags or contents words
 (``SPEC-BSP46 §6.2`` and E.1).  Quake 3 surface behaviour comes from the
 ``.shader`` scripts and the texture name, both content rather than engine data,
-so no v46 flag table is defined here — and SPEC-BSP38 §8's table, which
-describes a different family's assignment of the same field, must never be
-applied to a v46 map.
+so no flag table is defined here.
 """
 
 from __future__ import annotations

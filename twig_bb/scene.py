@@ -8,10 +8,9 @@ rather than colour, so it must not be gamma-decoded — and samples the second U
 set, where the atlas coordinates live.
 
 Two kinds of batch are built but not drawn: an undrawn surface
-(``SPEC-BSP38 §8.1``'s nodraw, ``SPEC-Q3SHADER §2.2``'s equivalents), and sky.
-Sky is left out deliberately: ``SPEC-BSP38 §8.1`` calls the surface a hole
-through which the sky is shown, so not drawing it is what lets the background
-node show through the hole.
+(``SPEC-Q3SHADER §2.2``'s nodraw), and sky.  Sky is left out deliberately:
+a sky surface is a hole through which the sky is shown, so not drawing it is
+what lets the background node show through the hole.
 """
 
 from __future__ import annotations
@@ -76,8 +75,7 @@ def build_shape(batch: Batch, index: int, atlas: LightmapAtlas,
         indices=batch.indices,
         material=material,
         # PBRMesh.solid is the backface-culling flag, so a two-sided material
-        # must clear it (SPEC-Q3SHADER §2.1's `cull none`; version 38 has no
-        # flag for it, so a v38 surface is always single-sided).
+        # must clear it (SPEC-Q3SHADER §2.1's `cull none`).
         solid=not style.double_sided)
     # Sky is drawn by the backdrop rather than as geometry, so it must not be
     # written into a shadow map either; the shadow pass reads this opt-out off

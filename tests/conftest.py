@@ -1,4 +1,4 @@
-"""Shared fixtures: synthetic maps on disk, and the real sample maps if present."""
+"""Shared fixtures: synthetic maps on disk, and the real sample map if present."""
 
 from __future__ import annotations
 
@@ -10,8 +10,18 @@ import pytest
 import bspbuilder
 
 WORKSPACE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ARENA_MAP = os.path.join(WORKSPACE, 'tmp', 'arena', 'maps', 'ctf-curvy.bsp')
 QUAKE3_MAP = os.path.join(WORKSPACE, 'tmp', 'q3', 'ztn', 'maps', 'ztn3dm1.bsp')
+
+
+# Two test modules define an OpenGLContext window class at import time, which
+# needs a real GL backend: with none present (a headless box, plain `tox`) the
+# class body raises a metaclass conflict before any test is collected, and the
+# whole run errors out.  Skip *collecting* those files when the viewer will not
+# import, so the suite is green headless and still runs them where GL is up.
+try:
+    from twig_bb import viewer as _viewer  # noqa: F401
+except Exception:
+    collect_ignore = ['test_viewer.py', 'test_hudsample.py']
 
 
 @pytest.fixture
@@ -30,12 +40,6 @@ def _sample(path: str, what: str) -> Optional[str]:
     if not os.path.exists(path):
         pytest.skip('%s not present at %s' % (what, path))
     return path
-
-
-@pytest.fixture
-def arena_map() -> Optional[str]:
-    """The Alien Arena sample map (``IBSP`` v38), or skip."""
-    return _sample(ARENA_MAP, 'Alien Arena sample map')
 
 
 @pytest.fixture

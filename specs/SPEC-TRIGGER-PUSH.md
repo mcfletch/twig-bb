@@ -1,4 +1,15 @@
-# SPEC-TRIGGER-PUSH: jump-pad / push-volume entity behaviour in Quake 2-lineage maps
+# SPEC-TRIGGER-PUSH: jump-pad / push-volume entity behaviour in Quake-lineage maps
+
+> **Status (2026-08).** twig-bb reads only `IBSP` version 46 (Quake 3 /
+> OpenArena) maps; the version 38 (Quake 2) reader has been removed. This spec
+> is **retained and live**: the push-volume, world-gravity and `func_door`
+> vocabulary and arithmetic it records are shared across the Quake lineage, and
+> the current Quake 3 push implementation (`twig_bb.jumppads`) cites it
+> throughout. Its provenance is genuinely Alien Arena (the source read under the
+> clean-room wall below), and that is left unaltered; the **Alien-Arena-specific
+> divergences** it flags (deathmatch door doubling, monsterjump-affects-players,
+> the low-gravity mode) are historical notes about that source rather than
+> behaviour of the current viewer.
 
 | | |
 |---|---|

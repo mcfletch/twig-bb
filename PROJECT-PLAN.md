@@ -4,7 +4,7 @@
 missing · 📋 **Planned** — designed here, not yet built · ⬜ **Todo** — wanted, not yet
 designed · 🛑 **Shelved** — deliberately not done.
 
-Today twig-bb loads a Quake 2 / Quake 3 map and lets you walk around inside it. This
+Today twig-bb loads a Quake 3 map and lets you walk around inside it. This
 plan is the route from *a map you can walk* to *a map you can play in*: characters
 that move under their own direction, things that can be shot, sound, and the screens
 a game needs around the outside of the render loop.

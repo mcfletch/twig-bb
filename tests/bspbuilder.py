@@ -1,9 +1,9 @@
-"""Synthesise small `IBSP` files so the readers can be tested without a map.
+"""Synthesise small `IBSP` files so the reader can be tested without a map.
 
-The layouts written here are the ones the readers must accept: ``SPEC-BSP38``
-§1–§4 for version 38 and ``SPEC-BSP46`` §1–§4 for version 46.  Building the
-bytes independently of the reader is the point — a test that fed the reader its
-own dtypes would only prove the dtypes are self-consistent.
+The layouts written here are the ones the reader must accept: ``SPEC-BSP46``
+§1–§4 for version 46.  Building the bytes independently of the reader is the
+point — a test that fed the reader its own dtypes would only prove the dtypes
+are self-consistent.
 """
 
 from __future__ import annotations
@@ -11,20 +11,11 @@ from __future__ import annotations
 import struct
 from typing import Dict, Optional, Sequence, Tuple
 
-# SPEC-BSP38 §1.1/§1.5 and SPEC-BSP46 §1.1/§1.5.
+# SPEC-BSP46 §1.1/§1.5.
 MAGIC = b'IBSP'
-V38_LUMPS = 19
 V46_LUMPS = 17
 
-# SPEC-BSP38 §2.1 — lump index by name.
-V38_INDEX = {
-    'entities': 0, 'planes': 1, 'vertexes': 2, 'visibility': 3, 'nodes': 4,
-    'texinfo': 5, 'faces': 6, 'lighting': 7, 'leafs': 8, 'leaffaces': 9,
-    'leafbrushes': 10, 'edges': 11, 'surfedges': 12, 'models': 13,
-    'brushes': 14, 'brushsides': 15, 'pop': 16, 'areas': 17, 'areaportals': 18,
-}
-
-# SPEC-BSP46 §2.1 — a different order, and two fewer lumps.
+# SPEC-BSP46 §2.1 — lump index by name.
 V46_INDEX = {
     'entities': 0, 'textures': 1, 'planes': 2, 'nodes': 3, 'leafs': 4,
     'leaffaces': 5, 'leafbrushes': 6, 'models': 7, 'brushes': 8,
@@ -36,17 +27,18 @@ V46_INDEX = {
 def build(version: int, lumps: Dict[str, bytes]) -> bytes:
     """Assemble a whole file from ``{lump name: payload}``.
 
-    Lumps not supplied are written as zero-length, which SPEC-BSP38 §1.6 and
-    SPEC-BSP46 §1.6 make legal.  Payloads are laid out in directory order with
-    no padding; the readers must not depend on that (SPEC-BSP38 §1.8).
+    ``version`` is written into the header verbatim, so a test can hand the
+    reader a foreign version to prove it is refused; the directory itself is
+    always the version 46 layout.  Lumps not supplied are written as
+    zero-length, which SPEC-BSP46 §1.6 makes legal.  Payloads are laid out in
+    directory order with no padding; the reader must not depend on that
+    (SPEC-BSP46 §1.8).
     """
-    index = V38_INDEX if version == 38 else V46_INDEX
-    count = V38_LUMPS if version == 38 else V46_LUMPS
-    header_size = 8 + count * 8
-    directory = [(0, 0)] * count
+    header_size = 8 + V46_LUMPS * 8
+    directory = [(0, 0)] * V46_LUMPS
     payload = b''
     for name, data in lumps.items():
-        directory[index[name]] = (header_size + len(payload), len(data))
+        directory[V46_INDEX[name]] = (header_size + len(payload), len(data))
         payload += data
     head = MAGIC + struct.pack('<i', version)
     for offset, size in directory:
@@ -55,118 +47,12 @@ def build(version: int, lumps: Dict[str, bytes]) -> bytes:
 
 
 def entity_text(entities: Sequence[Dict[str, str]]) -> bytes:
-    """The entity lump for a list of key dicts (SPEC-BSP38 §10.2)."""
+    """The entity lump for a list of key dicts (SPEC-BSP46 §5.2)."""
     blocks = []
     for entity in entities:
         pairs = ''.join('"%s" "%s"\n' % (k, v) for k, v in entity.items())
         blocks.append('{\n%s}\n' % pairs)
     return (''.join(blocks)).encode('ascii') + b'\x00'
-
-
-# -- version 38 records ------------------------------------------------------
-
-def v38_plane(normal: Sequence[float], distance: float, kind: int = 0) -> bytes:
-    """SPEC-BSP38 §4.1 — 20 bytes."""
-    return struct.pack('<4f i', normal[0], normal[1], normal[2], distance, kind)
-
-
-def v38_vertex(position: Sequence[float]) -> bytes:
-    """SPEC-BSP38 §4.2 — 12 bytes."""
-    return struct.pack('<3f', *position)
-
-
-def v38_texinfo(s_axis: Sequence[float], s_offset: float,
-                t_axis: Sequence[float], t_offset: float,
-                flags: int = 0, value: int = 0, name: str = 'e1u1/wall',
-                next_frame: int = -1) -> bytes:
-    """SPEC-BSP38 §4.5 — 76 bytes."""
-    return (struct.pack('<3f f 3f f i i', *s_axis, s_offset, *t_axis, t_offset,
-                        flags, value)
-            + name.encode('ascii').ljust(32, b'\x00')[:32]
-            + struct.pack('<i', next_frame))
-
-
-def v38_face(plane: int, side: int, first_edge: int, num_edges: int,
-             texinfo: int, styles: Sequence[int] = (0, 255, 255, 255),
-             lightofs: int = -1) -> bytes:
-    """SPEC-BSP38 §4.6 — 20 bytes."""
-    return struct.pack('<H h i h h 4B i', plane, side, first_edge, num_edges,
-                       texinfo, *styles, lightofs)
-
-
-def v38_edge(a: int, b: int) -> bytes:
-    """SPEC-BSP38 §4.10 — 4 bytes."""
-    return struct.pack('<HH', a, b)
-
-
-def v38_surfedge(value: int) -> bytes:
-    """SPEC-BSP38 §4.11 — a signed index whose sign is direction."""
-    return struct.pack('<i', value)
-
-
-def v38_model(mins: Sequence[float], maxs: Sequence[float],
-              origin: Sequence[float], root: int, first_face: int,
-              num_faces: int) -> bytes:
-    """SPEC-BSP38 §4.12 — 48 bytes."""
-    return struct.pack('<3f 3f 3f iii', *mins, *maxs, *origin, root,
-                       first_face, num_faces)
-
-
-def v38_leaf(contents: int = 0, cluster: int = -1, area: int = 0,
-             mins: Sequence[int] = (0, 0, 0), maxs: Sequence[int] = (0, 0, 0),
-             first_leafface: int = 0, num_leaffaces: int = 0,
-             first_leafbrush: int = 0, num_leafbrushes: int = 0) -> bytes:
-    """SPEC-BSP38 §4.7 — 28 bytes."""
-    return struct.pack('<i h h 3h 3h HHHH', contents, cluster, area, *mins,
-                       *maxs, first_leafface, num_leaffaces, first_leafbrush,
-                       num_leafbrushes)
-
-
-def v38_node(plane: int, front: int, back: int,
-             mins: Sequence[int] = (0, 0, 0), maxs: Sequence[int] = (0, 0, 0),
-             first_face: int = 0, num_faces: int = 0) -> bytes:
-    """SPEC-BSP38 §4.4 — 28 bytes."""
-    return struct.pack('<i i i 3h 3h HH', plane, front, back, *mins, *maxs,
-                       first_face, num_faces)
-
-
-def v38_brush(first_side: int, num_sides: int, contents: int) -> bytes:
-    """SPEC-BSP38 §4.13 — 12 bytes."""
-    return struct.pack('<iii', first_side, num_sides, contents)
-
-
-def v38_brushside(plane: int, texinfo: int) -> bytes:
-    """SPEC-BSP38 §4.14 — 4 bytes."""
-    return struct.pack('<Hh', plane, texinfo)
-
-
-def v38_quad(origin: Tuple[float, float, float] = (0.0, 0.0, 0.0),
-             size: float = 64.0, flags: int = 0, lightofs: int = -1,
-             styles: Sequence[int] = (0, 255, 255, 255)) -> Dict[str, bytes]:
-    """A one-face map: an axis-aligned square in the z = origin[2] plane.
-
-    Its four vertices are walked through the edge/surfedge indirection of
-    SPEC-BSP38 §4.10–§4.11 with one edge reversed, so a reader that ignores the
-    sign of a surfedge produces a different ring.
-    """
-    x, y, z = origin
-    corners = [(x, y, z), (x + size, y, z), (x + size, y + size, z), (x, y + size, z)]
-    vertexes = b''.join(v38_vertex(c) for c in corners)
-    # edge 0 is never referenced (SPEC-BSP38 §4.10.1)
-    edges = v38_edge(0, 0) + v38_edge(0, 1) + v38_edge(1, 2) + v38_edge(3, 2) + v38_edge(3, 0)
-    surfedges = (v38_surfedge(1) + v38_surfedge(2)
-                 + v38_surfedge(-3)      # reversed: 2 -> 3
-                 + v38_surfedge(4))
-    return {
-        'entities': entity_text([{'classname': 'worldspawn'}]),
-        'planes': v38_plane((0, 0, 1), z, 2),
-        'vertexes': vertexes,
-        'edges': edges,
-        'surfedges': surfedges,
-        'texinfo': v38_texinfo((1, 0, 0), 0.0, (0, -1, 0), 0.0, flags=flags),
-        'faces': v38_face(0, 0, 0, 4, 0, styles, lightofs),
-        'models': v38_model((x, y, z), (x + size, y + size, z), (0, 0, 0), 0, 0, 1),
-    }
 
 
 # -- version 46 records ------------------------------------------------------

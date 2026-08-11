@@ -1,10 +1,10 @@
 """Turn version 46 faces into batched triangles with lightmap coordinates.
 
-A version 46 face is far more self-describing than a version 38 one: its
-vertices carry positions, normals, material UVs and lightmap UVs directly
-(``SPEC-BSP46 §4.9``, ``§4.9.1``), and its triangles are a run of *meshverts*,
-each an offset from the face's own first vertex (``SPEC-BSP46 §4.10.1``).  So
-this builder projects nothing and derives no luxel grid; it gathers, addresses
+A version 46 face is highly self-describing: its vertices carry positions,
+normals, material UVs and lightmap UVs directly (``SPEC-BSP46 §4.9``,
+``§4.9.1``), and its triangles are a run of *meshverts*, each an offset from the
+face's own first vertex (``SPEC-BSP46 §4.10.1``).  So this builder projects
+nothing and derives no luxel grid; it gathers, addresses
 the lightmap image the face names (``§4.12``, ``§4.13``), and tessellates
 Bezier patches (``§6.3``–``§6.5``).
 

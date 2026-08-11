@@ -12,7 +12,7 @@ passes but we don't currently implement the PK3 sky rendering.
 
 ```bash
 twig-bb                                 # the start screen: pick a level
-twig-bb arena/maps/ctf-curvy.bsp        # a map you already have
+twig-bb maps/oa_dm1.bsp                  # a map you already have
 twig-bb some-map.pk3                    # an archive: unpacked for you
 twig-bb https://example.com/map.pk3     # a URL: fetched and cached
 twig-bb openarena:oa_dm1                # a map from a content pack
@@ -22,16 +22,10 @@ With nothing of your own to look at, `twig-bb --list-packs` shows what can
 be downloaded and `openarena:<map>` fetches and opens one of the fifty
 OpenArena levels — see [Content packs](#content-packs).
 
-Both map families go through the same entry point. `IBSP` version 38 (Quake 2)
-and version 46 (Quake 3, and OpenArena) are told apart by their header and
-dispatched to their own reader; everything after that — surface styles, batched
-geometry, the lightmap atlas, PBR materials, the scene, the collision mesh, push
-volumes — is the same objects either way.
-
-> Note: Realistically, you likely do not want to use the Quake 2 renderer,
-> as there are no CC compatible Quake2 base texture packs, so essentially all
-> Quake 2 maps will be broken. However, if you for some reason need to be
-> able to read the format a model should load.
+Maps are `IBSP` version 46 (Quake 3, and OpenArena): the header is checked and
+the map is read, and everything after that — surface styles, batched geometry,
+the lightmap atlas, PBR materials, the scene, the collision mesh, push volumes —
+is built from it.
 
 ## Content Licensing Note
 
@@ -573,29 +567,27 @@ the map's. A release that wraps its content in a version directory and a pak
 directory is resolved to the level texture names are actually relative to.
 `twig-bb-fetch --purge` removes it along with the unpacked maps.
 
-Two other gaps are deliberate. A `.wal` texture is palette-indexed and the
-palette is separate content this viewer does not carry, so a stock Quake 2 map
-whose textures are all `.wal` renders untextured; the warning names the file.
-Skyboxes are not drawn: a sky surface is a hole the sky shows through
-(`SPEC-BSP38 §8.1`), and the hole shows the viewer's own backdrop.
+One other gap is deliberate. Skyboxes are not drawn: a sky surface is a hole the
+sky shows through (`SPEC-Q3SHADER §2.2`), and the hole shows the viewer's own
+backdrop.
 
 ## How it is put together
 
 | Module | What it does |
 |---|---|
-| `bspfile` | the `IBSP` container both families share: header, directory, lumps |
-| `q2bsp`, `q3bsp` | the two format layers: lumps as arrays, entities as objects |
-| `entities` | the entity lump's text syntax, shared by both families |
+| `bspfile` | the `IBSP` container: header, directory, lumps |
+| `q3bsp` | the format layer: lumps as arrays, entities as objects |
+| `entities` | the entity lump's text syntax |
 | `surfaces` | `SurfaceStyle` — translucency, masking, sky, scrolling, lightmapping, stated once |
 | `worldgeometry` | batched triangles in scene space, and the map-to-scene axis convention |
-| `q2geometry`, `q3geometry` | each family's faces into those batches |
+| `q3geometry` | faces into those batches |
 | `lightmapatlas` | thousands of small baked-light blocks into a few GPU pages |
 | `q3shader` | Quake 3 `.shader` material scripts |
 | `materials` | texture names to images, surface styles to PBR materials |
 | `scene` | one shape per batch, with its lightmap page wired in |
 | `jumppads` | push volumes, driven by the physics trigger system |
 | `liquids` | water, slime and lava as volumes to swim in |
-| `maploader` | sniff the version, dispatch, and hand back a loaded map |
+| `maploader` | check the version, read the map, and hand back a loaded map |
 | `download` | fetch and unpack archives through the OpenGLContext resolver |
 | `viewer` | the window: walk, fly, capture |
 
@@ -612,15 +604,17 @@ numbered fact in one of the specifications under [`specs/`](specs/):
 
 | Spec | Covers | Provenance |
 |---|---|---|
-| `SPEC-BSP38` | the `IBSP` v38 container, lumps, flags, entities, lightmaps | clean-room: written by a Reader who wrote no code |
 | `SPEC-TRIGGER-PUSH` | `trigger_push`, `trigger_monsterjump`, world gravity | clean-room |
 | `SPEC-BSP46` | the `IBSP` v46 container | no copyleft source: a published format reference, this project's own earlier BSD reader, and sample bytes |
 | `SPEC-Q3SHADER` | Quake 3 `.shader` material scripts | no copyleft source: the published shader manual and shipped map content |
 | `SPEC-Q3PUSH` | version 46 aimed jump pads | no copyleft source: entity data observed in the 50 shipped OpenArena maps, plus projectile physics |
 | `SPEC-Q3ENTITIES` | version 46 game entities: placed sounds (§1) and the pickups a map places (§3) | no copyleft source: every classname and key read out of the entity lumps of 67 shipped maps, with the counts recorded |
 
-Two further specifications, `SPEC-LTMP` and `SPEC-RSCRIPT`, were written and
-implemented for Alien Arena and then retired with the code that read them; see
+Three further specifications are retired. `SPEC-BSP38` (the `IBSP` v38 container —
+Quake 2) is kept for provenance: the v38 reader has been removed, but many shared
+modules still cite it for facts true of the whole Quake lineage — the unit scale,
+the entity text syntax, yaw. `SPEC-LTMP` and `SPEC-RSCRIPT` were written and
+implemented for Alien Arena and then retired with the code that read them. See
 [`specs/README.md`](specs/README.md).
 
 The procedure those specs were written under is
@@ -761,9 +755,7 @@ geometry, and those are the liquids — which is why the split is worth making
 rather than deforming everything.
 
 Every wave is a pure function of **one scene clock**, so a map's surfaces move
-together rather than drifting apart. Version 38 has no scripts, so its
-`SURF_FLOWING` flag produces the same value object a `tcMod scroll` does and
-nothing downstream branches on which family a map came from.
+together rather than drifting apart.
 
 The evaluation is `twig_bb.surfaceanim` (waves, coordinate transforms,
 deformation, colour) and the application is `twig_bb.animator` (which
@@ -1328,7 +1320,7 @@ Recorded as decisions rather than oversights:
 
 - **Brush-model movers.** `func_door`, `func_plat` and friends are drawn where
   they stand and do not move (`SPEC-TRIGGER-PUSH §10` describes what a mover
-  would need). On `ctf-curvy` the thing in front of the spawn that looks like a
+  would need). In some maps the thing in front of the spawn that looks like a
   jump pad is one of these: a rising plate, not a push volume.
 - **`func_conveyor` and the current content bits** (`SPEC-TRIGGER-PUSH §9.5`) —
   a movement-solver feature rather than a pad.

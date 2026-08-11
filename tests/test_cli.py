@@ -12,7 +12,7 @@ def _map(tmp_path, lumps=None, name='cli-test.bsp'):
     maps = tmp_path / 'maps'
     maps.mkdir(parents=True, exist_ok=True)
     path = maps / name
-    path.write_bytes(bspbuilder.build(38, lumps or bspbuilder.v38_quad()))
+    path.write_bytes(bspbuilder.build(46, lumps or bspbuilder.v46_quad()))
     return str(path)
 
 
@@ -20,20 +20,20 @@ def test_the_map_reporter_summarises_a_map(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr('sys.argv', ['twig-bb-bsp', _map(tmp_path)])
     maploader.main()
     printed = capsys.readouterr().out
-    assert 'quake2' in printed
-    assert 'IBSP version 38' in printed
+    assert 'quake3' in printed
+    assert 'IBSP version 46' in printed
     assert 'triangles' in printed
     assert 'gravity 800' in printed
 
 
 def test_the_map_reporter_names_the_push_volumes_it_found(tmp_path, capsys,
                                                           monkeypatch):
-    lumps = bspbuilder.v38_quad()
+    lumps = bspbuilder.v46_quad()
     lumps['entities'] = bspbuilder.entity_text([
         {'classname': 'worldspawn'},
         {'classname': 'trigger_push', 'model': '*1', 'angle': '-1'}])
-    lumps['models'] = (bspbuilder.v38_model((0, 0, 0), (64, 64, 0), (0, 0, 0), 0, 0, 1)
-                       + bspbuilder.v38_model((0, 0, 0), (64, 64, 8), (0, 0, 0), 0, 0, 0))
+    lumps['models'] = (bspbuilder.v46_model((0, 0, 0), (64, 64, 0), 0, 1)
+                       + bspbuilder.v46_model((0, 0, 0), (64, 64, 8), 0, 0))
     monkeypatch.setattr('sys.argv', ['twig-bb-bsp', _map(tmp_path, lumps),
                                      '--verbose'])
     maploader.main()

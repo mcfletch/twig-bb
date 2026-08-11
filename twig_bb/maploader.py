@@ -1,15 +1,13 @@
-"""Load a map by sniffing its version and dispatching to a family reader.
+"""Load a map by sniffing its version and reading it.
 
 This is the seam the rest of the viewer sits behind: a caller hands over a path
 and gets a :class:`LoadedMap`, whose geometry, materials, scene, collision mesh,
-spawn points and push volumes are the same objects whichever family the file
-came from.  ``SPEC-BSP38 §1.2`` and ``SPEC-BSP46 §1.2`` differ in one header
-field, and that field is the only place the two paths diverge.
+spawn points and push volumes the viewer asks about without caring how the file
+on disk was laid out.  ``SPEC-BSP46 §1.2`` is the container this reads.
 
-Where the material styles come from does differ, and has to: ``SPEC-BSP38 §8.1``
-gives version 38 a surface-flags table, while ``SPEC-BSP46 §6.2`` records no
-flag values at all for version 46, so its styles come from the `.shader`
-scripts of ``SPEC-Q3SHADER``.  Both produce the same
+Surface styles come from the `.shader` scripts of ``SPEC-Q3SHADER``:
+``SPEC-BSP46 §6.2`` records no flag values on a surface, so what a texture name
+means is decided by its material script, producing a
 :class:`~twig_bb.surfaces.SurfaceStyle`.
 """
 
@@ -23,7 +21,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from . import bspfile, jumppads, q2bsp, q2geometry, q3bsp, q3geometry, q3shader
+from . import bspfile, jumppads, q3bsp, q3geometry, q3shader
 from .entities import Entity
 from .lightmapatlas import LightmapAtlas
 from .materials import DEFAULT_LIGHTMAP_STRENGTH, MaterialLibrary
@@ -34,9 +32,8 @@ from .worldgeometry import SCENE_SCALE, WorldGeometry, to_scene_points
 log = logging.getLogger(__name__)
 
 #: Classnames a level editor writes for a player start.  Mapping vocabulary
-#: rather than a format fact: nothing in ``SPEC-BSP38 §10`` or ``SPEC-BSP46
-#: §5`` defines them, and they are the same words in every editor's entity
-#: list.
+#: rather than a format fact: nothing in ``SPEC-BSP46 §5`` defines them, and
+#: they are the same words in every editor's entity list.
 SPAWN_CLASSNAMES = (
     'info_player_start', 'info_player_deathmatch', 'info_player_team1',
     'info_player_team2', 'team_ctf_redplayer', 'team_ctf_blueplayer',
@@ -53,7 +50,7 @@ class SpawnPoint:
     """Where a player may start, in scene space."""
 
     position: np.ndarray
-    #: Yaw in degrees as the map authored it (``SPEC-BSP38 §3.3``).
+    #: Yaw in degrees as the map authored it.
     angle: float = 0.0
     classname: str = ''
 
@@ -71,9 +68,8 @@ class LoadedMap:
     atlas: LightmapAtlas
     library: MaterialLibrary
     roots: List[str]
-    #: What a texture name means as a surface, where the family has a material
-    #: script layer to say so.  None for version 38, whose styles come from the
-    #: flags on each face rather than from a name (``SPEC-BSP38 §8.1``).
+    #: What a texture name means as a surface, as its material script says
+    #: (``SPEC-Q3SHADER``).
     style_for: Optional[Callable[[str], SurfaceStyle]] = None
 
     @property
@@ -139,7 +135,7 @@ class LoadedMap:
 
     def model_bounds(self, index: Optional[int]
                      ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
-        """A brush model's map-space bounds, or None (``SPEC-BSP38 §10.5``)."""
+        """A brush model's map-space bounds, or None (``SPEC-BSP46 §4.6``)."""
         if index is None:
             return None
         models = self.bsp.models
@@ -217,13 +213,11 @@ def load(path: str, lightmap_strength: Optional[float] = None,
     name = os.path.splitext(os.path.basename(path))[0]
     strength = (DEFAULT_LIGHTMAP_STRENGTH if lightmap_strength is None
                 else lightmap_strength)
-    if version == q2bsp.BSP_VERSION:
-        return _load_quake2(path, name, roots, strength)
     if version == q3bsp.BSP_VERSION:
         return _load_quake3(path, name, roots, strength, subdivisions)
     raise bspfile.MalformedBSP(
-        'IBSP version %d is not supported (expected %d or %d)'
-        % (version, q2bsp.BSP_VERSION, q3bsp.BSP_VERSION))
+        'IBSP version %d is not supported (expected %d)'
+        % (version, q3bsp.BSP_VERSION))
 
 
 def _content_roots(path: str, extra: Sequence[str]) -> List[str]:
@@ -236,21 +230,6 @@ def _content_roots(path: str, extra: Sequence[str]) -> List[str]:
         if candidate and candidate not in roots:
             roots.append(candidate)
     return roots
-
-
-def _load_quake2(path: str, name: str, roots: List[str],
-                 strength: float) -> LoadedMap:
-    """Read a version 38 map.
-
-    Surface styles come from the texinfo flags of ``SPEC-BSP38 §8.1``; version
-    38 has no material-script layer of its own.
-    """
-    bsp = q2bsp.load(path)
-    library = MaterialLibrary(roots, family='quake2', lightmap_strength=strength)
-    world, atlas = q2geometry.build(bsp, texture_size=library.texture_size)
-    return LoadedMap(path=path, name=name, family='quake2',
-                     version=q2bsp.BSP_VERSION, bsp=bsp, world=world,
-                     atlas=atlas, library=library, roots=roots)
 
 
 def _load_quake3(path: str, name: str, roots: List[str], strength: float,
@@ -277,7 +256,7 @@ def main() -> None:
     """Report what a map contains, without opening a window."""
     import argparse
     parser = argparse.ArgumentParser(
-        description='Read a Quake 2 / Alien Arena / Quake 3 map and report it')
+        description='Read a Quake 3 map and report it')
     parser.add_argument('target', help='a .bsp map file')
     parser.add_argument('--verbose', action='store_true', help='log the details')
     options = parser.parse_args()

@@ -60,7 +60,7 @@ TEXTURE_KEYWORDS = ('map', 'clampmap')
 
 #: Opacity given to a surface the scripts call translucent.  The language says
 #: *that* a surface blends, not by how much (``SPEC-Q3SHADER §2.2``, ``§2.3``),
-#: unlike version 38's two explicit fractions (``SPEC-BSP38 §8.1``).
+#: so the fraction is the viewer's own choice.
 TRANSLUCENT_OPACITY = 0.5
 
 
@@ -333,11 +333,9 @@ def _surfaceparm(material: Material, value: str) -> None:
         material.masked = True
     if value in LIQUID_PARMS:
         # A liquid is a volume to swim in, not a surface to stand on
-        # (``SPEC-Q3SHADER §2.2`` names the three; ``SPEC-BSP38 §9.4`` states
-        # the rule the other family words explicitly -- what stops a player is
-        # solid, playerclip and window, and a liquid is none of them).
+        # (``SPEC-Q3SHADER §2.2`` names the three) -- so it is left out of the
+        # collision mesh and swum through instead.
         material.liquid = True
-        # Which one, which the version 38 side has no way to say from a face.
         material.liquidKind = value
         material.solid = False
     if value == PARM_TRANS or value in LIQUID_PARMS:

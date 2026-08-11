@@ -7,19 +7,18 @@ knowledge came through, and each one records where its own facts came from.
 
 | Spec | Covers |
 |---|---|
-| [SPEC-BSP38.md](SPEC-BSP38.md) | the `IBSP` v38 container — Quake 2 |
 | [SPEC-BSP46.md](SPEC-BSP46.md) | the `IBSP` v46 container — Quake 3 |
 | [SPEC-TRIGGER-PUSH.md](SPEC-TRIGGER-PUSH.md) | push volumes, monster jumps, world gravity, and `func_door` |
 | [SPEC-Q3SHADER.md](SPEC-Q3SHADER.md) | Quake 3 `.shader` material scripts, including the animation family (§2.4, added 2026-07-27 from the same published manual) |
 | [SPEC-Q3PUSH.md](SPEC-Q3PUSH.md) | v46 jump pads, which are aimed at a destination rather than pointed |
 | [SPEC-Q3ENTITIES.md](SPEC-Q3ENTITIES.md) | v46 game entities — `target_speaker` (§1) and the pickups a map places (§3); the rest as they are built |
 
-Two of them — `SPEC-BSP38` and `SPEC-TRIGGER-PUSH` — were written under the
-clean-room procedure in [CLEAN-ROOM.md](CLEAN-ROOM.md): a Reader who wrote no
-project code read the GPL source and produced a specification, and the
-implementer read only the specification. The others needed no wall at all,
-because their facts came from published documentation, this project's own
-earlier BSD code, and the bytes of sample files.
+`SPEC-TRIGGER-PUSH` was written under the clean-room procedure in
+[CLEAN-ROOM.md](CLEAN-ROOM.md): a Reader who wrote no project code read the GPL
+source and produced a specification, and the implementer read only the
+specification. The others needed no wall at all, because their facts came from
+published documentation, this project's own earlier BSD code, and the bytes of
+sample files.
 
 `SPEC-Q3PUSH` goes one step further and is worth reading as an example: where a
 fact could not be established from a permitted source, it says so and marks the
@@ -37,6 +36,13 @@ Its §3.3.2 and §3.6.2 are two such gaps that an implementation has to decide f
 itself, and the code that decides them says so.
 
 ### Retired specifications
+
+[SPEC-BSP38.md](SPEC-BSP38.md) (the `IBSP` v38 container — Quake 2) is **kept but
+retired**: the v38 reader was removed — a testable v38 sample map is not cleanly
+downloadable, so the format was dropped rather than maintained untested — but the
+spec is left in place because dozens of shared modules still cite it for facts
+true of the whole Quake lineage: the unit scale, the entity text syntax, yaw,
+player height. Those citations are provenance, not a live reader.
 
 `SPEC-LTMP` (Alien Arena's external `.lightmap` file) and `SPEC-RSCRIPT` (its
 `.rscript` material scripts) were written and implemented, then removed along

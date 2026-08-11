@@ -1,11 +1,9 @@
 """Pack many small baked-lighting blocks into a few GPU textures.
 
-Version 38 gives one luxel grid per face, of a size derived from that face's
-extent (``SPEC-BSP38 §7.2``); version 46 gives whole 128 x 128 images that
-faces address by index (``SPEC-BSP46 §4.13``).  Either way a map has thousands
-of small images and a renderer wants a handful of large ones, so both feed this
-packer and address the result through :meth:`LightmapAtlas.uv_from_luxels` or
-:meth:`LightmapAtlas.uv_from_normalised`.
+Version 46 gives whole 128 x 128 images that faces address by index
+(``SPEC-BSP46 §4.13``).  A map has thousands of these and a renderer wants a
+handful of large ones, so they feed this packer and address the result through
+:meth:`LightmapAtlas.uv_from_luxels` or :meth:`LightmapAtlas.uv_from_normalised`.
 
 **Why a shelf pack.** The whole set is sorted by height once and laid down in
 rows, so placing a block is integer arithmetic and no search runs over the

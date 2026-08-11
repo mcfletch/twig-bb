@@ -214,9 +214,8 @@ class GeometryBuilder:
 
         ``indices`` are local to this surface's own vertices; they are rebased
         onto the merged pool when the batch is built.  ``tangents`` may be
-        supplied where a surface knows its own tangent frame exactly (a planar
-        version 38 face does, from its projection axes — ``SPEC-BSP38 §6.3``);
-        otherwise one is estimated from the UVs at build time.
+        supplied where a surface knows its own tangent frame exactly; otherwise
+        one is estimated from the UVs at build time.
         """
         indices = np.asarray(indices, dtype=np.uint32).ravel()
         if not len(indices):

@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 import bspbuilder
-from twig_bb import liquids, maploader, q2bsp
+from twig_bb import liquids, maploader
 from twig_bb.worldgeometry import SCENE_SCALE, to_scene_points
 
 
@@ -56,60 +56,6 @@ def test_volumes_report_how_many_there_are():
 
 # -- reading them out of a map ------------------------------------------------
 
-def _v38_map(tmp_path, contents, name='liquid.bsp'):
-    """A version 38 map with one leaf carrying ``contents``."""
-    lumps = bspbuilder.v38_quad(size=512.0)
-    leaves = np.zeros(2, dtype=q2bsp.LEAF)
-    leaves[0]['contents'] = q2bsp.CONTENTS_SOLID
-    leaves[1]['contents'] = contents
-    leaves[1]['mins'] = (0, 0, 0)
-    leaves[1]['maxs'] = (128, 256, 64)
-    lumps['leafs'] = leaves.tobytes()
-    path = tmp_path / name
-    path.write_bytes(bspbuilder.build(38, lumps))
-    return str(path)
-
-
-@pytest.mark.parametrize('contents', [q2bsp.CONTENTS_WATER, q2bsp.CONTENTS_SLIME,
-                                      q2bsp.CONTENTS_LAVA])
-def test_a_version_38_leaf_of_liquid_becomes_a_volume(tmp_path, contents):
-    """`SPEC-BSP38 §9.4`: water, slime and lava are the liquids."""
-    loaded = maploader.load(_v38_map(tmp_path, contents))
-    volumes = liquids.from_map(loaded)
-    assert len(volumes) == 1
-
-
-def test_a_version_38_solid_leaf_is_not_a_volume(tmp_path):
-    loaded = maploader.load(_v38_map(tmp_path, q2bsp.CONTENTS_SOLID))
-    assert not liquids.from_map(loaded)
-
-
-def test_a_leaf_that_is_both_liquid_and_something_else_still_counts(tmp_path):
-    """`SPEC-BSP38 §9.1`: contents bits combine freely."""
-    loaded = maploader.load(
-        _v38_map(tmp_path, q2bsp.CONTENTS_WATER | q2bsp.CONTENTS_TRANSLUCENT))
-    assert len(liquids.from_map(loaded)) == 1
-
-
-def test_the_volume_is_in_scene_space(tmp_path):
-    """Map units are inches on a Z-up axis; the scene is metres and Y-up
-    (`SPEC-BSP38 §3.2`), so a volume read in map units puts the swimmer in the
-    wrong place by a factor of forty."""
-    loaded = maploader.load(_v38_map(tmp_path, q2bsp.CONTENTS_WATER))
-    volume = liquids.from_map(loaded)._volumes[0]
-    extent = volume.maxs - volume.mins
-    assert sorted(np.round(extent, 6)) == pytest.approx(
-        sorted(np.round(np.array([128.0, 256.0, 64.0]) * SCENE_SCALE, 6)))
-
-
-def test_the_volume_bounds_are_ordered_after_the_axis_swap(tmp_path):
-    """The axis convention negates a coordinate, so a min can come out above a
-    max and the box would contain nothing at all."""
-    loaded = maploader.load(_v38_map(tmp_path, q2bsp.CONTENTS_WATER))
-    volume = liquids.from_map(loaded)._volumes[0]
-    assert (volume.maxs >= volume.mins).all()
-
-
 def _v46_map(tmp_path, lumps, shader=''):
     """A version 46 map in a content tree, with an optional shader script."""
     maps = tmp_path / 'maps'
@@ -142,6 +88,25 @@ def test_a_map_whose_family_has_no_leaf_contents_reads_its_brushes(tmp_path):
     assert len(liquids.from_map(loaded)) == 1
 
 
+def test_the_volume_is_in_scene_space(tmp_path):
+    """Map units are inches on a Z-up axis; the scene is metres and Y-up
+    (`SPEC-BSP46 §3.2`), so a volume read in map units puts the swimmer in the
+    wrong place by a factor of forty."""
+    loaded = _v46_map(tmp_path, bspbuilder.v46_water(), WATER_SHADER)
+    volume = liquids.from_map(loaded)._volumes[0]
+    extent = volume.maxs - volume.mins
+    assert sorted(np.round(extent, 6)) == pytest.approx(
+        sorted(np.round(np.array([64.0, 64.0, 32.0]) * SCENE_SCALE, 6)))
+
+
+def test_the_volume_bounds_are_ordered_after_the_axis_swap(tmp_path):
+    """The axis convention negates a coordinate, so a min can come out above a
+    max and the box would contain nothing at all."""
+    loaded = _v46_map(tmp_path, bspbuilder.v46_water(), WATER_SHADER)
+    volume = liquids.from_map(loaded)._volumes[0]
+    assert (volume.maxs >= volume.mins).all()
+
+
 def test_a_version_46_brush_whose_texture_is_not_a_liquid_is_no_volume(tmp_path):
     loaded = _v46_map(tmp_path, bspbuilder.v46_water())    # no script: not water
     assert not liquids.from_map(loaded)
@@ -172,12 +137,10 @@ def test_a_leaf_holding_no_brushes_is_skipped(tmp_path):
     assert len(liquids.from_map(loaded)) == 1
 
 
-def test_a_version_38_map_with_no_leaves_has_no_liquids(tmp_path):
-    lumps = bspbuilder.v38_quad(size=512.0)
+def test_a_map_with_no_leaves_has_no_liquids(tmp_path):
+    lumps = bspbuilder.v46_water()
     lumps['leafs'] = b''
-    path = tmp_path / 'noleaves.bsp'
-    path.write_bytes(bspbuilder.build(38, lumps))
-    assert not liquids.from_map(maploader.load(str(path)))
+    assert not liquids.from_map(_v46_map(tmp_path, lumps, WATER_SHADER))
 
 
 # -- which liquid it is -------------------------------------------------------
@@ -218,22 +181,18 @@ def test_the_innermost_liquid_wins_where_two_overlap():
     assert volumes.kind_at((1, 1, 1)) == liquids.WATER
 
 
-@pytest.mark.parametrize('contents,kind', [
-    (q2bsp.CONTENTS_WATER, liquids.WATER),
-    (q2bsp.CONTENTS_SLIME, liquids.SLIME),
-    (q2bsp.CONTENTS_LAVA, liquids.LAVA),
-])
-def test_a_version_38_leaf_says_which_liquid_it_holds(tmp_path, contents, kind):
-    """`SPEC-BSP38 §9.4`: the contents word names it outright."""
-    loaded = maploader.load(_v38_map(tmp_path, contents))
+@pytest.mark.parametrize('kind', [liquids.WATER, liquids.SLIME, liquids.LAVA])
+def test_a_version_46_brush_says_which_liquid_it_holds(tmp_path, kind):
+    """`SPEC-Q3SHADER §2.2`: the `surfaceparm` names it outright."""
+    shader = WATER_SHADER.replace('surfaceparm water', 'surfaceparm %s' % kind)
+    loaded = _v46_map(tmp_path, bspbuilder.v46_water(), shader)
     assert liquids.from_map(loaded)._volumes[0].kind == kind
 
 
-def test_a_version_38_leaf_of_two_liquids_reports_the_worse_one(tmp_path):
-    """`SPEC-BSP38 §9.1`: the bits combine, and lava is what matters."""
-    loaded = maploader.load(
-        _v38_map(tmp_path, q2bsp.CONTENTS_WATER | q2bsp.CONTENTS_LAVA))
-    assert liquids.from_map(loaded)._volumes[0].kind == liquids.LAVA
+def test_the_severity_order_puts_the_worst_liquid_first():
+    """A body spanning several liquids hears about the worst; `LIQUID_SEVERITY`
+    is that order, so lava outranks slime outranks water."""
+    assert liquids.LIQUID_SEVERITY == (liquids.LAVA, liquids.SLIME, liquids.WATER)
 
 
 #: The same surface the map's brush names, declared as slime instead.  Only the

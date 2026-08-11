@@ -7,7 +7,7 @@ them to being carried all the way through to the style the renderer reads.
 import numpy as np
 import pytest
 
-from twig_bb import q2bsp, q3shader, surfaceanim as anim, surfaces
+from twig_bb import q3shader, surfaceanim as anim, surfaces
 
 
 def material(text):
@@ -158,22 +158,6 @@ class TestReachingTheStyle:
         assert not surfaces.SurfaceStyle(name='x').animated
         assert surfaces.SurfaceStyle(name='x',
                                      animation=anim.flowing_animation()).animated
-
-
-class TestQuake2Flowing:
-    """Version 38 has no script: the flag is the whole of the directive."""
-
-    def test_a_flowing_surface_gets_a_scroll(self):
-        style = surfaces.style_from_quake2_flags('x', q2bsp.SURF_FLOWING)
-        assert style.animation.animated
-        assert style.scrolling
-
-    def test_a_still_surface_gets_none(self):
-        assert not surfaces.style_from_quake2_flags('x', 0).animation.animated
-
-    def test_a_warped_surface_is_marked_warping(self):
-        style = surfaces.style_from_quake2_flags('x', q2bsp.SURF_WARP)
-        assert style.warping
 
 
 def test_the_transform_moves_as_time_passes():
