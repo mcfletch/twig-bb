@@ -1655,6 +1655,18 @@ licensing terms the artist does. What the brief has to add:
   compatible with a BSD project, recorded per asset for §10's notices exactly as
   §5 does for the art.
 
+**⬜ Todo: evaluate the Sonniss GDC Game Audio bundle as a source.**
+Sonniss gives away a large royalty-free sound-effects bundle each year at GDC
+([sonniss.com/gameaudiogdc](https://sonniss.com/gameaudiogdc/)). Before commissioning
+anything, check whether its weapon, impact, footstep and ambience effects would be
+usable here — and, critically, **whether its licence is compatible with a BSD project
+and with our fetch-not-vendor rule** (§1): the bundles are "royalty-free" but carry
+their own terms, so read them before assuming a clip can be shipped or even
+redistributed via §9's pack machinery. If usable, it could reduce or reshape the
+commission the brief above describes; if not, record why so this is a decided question
+rather than an open one. Cite the licence per asset for §10's notices, exactly as the
+commissioned work would be.
+
 **Placeholders are the designed path here too, and better than §5's.**
 `omi_audio.synth` makes tones, chirps, noise bursts and percussive
 impacts out of arithmetic — no files, no licences — and a game with a
