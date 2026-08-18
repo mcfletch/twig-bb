@@ -120,16 +120,18 @@ class TestAmmunition:
         """Its own ``ammoPerShot``, so retuning the table retunes this."""
         rifle = table.by_key('rifle')
         player.give('rifle')
-        player.ammo['cells'] = 10
+        pool = str(rifle.ammoType)
+        player.ammo[pool] = 10
         assert player.spend(rifle) is True
-        assert player.ammo['cells'] == 10 - int(rifle.ammoPerShot)
+        assert player.ammo[pool] == 10 - int(rifle.ammoPerShot)
 
     def test_a_weapon_cannot_fire_without_the_ammunition(self, player, table):
         rifle = table.by_key('rifle')
-        player.ammo['cells'] = int(rifle.ammoPerShot) - 1
+        pool = str(rifle.ammoType)
+        player.ammo[pool] = int(rifle.ammoPerShot) - 1
         assert player.can_fire(rifle) is False
         assert player.spend(rifle) is False
-        assert player.ammo['cells'] == int(rifle.ammoPerShot) - 1
+        assert player.ammo[pool] == int(rifle.ammoPerShot) - 1
 
     def test_ammunition_is_capped_when_it_is_picked_up(self, player):
         player.give_ammo('bullets', 10_000)
@@ -137,6 +139,47 @@ class TestAmmunition:
 
     def test_a_type_nobody_has_any_of_reads_as_none(self, player, table):
         assert player.ammo_for(table.by_key('shotgun')) == 0
+
+
+class TestFallingToTheBestLoadedWeapon:
+    """When one weapon runs dry, the hand falls to the strongest still loaded."""
+
+    def armed(self, player, *keys):
+        """Give the player each weapon with a full pool behind it."""
+        for key in keys:
+            weapon = weapons.default_table().by_key(key)
+            player.give(key)
+            player.give_ammo(str(weapon.ammoType), int(weapon.startingAmmo))
+        return player
+
+    def test_it_is_the_highest_by_slot_not_the_next_one_along(self, player,
+                                                              table):
+        """The best weapon still loaded, so an empty gun does not drop the
+        player onto the weakest thing they happen to hold."""
+        self.armed(player, 'shotgun', 'rocket')
+        player.ammo['bullets'] = 0                       # the pistol runs dry
+        assert player.to_best_loaded(table) == 'rocket'  # slot 4, over slot 2
+        assert player.selected == 'rocket'
+
+    def test_an_empty_pool_is_passed_over_like_a_weapon_never_picked_up(self,
+                                                                        player,
+                                                                        table):
+        self.armed(player, 'shotgun', 'rocket')
+        player.ammo['bullets'] = 0
+        player.ammo['rockets'] = 0                        # the best is empty too
+        assert player.to_best_loaded(table) == 'shotgun'
+
+    def test_nothing_loaded_is_no_switch_at_all(self, player, table):
+        player.ammo['bullets'] = 0
+        assert player.to_best_loaded(table) is None
+        assert player.selected == 'pistol'
+
+    def test_it_does_not_switch_off_a_weapon_that_can_still_fire(self, player,
+                                                                 table):
+        """Called with the pistol still loaded, the best loaded *is* the
+        pistol, and switching to what is already in hand is no switch."""
+        self.armed(player, 'shotgun')
+        assert player.to_best_loaded(table) is None
 
 
 class TestSpread:

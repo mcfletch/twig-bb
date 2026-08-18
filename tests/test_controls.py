@@ -261,6 +261,45 @@ class TestWhatTheCommandsDo:
         assert controls.apply_commands([], True, player, table,
                                        now=1.01) == []
 
+    def _arm(self, player, *keys):
+        for key in keys:
+            weapon = weapons.default_table().by_key(key)
+            player.give(key)
+            player.give_ammo(str(weapon.ammoType), int(weapon.startingAmmo))
+
+    def test_firing_the_last_round_falls_to_the_best_loaded_weapon(self, player,
+                                                                    table):
+        """The trigger the player is still holding meets a loaded gun next pull,
+        rather than the spent one it just emptied."""
+        self._arm(player, 'rocket')
+        player.ammo['bullets'] = 1
+        events = controls.apply_commands([], True, player, table, now=1.0)
+        assert [event.kind for event in events] == ['fire', 'select']
+        assert events[1].text == 'ROCKET'
+        assert player.selected == 'rocket'
+
+    def test_an_empty_trigger_switches_to_the_best_loaded_weapon(self, player,
+                                                                  table):
+        self._arm(player, 'rocket')
+        player.ammo['bullets'] = 0
+        events = controls.apply_commands([], True, player, table, now=1.0)
+        assert [event.kind for event in events] == ['empty', 'select']
+        assert player.selected == 'rocket'
+
+    def test_it_falls_to_the_highest_not_the_next_one_along(self, player, table):
+        """Pistol empty, both a shotgun and a launcher loaded: the launcher."""
+        self._arm(player, 'shotgun', 'rocket')
+        player.ammo['bullets'] = 0
+        controls.apply_commands([], True, player, table, now=1.0)
+        assert player.selected == 'rocket'
+
+    def test_with_nothing_else_loaded_it_only_says_it_is_empty(self, player,
+                                                               table):
+        player.ammo['bullets'] = 0
+        events = controls.apply_commands([], True, player, table, now=1.0)
+        assert [event.kind for event in events] == ['empty']
+        assert player.selected == 'pistol'
+
     def test_the_wheel_walks_the_weapons_held(self, player, table):
         player.give('shotgun')
         controls.apply_commands([controls.NEXT_WEAPON], False, player, table,

@@ -331,7 +331,9 @@ and pushes the same way whichever launcher threw it:
 
 | Field | Units | What it decides |
 |---|---|---|
-| `speed` | m/s | how fast it leaves |
+| `speed` | m/s | how fast it leaves the muzzle |
+| `acceleration` | m/s² along its heading | thrust: **zero is an unpowered round** that only ever slows; above zero is a motor that builds speed as it flies |
+| `maxSpeed` | m/s | the speed a motor levels off at; zero never levels off |
 | `gravity` | m/s² downward | **zero is a rocket**; anything else arcs |
 | `radius` | metres | how near a surface it has to pass to touch it |
 | `fuse` | seconds | when it goes off in the air; zero never does |
@@ -343,9 +345,10 @@ and pushes the same way whichever launcher threw it:
 | `knockback` | m/s | how hard it shoves, at the centre |
 | `selfDamage` | 0–1 | the share of splash the shooter takes from their own burst |
 
-A rocket and a grenade differ in **three** of those numbers — gravity, bounce
-and fuse — and in nothing else: two weapons needing two code paths would mean
-the table was not carrying the design.
+A rocket and a grenade differ only in those numbers — the rocket's thrust and
+top speed, its zero gravity, its zero bounce and zero fuse against the grenade's
+arc and its timer — and in nothing else: two weapons needing two code paths
+would mean the table was not carrying the design.
 
 ### What the five are for
 
@@ -378,6 +381,15 @@ everything makes a rocket launcher a pistol with a bigger bang. It is read in bo
 that hand ammunition out: what you spawn holding, and what a weapon pickup
 arrives with. Slot 1 is read from the table too, so a variant that retunes the
 table changes what a player starts with by editing the table and nothing else.
+
+**Fire a weapon dry and the hand falls to the best one still loaded** — the
+*highest* by slot you have ammunition for, not merely the next one along, so
+emptying the launcher drops you onto the rifle rather than the pistol. It
+happens on the shot that spends the last round, so the trigger you are already
+holding meets a loaded weapon on its next pull rather than a dead click, and the
+switch is announced on the HUD exactly as a chosen one is. A weapon you hold
+with an empty pool is passed over like one you never picked up; with nothing
+left loaded the trigger simply reports empty.
 
 `PlayerState.carrying` still exists and holds the whole table, but nothing in a
 match uses it: it is what `twig-bb-hud` wants, where the point is to show every
@@ -936,12 +948,14 @@ a player who cannot see anyone walk up to them. Switching weapon, dying and
 running out all give the wide view back on their own, because what the frustum
 follows is whatever is in your hand this frame.
 
-The other two **throw something**. A rocket flies flat and fast and bursts on
-contact; a grenade arcs, bounces, and goes off on a fuse. Both are stepped as
-one batch of numbers rather than as physics bodies, and both are **swept** —
-each tick casts from where the projectile was to where it wants to be, so a
-rocket cannot be on one side of a wall and then the other having touched
-nothing.
+The other two **throw something**. A rocket is a *motor*, not a bullet: it
+leaves slowly — walking pace, so up close it is a splash weapon aimed at the
+floor rather than a flat one aimed at a chest — and thrusts hard to a top speed
+a sidestep at any real distance cannot beat, bursting on contact. A grenade
+arcs, bounces, and goes off on a fuse. Both are stepped as one batch of numbers
+rather than as physics bodies, and both are **swept** — each tick casts from
+where the projectile was to where it wants to be, so a rocket cannot be on one
+side of a wall and then the other having touched nothing.
 
 ### Bursts, knockback and rocket jumps
 
@@ -1265,6 +1279,17 @@ difficulty: the hardest bot decides twenty times a second, and held to nothing
 but that it would empty a rocket launcher into you in the frame you walked into
 view. What makes a hard bot hard is that it aims well and commits quickly, not
 that it is holding a different rifle from the one you picked up.
+
+**A bot fires from the loadout it carries, exactly as you do.** It spawns
+holding the pistol and goes and finds the rest — its shots come out of the same
+`PlayerState` a player's do, each one spends a round, and a weapon it never
+picked up or has emptied is simply not on the menu when it chooses. So a bot and
+a player spawning in view of each other are on the same footing, the launcher is
+something a bot has to *reach* on the map rather than something it was born
+holding, and the same fights stop being the same: a bot with a rocket in its
+pack plays one way and the same bot down to its pistol plays another. A respawn
+restores that starting pistol, and the level's ammunition and weapon pickups are
+where a bot rearms — the circuit it runs is the one you run.
 
 `near-passive` is both a real setting — company while you look around a level —
 and the fixture navigation is checked against, because a bot that walks and does

@@ -399,7 +399,7 @@ class Bot:
                                    - np.asarray(me.position, dtype='d'))) \
             if them is not None else 0.0
         self._watch_drift(them, dt)
-        weapon = self._chosen(gap)
+        weapon = self._chosen(gap, me.player)
         aim = self._swung(self._aimed(self._led(heading, weapon, gap)))
         self.facing = aim
         ready = self.watching >= float(self.skill.reactionTime)
@@ -431,7 +431,7 @@ class Bot:
         return self.since_shot >= float(weapon.fireInterval)
 
     # -- which weapon, and where to point it ------------------------------
-    def _chosen(self, gap: float) -> Any:
+    def _chosen(self, gap: float, loadout: Any = None) -> Any:
         """The weapon to use at this range, or None if there is no table.
 
         **A splash weapon at a distance and a trace up close.**  A rocket is
@@ -440,12 +440,18 @@ class Bot:
         comes from the projectile's own radius, and how much a bot *cares*
         comes from its difficulty.  A careless one fires anyway, which is what
         the bottom of the ladder is for.
+
+        ``loadout`` is the body's :class:`~twig_bb.player.PlayerState` -- what
+        it has picked up and what it has spent -- so a weapon it never found or
+        has emptied is not on the menu.  That is what stops every bot opening a
+        fight on a rocket: like a player, it reaches for the launcher only once
+        the level has handed it one.
         """
         if self.weapons is None:
             return None
         best = None
         for weapon in self.weapons.weapons:
-            if not self._usable(weapon, gap):
+            if not self._usable(weapon, gap, loadout):
                 continue
             if best is None or self._worth(weapon, gap) > self._worth(best, gap):
                 best = weapon
@@ -455,19 +461,39 @@ class Bot:
         """The first weapon in the table: better than naming none at all."""
         return self.weapons.weapons[0] if self.weapons.weapons else None
 
-    def _usable(self, weapon: Any, gap: float) -> bool:
-        """Whether this weapon may be used at this range.
+    def _usable(self, weapon: Any, gap: float, loadout: Any = None) -> bool:
+        """Whether this weapon may be used at this range and it has a round.
 
         A trace has no range worth speaking of and is always allowed.  A
         thrown one has **both** ends: nearer than :func:`safe_range` and the
         burst reaches back to the thrower, further than :func:`reach` and it
-        never arrives at all.
+        never arrives at all.  Either way, a weapon the body cannot pay for is
+        no more usable than one out of range.
         """
+        if not self._has_ammo(weapon, loadout):
+            return False
         kind = self._thrown(weapon)
         if kind is None:
             return True
         return (safe_range(kind, float(self.skill.blastSense))
                 <= gap <= reach(kind))
+
+    def _has_ammo(self, weapon: Any, loadout: Any) -> bool:
+        """Whether the body this mind drives has a round left for this weapon.
+
+        A bot fires from the same loadout a player does, so a launcher it never
+        found is not an option and one it has emptied drops out of the running
+        until it finds more -- which is what makes the weapon it reaches for a
+        thing the level handed it rather than a thing it was born holding.
+
+        A mind with no body to ask -- handed a bare weapon table in a test,
+        with no loadout behind it -- is held to no count and may fire what it
+        likes, the same courtesy :meth:`_loaded` gives a bot with no weapon
+        table at all.
+        """
+        if loadout is None:
+            return True
+        return bool(loadout.can_fire(weapon))
 
     def _worth(self, weapon: Any, gap: float) -> float:
         """How much a bot would rather have this weapon at this range.
@@ -517,10 +543,14 @@ class Bot:
         skill = float(self.skill.leadsTargets)
         if kind is None or skill <= 0.0 or gap <= 0.0:
             return heading
-        speed = float(kind.speed)
-        if speed <= 0.0:
+        # How long the shot *actually* takes to arrive, thrust and all -- not
+        # gap over its launch speed, which for a rocket that leaves slowly and
+        # builds would lead by the muzzle pace it holds for only an instant and
+        # aim a long way ahead of where it will really be.
+        travel = kind.time_to(gap)
+        if not math.isfinite(travel) or travel <= 0.0:
             return heading
-        ahead = self._drift * (gap / speed) * skill
+        ahead = self._drift * travel * skill
         aimed = heading * gap + ahead
         length = float(np.linalg.norm(aimed))
         return heading if length < 1e-9 else aimed / length
@@ -659,7 +689,11 @@ def reach(kind: Any, drop: float = AIM_DROP) -> float:
     gravity, fall = float(kind.gravity), max(0.0, float(drop))
     if gravity > 0.0:
         seconds = min(seconds, math.sqrt(2.0 * fall / gravity))
-    return speed * seconds
+    # How far it actually gets in that time, thrust included -- a rocket that
+    # builds speed reaches a good deal further over its life than its launch
+    # speed alone would say, and gating a bot on the launch speed would have it
+    # decline a shot it could easily make.
+    return kind.distance_in(seconds)
 
 
 def _around(chance: random.Random) -> np.ndarray:

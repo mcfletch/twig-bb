@@ -21,6 +21,7 @@ from omi_physics import model
 from omi_physics.world import PhysicsWorld
 
 from twig_bb import arena, bots, combat, projectiles, weapons
+from twig_bb.player import PlayerState
 
 
 def world():
@@ -36,11 +37,19 @@ def wall(w, x):
                       collider=model.Collider(shape=shape), position=(0, 0, 0))
 
 
-def match(difficulty='medium', distance=10.0):
+def match(difficulty='medium', distance=10.0, armed=True):
     made = arena.Arena(weapons=weapons.default_table())
     made.add('player', position=(0.0, 0.0, 0.0), name='You')
     made.add('bot0', position=(distance, 0.0, 0.0), bot=True,
              difficulty=difficulty, name='Bot')
+    if armed:
+        # A bot that has picked everything up: which weapon it *prefers* at a
+        # range is only a question once it holds more than one, so the choice
+        # and leading tests arm it.  A bot chooses from what its body carries
+        # now (`Bot._chosen`), so a pistol-only spawn would answer every one of
+        # them "pistol".  ``armed=False`` leaves it on the spawn loadout for
+        # the tests that are about running dry.
+        made.combatant('bot0').player = PlayerState.carrying(made.weapons)
     return made
 
 
@@ -584,6 +593,47 @@ class TestChoosingAWeapon:
         assert chosen == 'rocket'
 
 
+class TestFiringFromTheLoadoutItCarries:
+    """A bot may only fire what it has picked up, the same as a player.
+
+    The whole of "the bots always open on a rocket and never run dry" was that
+    their shots came out of nowhere: they ignored the loadout their body
+    carries.  A bot chooses from, and fires out of, exactly that loadout now,
+    which is what makes a rocket something it has to *find*.
+    """
+
+    def brain(self, difficulty='hard'):
+        return bots.Bot('bot0', difficulty=difficulty, seed=1,
+                        weapons=weapons.default_table(),
+                        projectiles=projectiles.default_table())
+
+    def test_a_spawned_bot_opens_with_the_weapon_it_spawned_holding(self):
+        """Its body carries the starting loadout -- a pistol -- so at a range
+        that would beg for a rocket it fires the one thing it actually has."""
+        found = match(difficulty='hard', distance=18.0, armed=False)
+        chosen = think(self.brain(), found, dt=5.0, times=2).weapon
+        assert chosen == 'pistol'
+
+    def test_finding_a_launcher_is_what_lets_it_choose_one(self):
+        found = match(difficulty='hard', distance=18.0, armed=False)
+        # Walk it over a rocket launcher, so to speak: the pool the level fills.
+        found.combatant('bot0').player.give('rocket')
+        found.combatant('bot0').player.give_ammo('rockets', 5)
+        chosen = think(self.brain(), found, dt=5.0, times=2).weapon
+        assert chosen == 'rocket'
+
+    def test_it_runs_dry_and_falls_back(self):
+        """Down to one rocket, it fires that and then reaches for the pistol
+        rather than clicking an empty launcher for the rest of the fight."""
+        found = match(difficulty='hard', distance=18.0, armed=False)
+        loadout = found.combatant('bot0').player
+        loadout.give('rocket')
+        loadout.ammo['rockets'] = 1
+        assert think(self.brain(), found, dt=5.0, times=2).weapon == 'rocket'
+        loadout.ammo['rockets'] = 0
+        assert think(self.brain(), found, dt=5.0, times=2).weapon == 'pistol'
+
+
 class TestHowFarAThrownWeaponReaches:
     """:func:`bots.reach` measured against the flight itself.
 
@@ -624,14 +674,17 @@ class TestHowFarAThrownWeaponReaches:
     def test_a_rocket_does_not_fall_and_so_reaches_as_far_as_it_lives(self):
         kind = projectiles.default_table().by_key(projectiles.ROCKET)
         assert self.drop(kind, bots.reach(kind) * 0.99) == pytest.approx(0.0)
+        # As far as it gets in its lifetime -- and because it is a motor, that
+        # is the distance it *accelerates* through, not its launch speed times
+        # its life.
         assert bots.reach(kind) == pytest.approx(
-            float(kind.speed) * float(kind.lifetime))
+            kind.distance_in(float(kind.lifetime)))
 
     def test_a_fuse_shortens_the_reach_of_something_that_does_not_fall(self):
         """The other of the two limits, on its own."""
         kind = projectiles.default_table().by_key(projectiles.ROCKET)
         kind.fuse = 1.0
-        assert bots.reach(kind) == pytest.approx(float(kind.speed))
+        assert bots.reach(kind) == pytest.approx(kind.distance_in(1.0))
 
 
 class TestHowFastTheAimCloses:

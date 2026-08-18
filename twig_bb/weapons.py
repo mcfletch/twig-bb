@@ -344,7 +344,7 @@ def default_table() -> WeaponTable:
         # rather than far over it.
         Weapon(
             key='rifle', title='RIFLE', slot=3,
-            ammoType='cells', ammoPerShot=1, startingAmmo=10,
+            ammoType='cartridges', ammoPerShot=1, startingAmmo=10,
             fireInterval=1.5,
             damage=120.0,
             # No cone at all at rest: at three hundred metres a tenth of a

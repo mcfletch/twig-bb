@@ -982,7 +982,21 @@ class TwigContext(OverlayMixin , BaseContext):
 
         The rules return events and this decides what to do with them, which is
         the seam §11 asks for: the HUD reads events and never writes state.
+
+        **A corpse has no gun.**  While the player is dead the trigger is a
+        request to come back, not a shot, so it never reaches the weapon
+        accounting: routing it there made an empty rifle answer "OUT OF
+        CARTRIDGES"
+        and swallow the respawn, and a loaded one spend a round every frame the
+        button was held waiting to return.  The dead-check that actually ends
+        the death is :meth:`_shoot`; this only keeps the accounting from
+        running ahead of it.
         """
+        if firing:
+            me = self.arena.combatant(game.PLAYER_ID)
+            if me is not None and not me.alive:
+                self.rules.ask_to_respawn(game.PLAYER_ID)
+                firing = False
         for event in controls.apply_commands(commands, firing, self.player,
                                              self.weapons, hudclock()):
             if event.kind == 'fire':

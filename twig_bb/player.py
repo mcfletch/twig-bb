@@ -236,6 +236,35 @@ class PlayerState:
             return False
         return self.select(str(weapon.key))
 
+    def to_best_loaded(self, table: Any) -> Optional[str]:
+        """If the weapon in hand has run dry, fall to the highest still loaded.
+
+        Rather than leave the player on a dead trigger, put the **best** weapon
+        they can still fire in hand -- *highest* by ``slot``, the same order the
+        bar and the number keys use, so it is the strongest thing they have left
+        and not merely the next one along.  Returns the key switched to, or None
+        if there was no need or no way: the weapon in hand can still fire, every
+        weapon is empty, or there is no table to rank by.
+
+        It **does nothing while the weapon in hand can still fire**, so it is
+        safe to call on any shot -- it bites only when the trigger would
+        otherwise be dead.  And it reads ammunition, so a weapon held with an
+        empty pool is passed over exactly as one never picked up is.
+        """
+        if table is None:
+            return None
+        held = table.by_key(self.selected)
+        if held is not None and self.can_fire(held):
+            return None
+        loaded = [weapon for weapon in
+                  (table.by_key(key) for key in self.weapons)
+                  if weapon is not None and self.can_fire(weapon)]
+        if not loaded:
+            return None
+        best = max(loaded, key=lambda weapon: int(weapon.slot))
+        key = str(best.key)
+        return key if self.select(key) else None
+
     def cycle(self, table: Any, step: int = 1) -> str:
         """Move to the next weapon held, in table order, and return its key.
 

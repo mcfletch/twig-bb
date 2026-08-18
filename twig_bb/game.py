@@ -227,6 +227,12 @@ def _apply(world: Any, match: arenamod.Arena, one: Any, command: Any,
         one.position = walking.walk(one.id, one.position, command.move, dt)
     if command.fired and command.aim is not None:
         chosen = _wanted(match, command, weapon)
+        # A bot pays for its shots out of the loadout it carries, exactly as a
+        # player does: a round it cannot afford is an empty click, not a free
+        # rocket.  Its mind already prefers a weapon it can fire (see
+        # `Bot._chosen`), so this bites only once it has emptied everything.
+        if chosen is None or not one.player.spend(chosen):
+            return
         shoot(world, match, one.id, chosen,
               origin=one.position + EYE_OFFSET,
               direction=command.aim, spread=float(chosen.restSpread),

@@ -309,7 +309,14 @@ def default_table() -> ItemTable:
         # every one of these is a kill outright, so a box of fifty would be
         # fifty kills lying on the floor.  What holds the rifle in check is
         # how many rounds a level puts in front of you.
-        ItemKind(key='cells', title='CELLS', ammo=10, ammoType='cells',
+        ItemKind(key='cartridges', title='CARTRIDGES', ammo=10,
+                 ammoType='cartridges',
+                 # The map words stay the map's: a level declares this pickup
+                 # as ``ammo_cells`` and the rest, and what *we* call the pool
+                 # they fill is ours to name.  A sniper rifle takes cartridges,
+                 # not energy cells, so the pool and what the HUD prints are
+                 # ``cartridges`` while the classnames a map author typed are
+                 # left exactly as the format spells them.
                  classnames=['ammo_cells', 'ammo_lightning', 'ammo_slugs',
                              'ammo_nails', 'ammo_nailgun'],
                  colour=(0.4, 0.7, 1.0), **SNIPER_ROUND_PICKUP),
@@ -328,7 +335,7 @@ def default_table() -> ItemTable:
                  classnames=['weapon_shotgun'], colour=(0.8, 0.5, 0.3),
                  **SHOTGUN_PICKUP),
         ItemKind(key='weapon-rifle', title='RIFLE', weapon='rifle',
-                 ammo=5, ammoType='cells', respawn=20.0,
+                 ammo=5, ammoType='cartridges', respawn=20.0,
                  classnames=['weapon_railgun', 'weapon_lightning',
                              'weapon_plasmagun', 'weapon_chaingun',
                              'weapon_nailgun'],

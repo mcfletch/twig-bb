@@ -277,9 +277,32 @@ def _fire(player: Any, table: Any, now: float) -> List[Event]:
         return []
     if not player.spend(weapon):
         # Out of ammunition: reported once per attempted shot rather than once
-        # per frame, because ``ready`` still gates it.
+        # per frame, because ``ready`` still gates it.  Then fall to the best
+        # weapon still loaded, so an empty trigger arms the next one rather than
+        # leaving the player clicking a spent gun.
         player.last_shot = now
         return [Event('empty', _('OUT OF %s')
-                      % (str(weapon.ammoType).upper(),))]
+                      % (str(weapon.ammoType).upper(),))] + _fell_back(player,
+                                                                       table)
     player.fired(now)
-    return [Event('fire')]
+    events = [Event('fire')]
+    if not player.can_fire(weapon):
+        # That shot was the last round: switch now, so the trigger the player is
+        # still holding meets a loaded weapon on its next pull.
+        events.extend(_fell_back(player, table))
+    return events
+
+
+def _fell_back(player: Any, table: Any) -> List[Event]:
+    """Switch to the highest weapon still loaded, and name it if it changed.
+
+    The same ``select`` event a number key raises, so the HUD announces an
+    automatic switch exactly as it announces a chosen one -- a weapon changing
+    in the player's hand without a word is a weapon they will fire the wrong one
+    of.
+    """
+    key = player.to_best_loaded(table)
+    if not key:
+        return []
+    weapon = table.by_key(key)
+    return [Event('select', str(weapon.title) if weapon is not None else '')]

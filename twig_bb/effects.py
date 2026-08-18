@@ -63,10 +63,12 @@ TRAIL_RATE = 90.0
 
 #: How far a projectile flies between one puff of smoke and the next, in
 #: metres.  **A trail is laid along a path, not emitted over time**: at a rate
-#: per second a rocket doing 26 m/s strings its smoke out in dots a third of a
-#: metre apart -- a dotted line rather than a trail -- while a grenade rolling
-#: to a stop piles it up in one place.  Spacing by distance makes the trail
-#: read the same behind anything, at any speed, and stops when the thing does.
+#: per second a rocket at its 60 m/s top speed would string its smoke out in
+#: dots two thirds of a metre apart -- a dotted line rather than a trail --
+#: while the same rocket at its 16 m/s launch speed, and a grenade rolling to a
+#: stop, would pile it up.  A motor that changes speed as it flies is exactly
+#: why this matters: spacing by distance makes the trail read the same behind
+#: anything, at any speed, and stops when the thing does.
 #:
 #: It is set together with the trail emitter's ``size``, and the pair is the
 #: whole of whether this looks like smoke: a puff has a soft edge, so it has to

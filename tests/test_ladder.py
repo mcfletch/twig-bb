@@ -26,6 +26,7 @@ from omi_physics import model
 from omi_physics.world import PhysicsWorld
 
 from twig_bb import arena, bots, combat, weapons
+from twig_bb.player import PlayerState
 
 #: The tick the match is simulated at.  Fixed, and nothing reads a clock.
 TICK = 1.0 / 30.0
@@ -193,6 +194,20 @@ def play_armed(first: str, second: str, seed: int = 0,
     match = arena.Arena(weapons=table, fragLimit=0, timeLimit=seconds / 60.0)
     match.add('a', position=SPAWNS['a'], bot=True, difficulty=first, name='A')
     match.add('b', position=SPAWNS['b'], bot=True, difficulty=second, name='B')
+
+    def arm(id: str) -> None:
+        """Put the whole loadout in a bot's hands.
+
+        A bot fires only what its body carries now, and the spawn loadout is a
+        pistol; this room has no pickups to find a launcher in, so a test about
+        *the whole loadout* hands it over directly -- at the start and again on
+        every respawn, since a respawn restores the pistol-only starting kit
+        exactly as it does in the game.
+        """
+        match.combatant(id).player = PlayerState.carrying(table)
+
+    arm('a')
+    arm('b')
     minds = {id: bots.Bot(id, difficulty=difficulty, seed=seed + offset,
                           weapons=table, projectiles=kinds)
              for id, difficulty, offset in (('a', first, 0), ('b', second, 1000))}
@@ -211,6 +226,7 @@ def play_armed(first: str, second: str, seed: int = 0,
         for id in match.due_to_respawn():
             match.respawn(id, position=SPAWNS[id])
             minds[id].reset()
+            arm(id)
         for one in (match.combatant(id) for id in match.ids()):
             one.position = np.clip(one.position, -ROOM, ROOM)
             one.position[1] = 0.0

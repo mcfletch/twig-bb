@@ -93,6 +93,107 @@ class TestTheTable:
     def test_an_unknown_kind_is_no_kind_rather_than_an_error(self, kinds):
         assert kinds.by_key('nothing-like-this') is None
 
+    def test_a_rocket_is_a_motor_and_a_grenade_is_not(self, rocket, grenade):
+        """A rocket builds speed as it flies; a grenade only ever loses it."""
+        assert float(rocket.acceleration) > 0.0
+        assert float(grenade.acceleration) == 0.0
+
+    def test_a_rocket_leaves_slower_than_it_ends_up(self, rocket):
+        """Slow enough at the muzzle to be a close-range splash weapon, fast
+        enough at its ceiling to be one a sidestep cannot answer."""
+        assert float(rocket.speed) < float(rocket.maxSpeed)
+
+
+class TestHowLongAShotTakes:
+    """`time_to` is the flat flight time a bot leads a target by; it has to
+    account for the thrust, or a lead computed from the launch speed alone
+    aims a rocket where the target was a good deal too long ago."""
+
+    def test_an_unpowered_round_is_distance_over_speed(self, grenade):
+        assert grenade.time_to(32.0) == pytest.approx(32.0 / float(grenade.speed))
+
+    def test_zero_distance_takes_no_time(self, rocket):
+        assert rocket.time_to(0.0) == 0.0
+
+    def test_a_motor_arrives_sooner_than_its_launch_speed_would(self, rocket):
+        flat = 40.0 / float(rocket.speed)
+        assert rocket.time_to(40.0) < flat
+
+    def test_it_is_monotonic_in_distance(self, rocket):
+        earlier = [rocket.time_to(d) for d in range(0, 60, 5)]
+        assert earlier == sorted(earlier)
+        assert all(b > a for a, b in zip(earlier, earlier[1:]))
+
+    def test_a_round_that_cannot_move_never_arrives(self, kinds):
+        still = projectiles.Projectile(key='still', speed=0.0, acceleration=0.0)
+        assert still.time_to(10.0) == float('inf')
+
+    def test_distance_in_is_the_inverse_of_time_to(self, rocket):
+        """The distance covered in the time it takes to cover it, out and back."""
+        for distance in (2.0, 12.0, 24.0, 80.0):
+            assert rocket.distance_in(rocket.time_to(distance)) == \
+                pytest.approx(distance, rel=1e-6)
+
+    def test_a_motor_covers_more_ground_than_its_launch_speed_says(self, rocket):
+        over = 5.0
+        assert rocket.distance_in(over) > float(rocket.speed) * over
+
+    def test_an_unpowered_round_is_launch_speed_times_time(self, grenade):
+        assert grenade.distance_in(3.0) == pytest.approx(float(grenade.speed) * 3.0)
+
+
+class TestPickingUpSpeed:
+    """A rocket's speed climbs each tick, along its heading, up to its cap."""
+
+    def _speed(self, flight, index=0):
+        return float(np.linalg.norm(flight.velocity[index]))
+
+    def test_it_leaves_the_muzzle_at_its_launch_speed(self, flight, rocket):
+        flight.launch(rocket, origin=(0, 1, 0), direction=(1, 0, 0),
+                      owner='player')
+        # The first tick moves at the launch speed -- thrust is added for the
+        # tick after, so a rocket "leaves at speed" is literally true.
+        flight.step(world(), match(bots=0), dt=0.1)
+        assert flight.position[0][0] == pytest.approx(float(rocket.speed) * 0.1)
+
+    def test_it_is_faster_after_flying_than_at_the_muzzle(self, flight, rocket):
+        flight.launch(rocket, origin=(0, 1, 0), direction=(1, 0, 0),
+                      owner='player')
+        for _ in range(6):
+            flight.step(world(), match(bots=0), dt=0.05)
+        assert self._speed(flight) > float(rocket.speed)
+
+    def test_the_thrust_stays_on_the_heading(self, flight, rocket):
+        flight.launch(rocket, origin=(0, 1, 0), direction=(1, 0, 0),
+                      owner='player')
+        for _ in range(6):
+            flight.step(world(), match(bots=0), dt=0.05)
+        assert flight.velocity[0][1] == pytest.approx(0.0, abs=1e-9)
+        assert flight.velocity[0][2] == pytest.approx(0.0, abs=1e-9)
+
+    def test_it_never_passes_its_ceiling(self, flight, rocket):
+        flight.launch(rocket, origin=(0, 1, 0), direction=(1, 0, 0),
+                      owner='player')
+        for _ in range(200):
+            flight.step(world(), match(bots=0), dt=0.05)
+            if not len(flight):
+                break
+            assert self._speed(flight) <= float(rocket.maxSpeed) + 1e-6
+
+    def test_a_grenade_only_slows(self, flight, grenade):
+        """Its speed change is gravity's, never a motor's: no thrust adds to it."""
+        flight.launch(grenade, origin=(0, 50, 0), direction=(1, 0, 0),
+                      owner='player')
+        first = None
+        for _ in range(3):
+            flight.step(world(), match(bots=0), dt=0.02)
+        first = float(flight.velocity[0][0])
+        for _ in range(3):
+            flight.step(world(), match(bots=0), dt=0.02)
+        # The horizontal component is never pushed up: only gravity acts, and
+        # it is vertical, so along the heading a grenade is not a motor.
+        assert float(flight.velocity[0][0]) == pytest.approx(first, abs=1e-9)
+
 
 class TestAskingWhatIsInASlot:
     """Which kind is in each slot, for whoever has to *draw* the batch.

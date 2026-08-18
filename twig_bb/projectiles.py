@@ -29,6 +29,7 @@ answers the :class:`~twig_bb.arena.Detonated` events this emits.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 from typing import Any, List, Optional, Sequence
 
@@ -84,6 +85,22 @@ class Projectile(node.Node):
     #: How fast it leaves, and how hard it falls.  Zero gravity is a rocket.
     speed = field.newField('speed', 'SFFloat', 1, 24.0)
     gravity = field.newField('gravity', 'SFFloat', 1, 0.0)
+    #: Thrust along its own heading, in metres per second squared: a motor
+    #: rather than a muzzle.  Zero is an unpowered round -- a grenade, a
+    #: bullet, a thrown thing -- that leaves at :attr:`speed` and from then on
+    #: only ever slows.  Above zero is a rocket that leaves *slowly* and
+    #: builds: what makes one worth dodging at a distance is that it arrives
+    #: before a sidestep can, and what keeps it fair up close is that at the
+    #: range a rocket jump is taken it has barely begun to move.  Applied at
+    #: the end of a tick, so "leaves at :attr:`speed`" is true for the first
+    #: instant of flight.
+    acceleration = field.newField('acceleration', 'SFFloat', 1, 0.0)
+    #: The speed a motor levels off at, in metres per second; 0 for one whose
+    #: thrust never stops (which only a fused or short-lived kind should be,
+    #: or it accelerates until its lifetime runs out).  It caps the whole
+    #: speed and so is meant for a gravity-free thruster like a rocket rather
+    #: than for something also being pulled down.
+    maxSpeed = field.newField('maxSpeed', 'SFFloat', 1, 0.0)
     #: How near a surface it has to pass to touch it.
     radius = field.newField('radius', 'SFFloat', 1, 0.12)
 
@@ -131,6 +148,57 @@ class Projectile(node.Node):
     #: crosses a room as a dot.
     modelScale = field.newField('modelScale', 'SFFloat', 1, 1.0)
 
+    def time_to(self, distance: float) -> float:
+        """Seconds a shot of this kind takes to fly ``distance`` in a straight
+        line, given its launch speed, its thrust and its top speed.
+
+        The flat-flight answer: gravity is not in it, because the only caller
+        that needs it leads a target's aim, a thrown arc is never led, and a
+        flat shot is the one whose time this has to get right.  A kind that
+        cannot move takes forever, reported as infinity rather than a division
+        by zero, so a caller dividing by it simply declines to lead.
+        """
+        distance = max(0.0, float(distance))
+        if distance == 0.0:
+            return 0.0
+        launch = float(self.speed)
+        thrust = float(self.acceleration)
+        top = float(self.maxSpeed)
+        if thrust <= 0.0:
+            return distance / launch if launch > 0.0 else math.inf
+        # If it has a ceiling, how far it gets before reaching it -- past that
+        # the flight is at a constant top speed and the rest is plain division.
+        if top > launch:
+            climb = (top - launch) / thrust
+            reached = launch * climb + 0.5 * thrust * climb * climb
+            if distance > reached:
+                return climb + (distance - reached) / top
+        # Still gaining the whole way: solve distance = launch t + thrust t^2/2.
+        return (math.sqrt(launch * launch + 2.0 * thrust * distance)
+                - launch) / thrust
+
+    def distance_in(self, seconds: float) -> float:
+        """How far a shot of this kind gets in ``seconds``, flat, thrust and all.
+
+        The companion to :meth:`time_to`, and the honest range of a gravity-free
+        motor: a rocket that leaves at 16 m/s and climbs to 60 covers far more
+        ground over its life than its launch speed alone would say.  Gravity is
+        not in it for the same reason it is not in ``time_to`` -- the flat
+        flight is the one whose reach a bot gates on.
+        """
+        seconds = max(0.0, float(seconds))
+        launch = float(self.speed)
+        thrust = float(self.acceleration)
+        top = float(self.maxSpeed)
+        if thrust <= 0.0:
+            return launch * seconds
+        if top > launch:
+            climb = (top - launch) / thrust
+            if seconds > climb:
+                reached = launch * climb + 0.5 * thrust * climb * climb
+                return reached + top * (seconds - climb)
+        return launch * seconds + 0.5 * thrust * seconds * seconds
+
 
 class ProjectileTable(node.Node):
     """Every kind of projectile this game knows about."""
@@ -171,7 +239,15 @@ def default_table() -> ProjectileTable:
         # decides that, more than the damage is -- much above 1 and everything
         # but a hit at the feet is a puff of smoke.
         Projectile(
-            key=ROCKET, speed=26.0, gravity=0.0, radius=0.14,
+            # A motor, not a bullet: it leaves at 16 m/s -- walking pace for a
+            # rocket, slow enough that up close it is a splash weapon aimed at
+            # the floor and not a flat one aimed at a chest -- and thrusts hard
+            # to a top speed of 60, which a sidestep at any real distance
+            # cannot beat.  It spends its first ~24 m getting there; beyond
+            # that it cruises.  The old flat 26 m/s was dodgeable everywhere
+            # and threatening nowhere.
+            key=ROCKET, speed=16.0, acceleration=70.0, maxSpeed=60.0,
+            gravity=0.0, radius=0.14,
             fuse=0.0, lifetime=6.0, bounce=0.0,
             damage=110.0, splashDamage=85.0, splashRadius=4.0,
             splashFalloff=1.15, knockback=11.0, selfDamage=0.45,
@@ -340,6 +416,11 @@ class Projectiles:
             if self._fly(world, arena, index, dt, staged, bodies, gone):
                 spent.append(index)
         self._bury(spent)
+        # After the move, so this tick flew at the speed it started with and
+        # a motor's gain is felt on the next one -- which is what makes "a
+        # rocket leaves at ``speed``" exactly true and keeps every launch-speed
+        # test honest.
+        self._accelerate(dt)
         return gone
 
     def _fall(self, dt: float) -> None:
@@ -348,6 +429,34 @@ class Projectiles:
             return
         pull = np.array([float(kind.gravity) for kind in self._kinds])
         self.velocity[:self.live, 1] -= pull[self.kind[:self.live]] * dt
+
+    def _accelerate(self, dt: float) -> None:
+        """Add each kind's thrust along its own heading, capped at its top speed.
+
+        Vectorised over the whole batch like :meth:`_fall`.  A motor is a
+        change to how *fast* a projectile goes and not to *where* -- so it
+        scales the velocity a projectile already has rather than picking a
+        fresh one, which keeps a rocket following the bounce it just took
+        instead of snapping back onto the heading it was fired along.
+        """
+        live = self.live
+        if not self._kinds or live <= 0:
+            return
+        which = self.kind[:live]
+        thrust = np.array([float(k.acceleration) for k in self._kinds])[which]
+        if not np.any(thrust > 0.0):
+            return
+        top = np.array([float(k.maxSpeed) for k in self._kinds])[which]
+        speed = np.linalg.norm(self.velocity[:live], axis=1)
+        powered = (thrust > 0.0) & (speed > 1e-9)
+        if not np.any(powered):
+            return
+        gained = speed[powered] + thrust[powered] * dt
+        ceiling = top[powered]
+        capped = ceiling > 0.0
+        gained[capped] = np.minimum(gained[capped], ceiling[capped])
+        rows = np.nonzero(powered)[0]
+        self.velocity[rows] *= (gained / speed[powered])[:, None]
 
     def _fly(self, world: Any, arena: Any, index: int, dt: float, staged: dict,
              bodies: dict, gone: List[Detonation]) -> bool:

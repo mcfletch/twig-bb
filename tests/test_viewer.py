@@ -1516,6 +1516,40 @@ class TestDyingAndComingBack:
         context._shoot()
         assert not context.rules.waiting_to_come_back(game.PLAYER_ID)
 
+    def test_an_empty_rifle_still_comes_back(self, tmp_path, monkeypatch):
+        """Dying with an empty gun must not trap you at the scoreboard.
+
+        The whole trigger path runs here, not just ``_shoot``: a dead player
+        holding fire with no ammunition went through the weapon accounting,
+        which answered "OUT OF CARTRIDGES" and never reached the respawn.  The
+        trigger is a respawn request while dead, whatever the gun holds.
+        """
+        context, _fired = self.context(tmp_path, monkeypatch)
+        context._runCommands = viewer.TwigContext._runCommands.__get__(context)
+        posted = []
+        context.hud = type('_Hud', (),
+                           {'post': lambda _self, text: posted.append(text)})()
+        weapon = context.weapons.by_key(context.player.selected)
+        context.player.ammo[str(weapon.ammoType)] = 0
+        self.kill(context)
+        assert context.rules.waiting_to_come_back(game.PLAYER_ID)
+        context._runCommands([], firing=True)
+        assert not context.rules.waiting_to_come_back(game.PLAYER_ID)
+        # And the empty gun said nothing: a corpse has no round to be out of.
+        assert posted == []
+
+    def test_a_corpse_does_not_burn_ammunition(self, tmp_path, monkeypatch):
+        """Holding fire while dead must not drain the ammunition you respawn
+        with: a corpse has no gun, so the accounting does not run."""
+        context, _fired = self.context(tmp_path, monkeypatch)
+        context._runCommands = viewer.TwigContext._runCommands.__get__(context)
+        context.hud = type('_Hud', (), {'post': lambda _self, text: None})()
+        weapon = context.weapons.by_key(context.player.selected)
+        context.player.ammo[str(weapon.ammoType)] = 5
+        self.kill(context)
+        context._runCommands([], firing=True)
+        assert context.player.ammo[str(weapon.ammoType)] == 5
+
     def test_dying_takes_the_view_away_from_the_navigator(self, tmp_path,
                                                           monkeypatch):
         """The camera was the piece of a death with no owner: it stayed where
@@ -1817,6 +1851,11 @@ class TestTheMouseFiresInTheGame:
         made.weapons = weapons.default_table()
         made.player = player.PlayerState.carrying(made.weapons)
         made.player.selected = made.weapons.weapons[0].key
+        # A shot can only come from a living body in a match, and the trigger
+        # path now asks whether that body is alive before spending a round.
+        made.arena = arena.Arena(weapons=made.weapons, fragLimit=15,
+                                 timeLimit=10.0)
+        made.arena.add(game.PLAYER_ID, position=np.zeros(3), name='You')
         made.weaponBindings = viewer.controls.WeaponBindings()
         made.hud = _MessageSink()
         made._inputState = InputState()
