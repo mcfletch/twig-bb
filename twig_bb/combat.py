@@ -312,9 +312,11 @@ class _Capsules:
         self.taken += 1
         centre = (np.asarray(feet, dtype='d')
                   + np.array([0.0, BODY_HEIGHT * 0.5, 0.0]))
-        world.position[body] = centre
-        world.prev_position[body] = centre
         world.collider_shape[body] = self.shape
+        # Through the world rather than into its position array: a body's own
+        # bounding box is what a ray is rejected against, and a box left where
+        # the capsule used to be answers about where somebody used to be.
+        world.place_body(body, position=centre)
         return body
 
     def release(self, world: Any) -> None:
