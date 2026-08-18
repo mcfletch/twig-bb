@@ -34,6 +34,7 @@ from . import art
 from . import avatar
 from . import blast
 from . import bots as botsmod
+from . import characters as charactersmod
 from . import combat
 from . import falling
 from . import projectiles as projectilesmod
@@ -320,24 +321,31 @@ def _shoved(match: arenamod.Arena, one: Any, walking: Any) -> None:
     walking.shove(one.id, push)
 
 
-def bot_bodies(match: arenamod.Arena) -> Tuple[Group, Dict[str, Transform]]:
+def bot_bodies(match: arenamod.Arena,
+               cast: Optional[Any] = None) -> Tuple[Group, Dict[str, Transform]]:
     """A group holding a body for each bot, and the transforms to move them.
 
     Returned together because the caller needs both: the group goes in the
-    scene once, and the transforms are written every frame.  A capsule, drawn
-    as a cylinder between two spheres, because §5's art does not exist yet and
-    §6 had to be buildable before it did.
+    scene once, and the transforms are written every frame.
+
+    ``cast`` is a :class:`twig_bb.characters.Cast`, and each bot is drawn as
+    its figure.  Without one -- and for a bot the cast has no figure for --
+    the body is a capsule, which is what keeps a match playable with no art at
+    all: §6 was built against it and it is still the answer when a model will
+    not resolve.
     """
     group = Group(children=[])
     bodies: Dict[str, Transform] = {}
     for one in match.bots():
-        body = Transform(translation=tuple(one.position), children=_capsule())
+        drawn = None if cast is None else cast.subtree(one.id)
+        body = Transform(translation=tuple(one.position),
+                         children=[drawn] if drawn is not None else capsule())
         bodies[one.id] = body
         group.children = list(group.children) + [body]
     return (group, bodies)
 
 
-def _capsule() -> List[Any]:
+def capsule() -> List[Any]:
     """The parts of a stand-in body, standing on its feet."""
     look = Appearance(material=Material(diffuseColor=BODY_COLOUR,
                                         shininess=0.2))
@@ -425,8 +433,14 @@ def projectile_bodies(capacity: int,
     return (Group(children=children), bodies)
 
 
-def heading_rotation(direction: Sequence[float]) -> Tuple[float, float, float, float]:
-    """The axis and angle that turn :data:`MODEL_FORWARD` onto ``direction``.
+def heading_rotation(direction: Sequence[float],
+                     forward: Sequence[float] = MODEL_FORWARD,
+                     ) -> Tuple[float, float, float, float]:
+    """The axis and angle that turn ``forward`` onto ``direction``.
+
+    ``forward`` is which way the model is authored to face in its own frame,
+    which is not the same answer for everything: a projectile leaves Blender
+    pointing down -Z and a figure, following the avatar conventions, faces +Z.
 
     A rotation rather than a matrix because that is what a ``Transform`` holds.
     Something going nowhere is left alone: a projectile with no velocity has no
@@ -438,7 +452,7 @@ def heading_rotation(direction: Sequence[float]) -> Tuple[float, float, float, f
     if length == 0.0:
         return (0.0, 1.0, 0.0, 0.0)
     heading = heading / length
-    forward = np.asarray(MODEL_FORWARD, dtype=float)
+    forward = np.asarray(forward, dtype=float)
     axis = np.cross(forward, heading)
     angle = math.atan2(float(np.linalg.norm(axis)),
                        float(np.dot(forward, heading)))
@@ -577,13 +591,21 @@ def move_items(pickups: Any, bodies: List[Transform], now: float) -> None:
         body.rotation = (0.0, 1.0, 0.0, (now * ITEM_SPIN) % (2.0 * math.pi))
 
 
-def move_bodies(match: arenamod.Arena,
-                bodies: Dict[str, Transform]) -> None:
-    """Put each bot's body where the rules say it is.
+def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
+                cast: Optional[Any] = None, walking: Optional[Any] = None,
+                dt: float = 0.0) -> None:
+    """Put each bot's body where the rules say it is, and play what it is doing.
 
     A dead bot is moved out of sight rather than removed, because editing the
     scenegraph every time somebody dies costs a rebuild of what the pass has
-    gathered — and they are coming back in a second and a half.
+    gathered — and they are coming back in a second and a half.  A dying one is
+    left where it fell for as long as its death clip runs, because a body that
+    vanishes on the frame it is killed reads as a bug rather than as a kill.
+
+    With a ``cast``, each figure is also turned to face the way it is moving
+    and asked to play the clip its motion calls for.  ``walking`` is the
+    :class:`~twig_bb.walkers.Walkers` the bodies move in, which is what knows
+    a bot's speed and whether it is on the ground.
     """
     for id, body in bodies.items():
         one = match.combatant(id)
@@ -591,8 +613,19 @@ def move_bodies(match: arenamod.Arena,
             continue
         if one.alive:
             body.translation = tuple(float(value) for value in one.position)
-        else:
+        elif cast is None:
             body.translation = (0.0, -10_000.0, 0.0)
+        if cast is None:
+            continue
+        walker = None if walking is None else walking.of(id)
+        motion = charactersmod.motion_of(
+            walker, weapon=str(getattr(one, 'weapon', '') or ''),
+            dead=not one.alive)
+        cast.update(id, motion, dt)
+        if motion.speed >= charactersmod.WALK_SPEED and walker is not None:
+            body.rotation = heading_rotation(
+                (walker.velocity[0], 0.0, walker.velocity[2]),
+                forward=charactersmod.FORWARD)
 
 
 def messages(events: Sequence[Any], match: arenamod.Arena) -> List[str]:

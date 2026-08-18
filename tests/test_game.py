@@ -865,3 +865,69 @@ class TestSayingHowSomebodyDied:
 
     def test_a_frag_still_names_the_killer(self):
         assert self.line(target='bot1', by=game.PLAYER_ID) == 'You fragged Bot 1'
+
+
+class TestBodiesDrawnAsFigures:
+    """A bot drawn as a character rather than as a capsule.
+
+    The cast is what puts a figure under each body transform; without one the
+    capsule is still what a bot is drawn as, which is what keeps §6 developable
+    with no art at all.
+    """
+
+    def test_without_a_cast_a_bot_is_a_capsule(self):
+        _group, bodies = game.bot_bodies(started(bots=1))
+        assert len(bodies['bot1'].children) == len(game.capsule())
+
+    def test_with_a_cast_a_bot_is_its_figure(self):
+        from twig_bb import characters
+        found = started(bots=1)
+        cast = characters.Cast([one.id for one in found.bots()])
+        _group, bodies = game.bot_bodies(found, cast=cast)
+        assert list(bodies['bot1'].children) == [cast.subtree('bot1')]
+
+    def test_a_cast_with_no_figure_falls_back_to_the_capsule(self):
+        from twig_bb import characters
+        found = started(bots=1)
+        cast = characters.Cast([one.id for one in found.bots()],
+                               builds=['nobody-by-that-name'])
+        _group, bodies = game.bot_bodies(found, cast=cast)
+        assert len(bodies['bot1'].children) == len(game.capsule())
+
+    def test_moving_them_plays_a_clip_and_turns_them(self):
+        from twig_bb import characters
+        found = started(bots=1)
+        cast = characters.Cast([one.id for one in found.bots()])
+        _group, bodies = game.bot_bodies(found, cast=cast)
+
+        class Walker:
+            velocity = (6.0, 0.0, 0.0)
+            grounded = True
+
+        class Walking:
+            def of(self, id):
+                return Walker()
+
+        game.move_bodies(found, bodies, cast=cast, walking=Walking(), dt=0.1)
+        assert tuple(bodies['bot1'].rotation) != (0.0, 1.0, 0.0, 0.0)
+
+    def test_a_dead_bot_keeps_its_body_where_it_fell(self):
+        from twig_bb import characters
+        found = started(bots=1)
+        cast = characters.Cast([one.id for one in found.bots()])
+        _group, bodies = game.bot_bodies(found, cast=cast)
+        one = found.combatant('bot1')
+        one.player.health = 0
+        one.dead_for = 0.0
+        placed = tuple(bodies['bot1'].translation)
+        game.move_bodies(found, bodies, cast=cast, dt=0.1)
+        assert tuple(bodies['bot1'].translation) == placed
+
+    def test_without_a_cast_a_dead_bot_is_taken_out_of_sight(self):
+        found = started(bots=1)
+        _group, bodies = game.bot_bodies(found)
+        one = found.combatant('bot1')
+        one.player.health = 0
+        one.dead_for = 0.0
+        game.move_bodies(found, bodies)
+        assert float(bodies['bot1'].translation[1]) < -100.0

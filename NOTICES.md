@@ -55,15 +55,21 @@ a BSD library.
 |---|---|
 | The weapons and what they throw | **BSD-3-Clause** — Mike C. Fletcher, modelled for this project |
 | The pickups and the medikit | **BSD-3-Clause** — Mike C. Fletcher, modelled for this project |
+| The combatants' bodies, faces and hair | **CC0 1.0** — Quaternius, *Universal Base Characters* · <https://quaternius.com/packs/universalbasecharacters.html> |
+| Everything else about the combatants — skeleton, suit, animation, sockets | **BSD-3-Clause** — Mike C. Fletcher, built for this project |
 
-**Every model here is this project's own**, so nothing in the geometry carries
-an obligation onto anyone who redistributes twig-bb. It is credited anyway,
-because that is the rule for every piece of art here whether or not its licence
-demands it — the next person to read those directories should not have to guess
-which files carry one. How the models are built, and what makes them readable in
-a map that places no lights, is recorded in
-[`twig_bb/assets/weapons/CREDITS.md`](twig_bb/assets/weapons/CREDITS.md)
-and [`twig_bb/assets/items/CREDITS.md`](twig_bb/assets/items/CREDITS.md).
+**Nothing here carries an obligation onto anyone who redistributes twig-bb**:
+the models are either this project's own or public domain. Both are credited
+anyway, because that is the rule for every piece of art here whether or not its
+licence demands it — the next person to read those directories should not have
+to guess which files carry one. How the models are built, and what makes them
+readable in a map that places no lights, is recorded in
+[`twig_bb/assets/weapons/CREDITS.md`](twig_bb/assets/weapons/CREDITS.md),
+[`twig_bb/assets/items/CREDITS.md`](twig_bb/assets/items/CREDITS.md) and
+[`twig_bb/assets/characters/CREDITS.md`](twig_bb/assets/characters/CREDITS.md).
+
+CC0 asks for no attribution and gets it here regardless. Quaternius takes
+support at <https://www.patreon.com/quaternius>.
 
 **No audio files ship with this program at all**, and that is a decision rather
 than a gap. Every sound a fight makes — the weapons, impacts, deaths and

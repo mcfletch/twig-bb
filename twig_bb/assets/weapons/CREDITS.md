@@ -96,6 +96,16 @@ the hand: metres right, down and forward of the eye.
 `twig-bb-hud --weapon <key>` starts holding one weapon, which is how those
 numbers are dialled in.
 
+**In a combatant's hand it is the model that says where it is held.** Each
+weapon here carries a `socket_grip` node at the grip — the wrist of the stock,
+the pistol grip, the rear grip of the launcher — and a figure's own
+`socket_grip` is lined up with it (see
+[CHARACTER-RIG.md §4](../../../CHARACTER-RIG.md)). That is what lets these be
+modelled about their balance point, which is what the first-person placement
+above wants, without a rifle hanging off a fist fifteen centimetres from the
+hand. It is an ordinary glTF node: the format has no attachment-point extension
+and needs none.
+
 **Every model also gets a small emissive floor** (`EMISSIVE_FILL` in the build
 script, 0.07), and that is not decoration. A map places no dynamic lights at all — both
 families bake their lighting into lightmaps, which is what makes them look like

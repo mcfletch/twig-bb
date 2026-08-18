@@ -95,6 +95,7 @@ ignore = ["E501"]
 # conftest is the wrong home for this one: importing it sets the GL renderer,
 # profile and backend, which must not happen for the suite that needs no window.
 "tests/test_items_gl.py" = ["F811"]
+"tests/test_characters_gl.py" = ["F811"]
 
 [tool.mypy]
 # The numpy stubs in this environment use `type` statements, which mypy only

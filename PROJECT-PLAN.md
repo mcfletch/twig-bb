@@ -72,6 +72,7 @@ before it.
 | ✅ Asset pack fetch/unpack/consent | [twig_bb/download.py](twig_bb/download.py) | §9's catalogue and progress UI |
 | ✅ Quake 3 `.shader` parsing | [twig_bb/q3shader.py](twig_bb/q3shader.py) | §8's animated effects — already parsed, currently discarded |
 | ✅ glTF skinning and animation | [../openglcontext/OpenGLContext/loaders/gltf/animation.py](../openglcontext/OpenGLContext/loaders/gltf/animation.py) | §5's characters |
+| ✅ Humanoid rigs, clip blending, attachment points | [../openglcontext/OpenGLContext/character/](../openglcontext/OpenGLContext/character/) | §5's characters |
 | ✅ Declared but unimplemented `Sound` / `AudioClip` nodes | [../pyvrml97/vrml/vrml97/basenodes.py:450](../pyvrml97/vrml/vrml97/basenodes.py#L450) | §4's audio API — already specified, needs a renderer |
 
 Two of these deserve emphasis because they change what the phases cost. The VRML97
@@ -472,9 +473,47 @@ this". A bot is drawn as a plainly-coloured capsule, is shot as a capsule, and
 walks as one. Fighting was buildable before any art existed, which is what that
 fallback was for.
 
-**What remains is the whole of the art half**: the rig and clip-name contract,
-the animation state machine, the Quaternius CC0 stand-ins fitted *through* that
-contract, and the artist brief. None of it blocks anything now.
+**The figures ship, and the contract they satisfy is written down
+(2026-08-18).** A male and a female build, 5200 triangles each, on a humanoid
+skeleton of 57 bones with nineteen clips and four attachment points, generated
+by [`grass-clumps/character.py`](../grass-clumps/character.py) and committed to
+[twig_bb/assets/characters/](twig_bb/assets/characters/). The contract is
+[CHARACTER-RIG.md](CHARACTER-RIG.md) and the control layer is
+[twig_bb/characters.py](twig_bb/characters.py): a state machine over what the
+rules already know, choosing between the movement clips and layering the weapon
+clips over them.
+
+The **bodies** are Quaternius' CC0 *Universal Base Characters*, credited in
+[twig_bb/assets/characters/CREDITS.md](twig_bb/assets/characters/CREDITS.md).
+A human body is a modelling problem, and taking one from somebody who models
+them is what buys anatomy the generator was never going to reach. What the
+generator adds is the naming, the suit, the animation, the sockets and the
+budget: the suit is painted by where a texel lands *on the body*, so the same
+description of a garment clothes a mesh it did not unwrap -- including one a
+contributor brings.
+
+The machinery went upstream, as this plan's dividing line requires:
+`OpenGLContext.character` reads a skeleton (VRM 1.0's humanoid bone names, from
+`VRMC_vrm` or from the joint names), blends more than one clip at once, and
+finds the attachment points a figure declares; `oglc-character-sheet` renders
+every clip from four sides for review. See
+[../openglcontext/plans/CHARACTER-ANIMATION.md](../openglcontext/plans/CHARACTER-ANIMATION.md).
+
+**Combatants carry what the rules say they carry (2026-08-18).**
+`twig_bb.characters.Armoury` is the model for each weapon key, loaded once for
+the match and shared by everybody holding that one -- a weapon is not skinned
+and carries no per-body state, so twenty bots with rifles are twenty references
+to one subtree and a single instanced draw. `Character.carry` keeps the hand in
+step with the rules every frame, so nothing has to send an event when somebody
+picks a different weapon up, and a dead body -- which plays no weapon clip --
+holds nothing. Each weapon is placed by the grip **it** declares rather than by
+its own origin; see [CHARACTER-RIG.md §4](CHARACTER-RIG.md).
+
+**What remains of this phase:** the artist brief for §7's weapons and §13's
+sounds is unwritten, and a figure's accent colour is paint on its texture
+rather than something a match changes at runtime -- a per-team colour is a
+second build today (`--accent`), and would want `KHR_materials_variants` to be
+a load-time switch instead.
 
 What follows is the design as it was written.
 

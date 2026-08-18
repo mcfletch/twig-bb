@@ -85,6 +85,7 @@ from . import projectiles                                       # noqa: E402
 from . import download                                          # noqa: E402
 from . import effects, falling, feedback, fetcher, game         # noqa: E402
 from . import arena                                             # noqa: E402
+from . import characters                                        # noqa: E402
 from . import deathcam                                          # noqa: E402
 from . import items as itemsmod                                 # noqa: E402
 from . import jumppads, liquids, mapnotice, maploader, menu, notices  # noqa: E402
@@ -884,7 +885,15 @@ class TwigContext(OverlayMixin , BaseContext):
         if me is None:
             raise RuntimeError('the match was started without the player in it')
         self.player = me.player
-        self.botGroup, self.botBodies = game.bot_bodies(self.arena)
+        # A drawn figure for each of them, made once for the match: a
+        # scenegraph rebuilt whenever somebody spawns is one rebuilt during a
+        # fight.  A figure that will not load leaves that body a capsule and
+        # the match carries on -- see `twig_bb.characters`.
+        self.cast = characters.Cast(
+            [one.id for one in self.arena.bots()],
+            armoury=characters.Armoury(self.weapons))
+        self.botGroup, self.botBodies = game.bot_bodies(self.arena,
+                                                        cast=self.cast)
         self.effects = effects.Effects(self.arena,
                                        intensity=str(self.config.effects))
         # Everything in the air, and one body per slot to draw it with.  Both
@@ -1240,7 +1249,8 @@ class TwigContext(OverlayMixin , BaseContext):
         self._cameBack(tick.respawned)
         self._watchDeath(tick.events, dt)
         self._shovePlayer()
-        game.move_bodies(self.arena, self.botBodies)
+        game.move_bodies(self.arena, self.botBodies, cast=self.cast,
+                         walking=self.rules.walking, dt=dt)
         game.move_items(self.rules.pickups, self.itemBodies, hudclock())
         game.move_projectiles(self.flight, self.projectileBodies)
         flying = len(self.flight)

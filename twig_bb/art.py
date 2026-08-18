@@ -37,18 +37,28 @@ def path_for(relative: str) -> str:
     return os.path.join(ASSETS, relative)
 
 
-def load(relative: str) -> Optional[Any]:
+def load(relative: str, mount: Optional[str] = None) -> Optional[Any]:
     """The scenegraph subtree for one model, or None if it will not load.
 
     Every call reads the file again and hands back a subtree nobody else holds,
     because the caller is entitled to :func:`recolour` what it gets.  Callers
     that want one copy cache it themselves -- how long a model should be kept
     is a question about the thing holding it, not about the loader.
+
+    ``mount`` names an attachment point, and asks for the subtree placed so
+    that the point *the model itself* declares sits at the origin -- ready to
+    hang on a rig's point of the same name.  A model that declares no such
+    point comes back placed by its own origin, which is what every model does
+    without this.
     """
     path = path_for(relative)
     try:
         from OpenGLContext.loaders.gltf import load_gltf
-        return load_gltf(path).group
+        scene = load_gltf(path)
+        if mount is None:
+            return scene.group
+        from OpenGLContext.character.attachment import mounted
+        return mounted(scene, mount)
     except Exception:                       # noqa: BLE001 - art, not rules
         log.warning('could not load the model %s', path, exc_info=True)
         return None
