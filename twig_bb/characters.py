@@ -70,6 +70,13 @@ ONE_SHOTS = frozenset({'jump', 'land', 'die'})
 #: Metres a second below which somebody is standing still, and above which
 #: they are running rather than walking. Our numbers: they are a statement
 #: about how the art reads at speed, not about what the physics can do.
+#: How fast a body may turn to face where it is looking, in radians a second.
+#: A body that arrived at a new facing the instant its owner decided on one
+#: would snap round on the frame a bot noticed somebody, which reads as a
+#: glitch rather than as a reaction. Fast enough to be a soldier turning,
+#: slow enough to be seen.
+FACE_RATE = 7.0
+
 WALK_SPEED = 0.6
 RUN_SPEED = 4.0
 
@@ -138,7 +145,9 @@ class Motion:
     #: Whether it is going up rather than coming down, which is the whole
     #: difference between a jump and a fall.
     rising: bool = False
-    #: Radians a second of turn, positive to the left.
+    #: Radians a second the body is turning, positive to the left. Decided by
+    #: the *drawing* rather than by the rules: what the rules say is where
+    #: somebody is looking, and turning is what a body does on its way there.
     turning: float = 0.0
     #: The weapon key being carried, or '' for empty-handed.
     weapon: str = ''
@@ -181,6 +190,15 @@ def motion_of(walker: Any, weapon: str = '', facing: Any = None,
                   rising=y > 0.1 and not getattr(walker, 'grounded', True),
                   weapon=weapon, direction=heading_in((x, z), facing, speed),
                   **named)
+
+
+def _flat(direction: Any) -> Any:
+    """``direction`` as a unit vector in the ground plane, or None."""
+    if direction is None:
+        return None
+    flat = np.array([float(direction[0]), 0.0, float(direction[2])])
+    length = float(np.linalg.norm(flat))
+    return None if length < 1e-9 else flat / length
 
 
 def heading_in(velocity: Tuple[float, float], facing: Any,
@@ -362,6 +380,9 @@ class Character:
         #: never seen holding one.
         self.armoury = armoury
         self.locomotion = Locomotion()
+        #: Which way the body is drawn facing, which lags where its owner is
+        #: looking by however long the turn takes.
+        self.facing: Any = None
         self.holding: Optional[str] = None
         self._held: Any = None
         #: Whether the next clip should snap in rather than blend. True after
@@ -406,6 +427,36 @@ class Character:
         if self.model is not None and self._held is not None:
             self.model.detach('grip', self._held)
         self.holding, self._held = None, None
+
+    def face(self, wanted: Any, dt: float) -> Tuple[Any, float]:
+        """Turn towards ``wanted``, at most :data:`FACE_RATE`; where it got to.
+
+        Answers ``(facing, turning)`` -- the direction to draw the body along
+        and how fast it is turning, positive to its left. The second is what
+        makes a body turning on the spot play a turn rather than stand there
+        swivelling: the rules have no idea it is turning, because turning is
+        something the *drawing* does on its way to where the rules pointed.
+        """
+        wanted = _flat(wanted)
+        if wanted is None:
+            return (self.facing, 0.0)
+        if self.facing is None:
+            self.facing = wanted
+            return (self.facing, 0.0)
+        across = float(self.facing[0] * wanted[2] - self.facing[2] * wanted[0])
+        along = float(np.dot(self.facing, wanted))
+        angle = math.atan2(across, along)
+        limit = FACE_RATE * max(0.0, float(dt))
+        turn = max(-limit, min(limit, angle))
+        if abs(turn) < 1e-6:
+            self.facing = wanted
+            return (self.facing, 0.0)
+        cosine, sine = math.cos(turn), math.sin(turn)
+        # Rotating about the vertical, in the same handedness `heading_in` uses.
+        self.facing = np.array([
+            self.facing[0] * cosine - self.facing[2] * sine, 0.0,
+            self.facing[0] * sine + self.facing[2] * cosine])
+        return (self.facing, turn / max(dt, 1e-6))
 
     def carry(self, weapon: str) -> bool:
         """Hold what ``weapon`` names, taking the model from the armoury.
@@ -567,3 +618,8 @@ class Cast:
         """Play what ``motion`` calls for on one figure."""
         figure = self.figures.get(id)
         return ('', None) if figure is None else figure.update(motion, dt)
+
+    def face(self, id: str, wanted: Any, dt: float) -> Tuple[Any, float]:
+        """Turn one figure towards ``wanted`` -- see :meth:`Character.face`."""
+        figure = self.figures.get(id)
+        return (None, 0.0) if figure is None else figure.face(wanted, dt)

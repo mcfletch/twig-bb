@@ -638,18 +638,25 @@ def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
         # trigger is down is a moment the rules noticed and held on to.
         shooting = float(getattr(one, 'firing', 0.0) or 0.0)
         one.firing = max(0.0, shooting - max(0.0, float(dt)))
+        # **Where it is drawn facing lags where its owner is looking.** A body
+        # that arrived at a new facing on the frame its owner decided on one
+        # would snap round the moment a bot noticed somebody; and turning is
+        # something the drawing does on its way there, which the rules know
+        # nothing about -- so what it is doing while it turns comes back here
+        # rather than going in.
+        facing, turning = cast.face(id, _wanted_facing(one, walker), dt)
         motion = charactersmod.motion_of(
             walker, weapon=str(one.player.selected or ''),
             firing=shooting > 0.0, dead=not one.alive,
-            facing=getattr(one, 'facing', None))
+            facing=facing, turning=turning)
         cast.update(id, motion, dt)
-        turn = _facing_of(one, walker, motion)
-        if turn is not None:
-            body.rotation = heading_rotation(turn, forward=charactersmod.FORWARD)
+        if facing is not None:
+            body.rotation = heading_rotation(facing,
+                                             forward=charactersmod.FORWARD)
 
 
-def _facing_of(one: Any, walker: Any, motion: Any) -> Optional[Tuple[float, ...]]:
-    """Which way to turn a body, or None to leave it as it is.
+def _wanted_facing(one: Any, walker: Any) -> Optional[Tuple[float, ...]]:
+    """Which way a body wants to be facing, or None for no opinion.
 
     **Where somebody is looking beats where they are going.** A combatant with
     something in view faces it, whether they are standing, backing off or
@@ -663,8 +670,11 @@ def _facing_of(one: Any, walker: Any, motion: Any) -> Optional[Tuple[float, ...]
     if facing is not None and float(np.linalg.norm(np.asarray(facing[:3],
                                                               dtype=float))):
         return (float(facing[0]), 0.0, float(facing[2]))
-    if walker is not None and motion.speed >= charactersmod.WALK_SPEED:
-        return (float(walker.velocity[0]), 0.0, float(walker.velocity[2]))
+    if walker is None:
+        return None
+    across = (float(walker.velocity[0]), 0.0, float(walker.velocity[2]))
+    if math.hypot(across[0], across[2]) >= charactersmod.WALK_SPEED:
+        return across
     return None
 
 

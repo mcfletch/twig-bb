@@ -20,8 +20,8 @@ from omi_physics.world import PhysicsWorld
 
 from OpenGLContext.scenegraph.box import Box
 
-from twig_bb import (arena, art, avatar, bots, game, match as matchmod,
-                        walkers, weapons)
+from twig_bb import (arena, art, avatar, bots, characters, game,
+                        match as matchmod, walkers, weapons)
 
 
 class FakeSpawn:
@@ -933,6 +933,25 @@ class TestBodiesDrawnAsFigures:
         assert float(bodies['bot1'].translation[1]) < -100.0
 
 
+class _Watching:
+    """A cast that records the motion it is handed and draws nothing."""
+
+    def __init__(self, seen):
+        self.seen = seen
+        self.facing = None
+
+    def face(self, id, wanted, dt):
+        self.facing = wanted
+        return (wanted, 0.0)
+
+    def update(self, id, motion, dt):
+        self.seen['motion'] = motion
+        return ('idle', None)
+
+    def subtree(self, id):
+        return None
+
+
 class TestWhatABodyIsSeenDoing:
     """The state the drawing reads, and where the rules keep it.
 
@@ -944,7 +963,6 @@ class TestWhatABodyIsSeenDoing:
     """
 
     def _armed(self, weapon='rifle'):
-        from twig_bb import characters
         found = started(bots=1)
         one = found.combatant('bot1')
         one.player.give(weapon)
@@ -957,16 +975,33 @@ class TestWhatABodyIsSeenDoing:
         found, cast, bodies = self._armed()
         seen = {}
 
-        class Watching:
-            def update(self, id, motion, dt):
-                seen['motion'] = motion
-                return ('idle', None)
-
-            def subtree(self, id):
-                return None
-
-        game.move_bodies(found, bodies, cast=Watching(), dt=0.1)
+        game.move_bodies(found, bodies, cast=_Watching(seen), dt=0.1)
         assert seen['motion'].weapon == 'rifle'
+
+    def test_a_body_eases_round_rather_than_snapping(self):
+        """A body that arrived the instant its owner decided reads as a glitch."""
+        found, cast, bodies = self._armed()
+        one = found.combatant('bot1')
+        one.facing = np.array([0.0, 0.0, -1.0])
+        game.move_bodies(found, bodies, cast=cast, dt=0.1)
+        one.facing = np.array([0.0, 0.0, 1.0])          # a half turn, at once
+        game.move_bodies(found, bodies, cast=cast, dt=0.05)
+        part = cast.of('bot1').facing
+        assert abs(float(part[2]) + 1.0) > 0.01, 'it moved'
+        assert float(part[2]) < 0.0, 'but not all the way'
+
+    def test_turning_on_the_spot_is_something_the_figure_knows(self):
+        found, cast, bodies = self._armed()
+        one = found.combatant('bot1')
+        one.facing = np.array([0.0, 0.0, -1.0])
+        game.move_bodies(found, bodies, cast=cast, dt=0.1)
+        one.facing = np.array([1.0, 0.0, 0.0])
+        seen = {}
+
+        watching = _Watching(seen)
+        watching.face = cast.face
+        game.move_bodies(found, bodies, cast=watching, dt=0.05)
+        assert abs(seen['motion'].turning) > characters.TURN_RATE
 
     def test_a_body_turns_to_where_it_is_looking(self):
         """Somebody standing still and shooting at you faces you."""
@@ -1018,16 +1053,8 @@ class TestWhatABodyIsSeenDoing:
         found, cast, bodies = self._armed()
         seen = {}
 
-        class Watching:
-            def update(self, id, motion, dt):
-                seen['motion'] = motion
-                return ('idle', None)
-
-            def subtree(self, id):
-                return None
-
         found.combatant('bot1').firing = 0.2
-        game.move_bodies(found, bodies, cast=Watching(), dt=0.05)
+        game.move_bodies(found, bodies, cast=_Watching(seen), dt=0.05)
         assert seen['motion'].firing
 
     def test_the_trigger_is_only_down_for_as_long_as_the_shot(self):
