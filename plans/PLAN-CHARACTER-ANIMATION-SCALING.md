@@ -1,10 +1,14 @@
 # Plan — scale animated characters to the hundreds
 
-**Status:** 🟡 Partial — the load path is fixed end to end: the engine decode and
-shared-document API landed (§2), the twig-bb `Cast` is wired to them (Task A), and
-the level load now runs off the render thread (Task B, level-granularity). The
-per-frame animation path (C1–C5) and the per-figure capsule→rig swap are designed
-here, not yet built.
+**Status:** 🟡 Partial — the load path is fixed end to end (§2, Tasks A and B at
+level granularity) and **the per-frame path is built** (C1–C5, 2026-08-19): see
+[openglcontext/plans/CHARACTER-SCALING.md](../../openglcontext/plans/CHARACTER-SCALING.md)
+for what landed and what it measures. On a 3060 Ti a figure went from **2.85 ms
+of processor time a frame to 0.016 ms** in a crowd of 250, and 250 figures from
+~9 fps to **50 fps**. **Left:** twig-bb's own `Cast` still updates its figures one
+at a time rather than through `Crowd`; the per-figure capsule→rig swap; mesh-level
+LOD (`*_lod1.glb` is still never chosen); and the clip blend itself, which is the
+last piece still on the processor.
 
 **Goal (engine-level).** A game built on OpenGLContext can put **hundreds of
 skinned, animated characters** on screen and animate them in parallel without the
@@ -161,21 +165,43 @@ docs (engine docs live in `openglcontext/docs/`, this plan and
 |---|---|---|---|
 | ~~**A**~~ ✅ | Wire `Cast` to `parse_gltf`: parse each distinct build once, pass `document=` to every figure of it | twig-bb `characters.py` | **Done.** `_parse_document` + `load(document=…)`; test `test_a_cast_parses_each_build_once`. |
 | **B** 🟡 | Reusable background-load facility; twig-bb figures load off-thread, capsule→rig swap | OpenGLContext + twig-bb | **Level load is off-thread**: `viewer.load_level`/`build_match` are GL-free and run on a worker via `OpenGLContext.viewer.asyncscene.AsyncSceneMixin`; `_applyLevel` mounts on the render thread; capture stays synchronous. Tests: `tests/test_level_load.py`. **Left:** per-figure capsule→rig swap so a figure appears the instant its own load posts, rather than with the level. |
-| **C1** | Character LOD + per-frame update budget; use `*_lod1.glb`; skip off-screen/distant | OpenGLContext.character | Biggest cheap win for crowds. |
-| **C2** | Dedupe pose evaluation by `(clip, quantised time)` | OpenGLContext.character.mixer | |
-| **C4** | GPU skinning vertex-shader path (+ CPU fallback) | OpenGLContext passes + pbrmesh | The scalability keystone. |
-| **C5** | Instanced skinned draw for same-build figures | OpenGLContext.passes.instancing | Depends on C4. |
-| **C3** | Batched/threaded CPU skin | OpenGLContext.pbrmesh | Only if C4 is delayed; interim headroom. |
+| **C1** 🟡 | Character LOD + per-frame update budget; use `*_lod1.glb`; skip off-screen/distant | OpenGLContext.character | **Update budget and per-figure rate done** — `Crowd.update(dt, budget=N)` and `Member.rate`, taken in turn so none is starved, clocks still running. **Left:** picking a coarser *mesh* by screen size. |
+| ~~**C2**~~ ✅ | Dedupe pose evaluation by `(clip, quantised time)` | OpenGLContext.character | **Done, better than proposed.** Rather than quantising time and hoping figures collide, `character/clip.py` regroups a clip so one search serves every channel sharing a time grid and a constant channel costs a lookup (157 of 171 channels in a run cycle), and `Crowd` samples one clip for every figure playing it at once — exact, not approximate, and it does not need two figures to be at the same moment. |
+| ~~**C4**~~ ✅ | GPU skinning vertex-shader path (+ CPU fallback) | OpenGLContext passes + pbrmesh | **Done.** `shaders/_skinning_inc.glsl` + a shared growable joint palette (`scenegraph/skinning.py`); the CPU deform stays as the reference and as the fallback, and the test is that a posed figure rendered each way comes out the same against a real driver. Went further: `character/gpuskeleton.py` composes the **skeletons and palettes** in compute shaders too, so the processor uploads a pose and reads nothing back. |
+| ~~**C5**~~ ✅ | Instanced skinned draw for same-build figures | OpenGLContext.passes.instancing | **Done.** Figures of a build share their rest-pose vertices, so they batch on content; each instance carries where its own joints start in the palette (attribute 14). Two fixes for every instanced draw fell out: a material's packed block is cached against its `_ubo_version`, and the material table groups by what a material *says* rather than by which object says it. |
+| ~~**C3**~~ | Batched/threaded CPU skin | OpenGLContext.pbrmesh | **Not needed** — C4 landed, so there is no CPU skin in the hot path to batch. |
 
-### Acceptance
-A **benchmark scene** (new, in `openglcontext/tests/` or `twig-bb/tools/`) of
-100 / 250 / 500 skinned characters, each animating, on both integrated (Intel
-UHD-class) and discrete GPUs. Target: interactive frame rate (≥ the auto-preset's
-60 fps goal — keep shadows; see the forest-demo preset work) at 250, and no load
-stall regardless of count. Record before/after per-frame `update` cost and draw
-count. The network machine runs the **full gltf conformance suite with blessed
-baselines** to prove none of C1–C5 shifted rendered output (the two known-flaky
-timing/IBL tests excepted — see `openglcontext/CLAUDE.md`).
+### Acceptance — where it stands
+
+The benchmark is `openglcontext/tests/helpers/_crowd_perf_harness.py`: a field
+of skinned figures, each on its own clock, rendered offscreen, reporting the
+frame split between animating them and drawing them. Measured on an **RTX 3060
+Ti** (fifty-seven bone rigs, ~4 000 skinned vertices, twenty-three clips each,
+every figure on screen):
+
+| Figures | Animation | Drawing | Frame |
+|---|---|---|---|
+| 100 | 2.5 ms | 4.9 ms | **134 fps** |
+| 250 | 4.0 ms | 16.2 ms | **50 fps** |
+| 500 | 7.7 ms | 20.5 ms | **36 fps** |
+
+The animation half is met with room to spare and is no longer what limits a
+crowd. **250 figures fall short of 60 fps on the drawing half**, and most of
+that is the GPU filling pixels rather than work the engine is doing: the
+processor-side cost of a 250-figure frame is 12 ms of the 20 (81 fps with the
+frame-end sync removed). Every figure in this benchmark is on screen and large,
+which is the worst case a crowd meets; mesh-level LOD (C1's remaining half) is
+what a real scene would use to close it, and is not built.
+
+The **full glTF conformance suite passes, all 314 views**, on both skinning
+paths — and now deterministically: see the capture/IBL note in
+`openglcontext/plans/CHARACTER-SCALING.md`. Three baselines were re-blessed
+because they recorded a half-adapted lighting state; that is a correction, not
+a waiver, and the CPU path fails against the old ones identically.
+
+Not measured: **integrated (Intel UHD-class) graphics**, which this machine has
+none of. The GL 3.3 fallbacks are exercised (`OPENGLCONTEXT_GPU_SKINNING=0`,
+`OPENGLCONTEXT_GPU_SKELETON=0`) but their *speed* on such a part is unknown.
 
 ### Constraints & non-negotiables
 - **Engine-first:** no capability a real game would want may live in twig-bb. If

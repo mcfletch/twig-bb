@@ -39,11 +39,31 @@ def test_bots_get_a_cast_of_drawn_figures():
     assert bundle.botGroup is not None
 
 
+def _a_supported_map():
+    """A map file this build can actually decode, or None.
+
+    The cache holds whatever has been downloaded into it, which includes maps
+    of formats twig-bb does not read; picking the first name off the disk tests
+    the loader against a file it was never meant to open.
+    """
+    import struct
+
+    from twig_bb import q3bsp
+
+    for path in sorted(glob.glob(os.path.expanduser(
+            '~/.config/OpenGLContext/twig-bb-maps/*/maps/*.bsp'))):
+        with open(path, 'rb') as handle:
+            header = handle.read(8)
+        if len(header) == 8 and header[:4] == b'IBSP' \
+                and struct.unpack('<i', header[4:])[0] == q3bsp.BSP_VERSION:
+            return path
+    return None
+
+
 def test_load_level_decodes_a_real_map_without_a_gl_context():
-    maps = glob.glob(os.path.expanduser(
-        '~/.config/OpenGLContext/twig-bb-maps/*/maps/*.bsp'))
-    if not maps:
+    found = _a_supported_map()
+    if found is None:
         pytest.skip('no map content available in this environment')
-    bundle = viewer.load_level(config(), weapons.default_table(), maps[0])
+    bundle = viewer.load_level(config(), weapons.default_table(), found)
     assert bundle.loaded is not None
     assert bundle.arena is not None

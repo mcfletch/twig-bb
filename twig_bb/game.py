@@ -608,7 +608,7 @@ def move_items(pickups: Any, bodies: List[Transform], now: float) -> None:
 
 def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
                 cast: Optional[Any] = None, walking: Optional[Any] = None,
-                dt: float = 0.0) -> None:
+                dt: float = 0.0, mode: Any = None) -> None:
     """Put each bot's body where the rules say it is, and play what it is doing.
 
     A dead bot is moved out of sight rather than removed, because editing the
@@ -653,6 +653,10 @@ def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
         if facing is not None:
             body.rotation = heading_rotation(facing,
                                              forward=charactersmod.FORWARD)
+    if cast is not None and hasattr(cast, 'pose'):
+        # Every figure has now said what it is playing; posing them is one run
+        # of arithmetic over the lot rather than one each.
+        cast.pose(dt, mode=mode)
 
 
 def _wanted_facing(one: Any, walker: Any) -> Optional[Tuple[float, ...]]:

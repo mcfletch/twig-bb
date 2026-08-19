@@ -390,6 +390,11 @@ class Character:
         #: Where the model for a weapon comes from; None for a figure that is
         #: never seen holding one.
         self.armoury = armoury
+        #: The crowd this figure is posed with, or None for a figure that
+        #: poses itself. A cast puts every figure of a build in one, so the
+        #: whole cast is posed by one run of arithmetic -- see
+        #: :class:`OpenGLContext.character.crowd.Crowd`.
+        self.crowd: Any = None
         self.locomotion = Locomotion()
         #: Which way the body is drawn facing, which lags where its owner is
         #: looking by however long the turn takes.
@@ -529,7 +534,10 @@ class Character:
                 fade, self.QUICK_FADE if arms.startswith('fire_') else self.FADE))
         elif upper.tracks:
             upper.stop(fade=self.FADE)
-        self.model.update(dt)
+        if self.crowd is None:
+            # In a cast the figures are posed together, once, after every one
+            # of them has said what it is playing -- see Cast.pose.
+            self.model.update(dt)
 
     def available(self, movement: str) -> Optional[str]:
         """The clip to play for ``movement``, following the fallbacks.
@@ -624,6 +632,13 @@ class Cast:
     it is parsed once into a :class:`~OpenGLContext.loaders.gltf.SharedDocument`
     and its immutable vertex and animation data are held in common, so a bigger
     cast costs more posing but not more parsing.
+
+    **And the posing is shared too.** The figures of a build go into one
+    :class:`~OpenGLContext.character.crowd.Crowd`, so a frame poses all of them
+    in one run over arrays rather than once each: on a few dozen joints almost
+    all of what the arithmetic costs is setting it up. Each figure still says
+    for itself what it is playing (:meth:`update`); :meth:`pose` is what turns
+    all of that into skeletons, and it is called once, after.
     """
 
     def __init__(self, ids: Any, builds: Any = BUILDS,
@@ -633,6 +648,9 @@ class Cast:
         #: match however many people are carrying one.
         self.armoury = armoury
         self.figures: Dict[str, Character] = {}
+        #: One crowd per build: a crowd holds figures of one document, so that
+        #: a joint means the same joint in all of them.
+        self.crowds: Dict[str, Any] = {}
         documents: Dict[str, Any] = {}      # build name -> its parse, done once
         for index, id in enumerate(ids):
             name = chosen[index % len(chosen)]
@@ -641,7 +659,19 @@ class Cast:
             figure = load(name, group=None if fallback is None else fallback(),
                           document=documents[name])
             figure.armoury = armoury
+            self._enlist(name, figure)
             self.figures[id] = figure
+
+    def _enlist(self, build: str, figure: Character) -> None:
+        """Put a figure in its build's crowd, where it has a model to pose."""
+        if figure.model is None:
+            return
+        crowd = self.crowds.get(build)
+        if crowd is None:
+            from OpenGLContext.character.crowd import Crowd
+            crowd = self.crowds[build] = Crowd()
+        crowd.add(figure.model)
+        figure.crowd = crowd
 
     def __len__(self) -> int:
         return len(self.figures)
@@ -667,3 +697,15 @@ class Cast:
         """Turn one figure towards ``wanted`` -- see :meth:`Character.face`."""
         figure = self.figures.get(id)
         return (None, 0.0) if figure is None else figure.face(wanted, dt)
+
+    def pose(self, dt: float, mode: Any = None,
+             budget: Optional[int] = None) -> None:
+        """Pose the whole cast, once, after every figure has chosen its clips.
+
+        ``mode`` is the rendering context, which is what lets the skeletons and
+        joint palettes be composed on the GPU; without it the same arithmetic
+        runs in numpy. ``budget`` caps how many figures are brought up to date
+        this frame, taken in turn so none is starved.
+        """
+        for crowd in self.crowds.values():
+            crowd.update(dt, budget=budget, mode=mode)

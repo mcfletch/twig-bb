@@ -94,3 +94,66 @@ class TestABotHoldingItsWeapon:
         for one in ids[1:]:
             cast.of(one).drop()
         assert _lit(render(scene)) < three
+
+
+class TestTheCastIsPosedTogether:
+    """A cast poses its figures in one run, not one each.
+
+    What a figure plays is still its own decision; turning all of those
+    decisions into skeletons is one pass over
+    :class:`~OpenGLContext.character.crowd.Crowd`, which is what lets a room of
+    them cost about what one of them used to.
+    """
+
+    IDS = ['bot0', 'bot1', 'bot2', 'bot3']
+
+    def _cast(self):
+        from twig_bb import characters as charactersmod
+        return charactersmod.Cast(self.IDS)
+
+    def test_figures_of_a_build_share_one_crowd(self):
+        cast = self._cast()
+
+        assert cast.crowds, 'a cast with figures should have crowds'
+        assert sum(len(crowd) for crowd in cast.crowds.values()) == len(self.IDS)
+        for one in self.IDS:
+            assert cast.of(one).crowd is not None
+
+    def test_a_figure_updated_alone_is_not_posed_until_the_cast_is(self):
+        """Updating says what to play; posing is what moves the joints."""
+        from twig_bb import characters as charactersmod
+
+        cast = self._cast()
+        figure = cast.of('bot0')
+        rig = figure.model.mixer.rig
+        cast.update('bot0', charactersmod.Motion(speed=4.0), 1 / 60.0)
+        settled = [tuple(x.rotation) for x in rig.transforms]
+
+        cast.update('bot0', charactersmod.Motion(speed=4.0), 1 / 60.0)
+        assert [tuple(x.rotation) for x in rig.transforms] == settled
+
+        cast.pose(1 / 60.0)
+        assert [tuple(x.rotation) for x in rig.transforms] != settled
+
+    def test_posing_the_cast_moves_every_figure_and_skins_it(self):
+        import numpy as np
+        from twig_bb import characters as charactersmod
+
+        cast = self._cast()
+        rigs = [cast.of(one).model.mixer.rig for one in self.IDS]
+        before = [np.array([list(x.rotation) for x in rig.transforms])
+                  for rig in rigs]
+
+        for _ in range(24):
+            for one in self.IDS:
+                cast.update(one, charactersmod.Motion(speed=4.0, weapon='rifle'),
+                            1 / 60.0)
+            cast.pose(1 / 60.0)
+
+        for rig, rest in zip(rigs, before, strict=True):
+            posed = np.array([list(x.rotation) for x in rig.transforms])
+            assert (np.abs(posed - rest).max(axis=1) > 1e-6).sum() > 10
+        for one in self.IDS:
+            model = cast.of(one).model
+            assert all(mesh._skin_matrices is not None
+                       for skin in model.mixer.skins for mesh in skin.meshes)
