@@ -518,6 +518,17 @@ by `move_bodies`. Movement is chosen in the body's own frame -- `walk_back` and
 the two sidesteps are new clips -- and played at the speed the body is really
 going. `twig-bb-bots` is the review harness the lot was judged in.
 
+**Loading and animation scale to the hundreds (2026-08-19).** Drawing combatants
+as skinned rigs made the map load feel frozen (~2.9 s per rig, almost all of it
+`pygltflib`'s JSON decode) and roughly halved the frame rate (~6.7 ms per figure
+per frame of CPU skinning). The load half is fixed in the engine — a fast glTF
+decoder (~19× on a character) and a `parse_gltf`/`SharedDocument` API so a cast of
+one build parses and holds its vertex/keyframe data once. The per-frame half —
+LOD and an update budget, GPU skinning, instanced skinned draws, off-thread
+loading — is designed for a network-connected machine to build, with the goal of
+**hundreds of animated characters at frame rate**. See
+[plans/PLAN-CHARACTER-ANIMATION-SCALING.md](plans/PLAN-CHARACTER-ANIMATION-SCALING.md).
+
 **What remains of this phase:** the artist brief for §7's weapons and §13's
 sounds is unwritten, and a figure's accent colour is paint on its texture
 rather than something a match changes at runtime -- a per-team colour is a
