@@ -107,7 +107,7 @@ class TestWeaponClip:
     def test_a_weapon_nothing_knows_about(self):
         assert characters.weapon_clip(moving(weapon='harpoon')) == 'hold_rifle'
 
-    def test_the_dead_hold_nothing(self):
+    def test_the_dead_aim_nothing(self):
         assert characters.weapon_clip(moving(weapon='rifle', dead=True)) is None
 
 
@@ -182,6 +182,9 @@ class _Model:
     def update(self, dt):
         self.updated += dt
 
+    def reset(self):
+        self.played = []
+
     def attach(self, point, node):
         if point != 'grip':
             return None
@@ -211,9 +214,18 @@ class TestCharacter:
 
     def test_a_shot_fades_in_faster_than_a_stance(self):
         figure = characters.Character(_Model())
+        figure.update(moving(weapon='rifle'), 0.1)      # the first pose snaps
         figure.update(moving(weapon='rifle', firing=True), 0.1)
         fade = figure.model.layers['upper'].played[-1][1]['fade']
         assert fade == characters.Character.QUICK_FADE
+
+    def test_the_first_pose_after_a_reset_snaps(self):
+        """What a fade would blend from is the rest pose, which is a T-pose."""
+        figure = characters.Character(_Model())
+        figure.update(moving(), 0.1)
+        assert figure.model.played[-1][1]['fade'] == 0.0
+        figure.update(moving(speed=6.0), 0.1)
+        assert figure.model.played[-1][1]['fade'] == characters.Character.FADE
 
     def test_putting_the_weapon_away_stops_the_upper_layer(self):
         figure = characters.Character(_Model())
@@ -345,12 +357,14 @@ class TestCarrying:
             figure.update(moving(weapon='rifle'), 0.1)
         assert armoury.asked == ['rifle']
 
-    def test_the_dead_let_go(self):
+    def test_the_dead_keep_hold_of_it(self):
+        """A weapon that blinks out on the frame somebody dies reads as a bug."""
         armoury = _Armoury()
         figure = characters.Character(_Model(), armoury=armoury)
         figure.update(moving(weapon='rifle'), 0.1)
         figure.update(moving(weapon='rifle', dead=True), 0.1)
-        assert figure.holding is None and figure.model.attached == []
+        assert figure.holding == 'rifle'
+        assert figure.model.attached == [armoury.models['rifle']]
 
     def test_empty_handed_stays_empty(self):
         figure = characters.Character(_Model(), armoury=_Armoury())
@@ -366,6 +380,26 @@ class TestCarrying:
         figure = characters.Character(_Model())
         assert figure.update(moving(weapon='rifle'), 0.1) == ('idle', 'hold_rifle')
         assert figure.holding is None
+
+
+class TestComingBack:
+    """A respawn, which is the one thing that clears a latched death."""
+
+    def test_a_respawned_body_stops_playing_dead(self):
+        figure = characters.Character(_Model())
+        figure.update(moving(dead=True), 0.1)
+        assert figure.update(moving(speed=6.0), 0.1)[0] == 'run'
+
+    def test_it_snaps_rather_than_easing_out_of_dying(self):
+        figure = characters.Character(_Model())
+        figure.update(moving(dead=True), 0.1)
+        figure.update(moving(), 0.1)
+        assert figure.model.played[-1][1]['fade'] == 0.0
+
+    def test_being_dead_twice_over_is_not_a_respawn(self):
+        figure = characters.Character(_Model())
+        figure.update(moving(dead=True), 0.1)
+        assert figure.update(moving(dead=True, speed=6.0), 0.1)[0] == 'die'
 
 
 class TestArmoury:
@@ -412,5 +446,7 @@ class TestACastThatIsArmed:
         assert figure.holding == 'rifle'
         grip = figure.model.point('grip')
         assert figure._held in list(grip.children)
+        # And keeps hold of it when it dies: a weapon that vanishes on the
+        # frame somebody is shot is the one thing a player would call a bug.
         cast.update('a', moving(weapon='rifle', dead=True), 0.1)
-        assert figure.holding is None and figure._held not in list(grip.children)
+        assert figure.holding == 'rifle' and figure._held in list(grip.children)

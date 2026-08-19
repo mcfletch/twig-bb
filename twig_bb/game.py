@@ -62,6 +62,12 @@ BODY_RADIUS = combat.BODY_RADIUS
 #: From the feet up to the eyes.  What a camera is bound to, given a body.
 EYE_OFFSET = np.array([0.0, combat.EYE_HEIGHT, 0.0])
 
+#: How long a shot is shown for, in seconds.  Pulling a trigger is an instant
+#: and a firing animation is not, so the moment is held: long enough that a
+#: single shot is seen at all, short enough that it is not mistaken for a
+#: burst.  Read by :func:`move_bodies` off :attr:`Combatant.firing`.
+SHOT_SHOWN = 0.28
+
 #: How near the *best* spawn point a point has to be, as a fraction of its
 #: clear space, to be worth arriving at.  Below one there is variety and at
 #: one there is exactly one answer -- which is what let a player stand still
@@ -220,7 +226,12 @@ def _apply(world: Any, match: arenamod.Arena, one: Any, command: Any,
            surfaces: Optional[Any] = None,
            flight: Optional[Any] = None,
            walking: Optional[Any] = None) -> None:
-    """Turn one bot's command into movement and shots."""
+    """Turn one bot's command into movement, shots and a direction to face."""
+    # Where a bot is looking is part of what it decided, and the only record of
+    # it that outlives the tick: its mind is the AI's business, its facing is
+    # the match's, and what draws a body reads the match.
+    if command.aim is not None:
+        one.facing = np.asarray(command.aim, dtype='d')
     if walking is not None:
         # Every tick, whether or not it wanted to move: gravity, a slope and
         # whatever a burst threw it with do not wait for a decision.
@@ -234,6 +245,7 @@ def _apply(world: Any, match: arenamod.Arena, one: Any, command: Any,
         # `Bot._chosen`), so this bites only once it has emptied everything.
         if chosen is None or not one.player.spend(chosen):
             return
+        one.firing = SHOT_SHOWN
         shoot(world, match, one.id, chosen,
               origin=one.position + EYE_OFFSET,
               direction=command.aim, spread=float(chosen.restSpread),
@@ -452,17 +464,17 @@ def heading_rotation(direction: Sequence[float],
     if length == 0.0:
         return (0.0, 1.0, 0.0, 0.0)
     heading = heading / length
-    forward = np.asarray(forward, dtype=float)
-    axis = np.cross(forward, heading)
+    facing = np.asarray(forward, dtype=float)
+    axis = np.cross(facing, heading)
     angle = math.atan2(float(np.linalg.norm(axis)),
-                       float(np.dot(forward, heading)))
+                       float(np.dot(facing, heading)))
     if float(np.linalg.norm(axis)) < 1e-9:
         if angle < 1e-9:                    # already facing that way
             return (0.0, 1.0, 0.0, 0.0)
         # Straight backwards: every axis across the model turns it equally, so
         # one has to be picked rather than derived.
-        across = (1.0, 0.0, 0.0) if abs(forward[0]) < 0.9 else (0.0, 1.0, 0.0)
-        axis = np.cross(forward, np.asarray(across, dtype=float))
+        across = (1.0, 0.0, 0.0) if abs(facing[0]) < 0.9 else (0.0, 1.0, 0.0)
+        axis = np.cross(facing, np.asarray(across, dtype=float))
     axis = axis / float(np.linalg.norm(axis))
     return (float(axis[0]), float(axis[1]), float(axis[2]), float(angle))
 
@@ -618,14 +630,39 @@ def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
         if cast is None:
             continue
         walker = None if walking is None else walking.of(id)
+        # **Everything the drawing reads comes from the rules' own record.**
+        # What is in somebody's hands is what they selected; whether the
+        # trigger is down is a moment the rules noticed and held on to.
+        shooting = float(getattr(one, 'firing', 0.0) or 0.0)
+        one.firing = max(0.0, shooting - max(0.0, float(dt)))
         motion = charactersmod.motion_of(
-            walker, weapon=str(getattr(one, 'weapon', '') or ''),
-            dead=not one.alive)
+            walker, weapon=str(one.player.selected or ''),
+            firing=shooting > 0.0, dead=not one.alive,
+            facing=getattr(one, 'facing', None))
         cast.update(id, motion, dt)
-        if motion.speed >= charactersmod.WALK_SPEED and walker is not None:
-            body.rotation = heading_rotation(
-                (walker.velocity[0], 0.0, walker.velocity[2]),
-                forward=charactersmod.FORWARD)
+        turn = _facing_of(one, walker, motion)
+        if turn is not None:
+            body.rotation = heading_rotation(turn, forward=charactersmod.FORWARD)
+
+
+def _facing_of(one: Any, walker: Any, motion: Any) -> Optional[Tuple[float, ...]]:
+    """Which way to turn a body, or None to leave it as it is.
+
+    **Where somebody is looking beats where they are going.** A combatant with
+    something in view faces it, whether they are standing, backing off or
+    sidestepping across you -- which is what makes a figure shooting at you
+    look like it is shooting at you, and what the directional walk cycles are
+    for. With nothing in view there is nothing to face but the way they are
+    walking, and a body going nowhere at all is left alone rather than snapped
+    to some default.
+    """
+    facing = getattr(one, 'facing', None)
+    if facing is not None and float(np.linalg.norm(np.asarray(facing[:3],
+                                                              dtype=float))):
+        return (float(facing[0]), 0.0, float(facing[2]))
+    if walker is not None and motion.speed >= charactersmod.WALK_SPEED:
+        return (float(walker.velocity[0]), 0.0, float(walker.velocity[2]))
+    return None
 
 
 def messages(events: Sequence[Any], match: arenamod.Arena) -> List[str]:

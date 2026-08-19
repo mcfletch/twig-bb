@@ -1056,6 +1056,25 @@ single instanced draw rather than one per bot.
 A figure that will not load leaves the body drawn as a plain capsule and the
 match carries on: the rules decide a match, not the art.
 
+**Which way it is going decides what it plays**, in its own frame rather than
+the world's: a bot backing away from you while it shoots plays a backward walk,
+and one crossing in front of you sidesteps. Cycles play at the rate the body is
+really travelling, so feet stay on the ground instead of skating. And a body
+turns to face **where it is looking** before where it is going, which is what
+makes somebody shooting at you look like they are shooting at you.
+
+**Watching it out of the game.** `twig-bb-bots` puts one bot in front of a
+camera, scripts what the rules would be saying about it -- walking, backing
+off, sidestepping, turning onto a target, being shot -- and lays the frames out
+as contact sheets with an index page. It drives the same `move_bodies` the
+match calls, so what lands on the sheet is what a player sees, and it is how
+every one of these was judged:
+
+```bash
+twig-bb-bots --out sheets/
+twig-bb-bots --out sheets/ --weapon pistol --takes firing,turn-and-shoot
+```
+
 **Authoring your own.** [CHARACTER-RIG.md](CHARACTER-RIG.md) is the contract --
 the skeleton's bone names, the clip names, the attachment points, the materials
 and the budget. Anything that satisfies it is a character here, and swapping one

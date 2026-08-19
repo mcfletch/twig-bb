@@ -1,32 +1,28 @@
-"""What a combatant's body is doing, and the clip that shows it.
+"""What a combatant's body is doing, and which clip shows it.
 
-A body in a match is three things that have to agree: the capsule it *walks*
-in (:mod:`twig_bb.walkers`), the capsule a shot *meets*
-(:mod:`twig_bb.avatar`), and the figure it is *drawn* as. This is the third,
-and the only part of it that is a rule of this game rather than machinery:
-which of the rig's clips a body is playing, given what the rules already know
-about it.
+The rules already know how fast somebody is going, which way they are looking,
+what they are carrying and whether they are dead. This is the *reading* of that
+-- a state machine over what is known rather than a second copy of it -- and
+what comes out is the clip a figure plays and the weapon in its hand.
 
-**The engine plays; this decides.** Blending one clip into the next, layering
-the arms over the legs and hanging a weapon on a hand are
-:mod:`OpenGLContext.character`'s job and would be the same in any game. What
-is ours is the vocabulary -- ``idle`` / ``walk`` / ``run`` / ``jump`` /
-``fall`` / ``land`` / ``die`` / ``turn_left`` / ``turn_right``, and
-``hold_`` / ``aim_`` / ``fire_`` per weapon -- and the thresholds a body
-crosses between them. Both are written down in
-[CHARACTER-RIG.md](../CHARACTER-RIG.md), which is what a
-contributor authoring a character makes their model satisfy.
+Three things it decides that a viewer notices immediately when they are wrong:
 
-**Two layers, because a body does two things at once.** The legs run while the
-arms fire, so the movement clip plays over the whole body and the weapon clip
-plays over an ``upper`` layer masked to the spine and everything above it. A
-figure that stopped running to pull its trigger would read as a game that
-cannot chew gum and walk.
+* **Which way the body is travelling, in its own frame.** The same three metres
+  a second is a walk, a backward walk or a sidestep depending on where the
+  walker is *looking*, and a figure that ran forwards while it moved backwards
+  is the first thing anybody sees.
+* **How fast the cycle plays.** A walk authored at one speed and played at
+  another is a figure skating; scaling it by the speed the body is really going
+  is what pins the feet down.
+* **What is in the hand.** Followed every frame from what the rules say is
+  carried, so picking a different weapon up needs no event -- and kept when
+  somebody dies, because a weapon that blinks out on the frame they are shot
+  reads as a bug.
 
-**No art is not an error.** :func:`load` gives back a body drawn as a plain
-capsule when a model will not resolve, and everything above still runs -- the
-state machine is data, and a match is decided by rules rather than by whether
-a ``.glb`` was there.
+Nothing here draws anything or touches a scenegraph: :class:`Character` is
+handed a model and asks it for clips, and :class:`Cast` holds one per
+combatant. ``twig-bb-bots`` (:mod:`twig_bb.botreview`) plays the whole of it in
+front of a camera, out of the game, which is how it is reviewed.
 """
 
 from __future__ import annotations
@@ -35,7 +31,9 @@ import logging
 import math
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
+
+import numpy as np
 
 from . import art
 
@@ -45,6 +43,7 @@ __all__ = [
     'Motion', 'Locomotion', 'Character', 'Cast', 'Armoury',
     'WALK_SPEED', 'RUN_SPEED', 'TURN_RATE', 'LAND_TIME',
     'MOVEMENT', 'ONE_SHOTS', 'WEAPON_FAMILY', 'AIMED', 'FORWARD', 'BUILDS',
+    'MOVEMENT_FALLBACK', 'CLIP_SPEED', 'heading_in',
     'motion_of', 'weapon_clip', 'load',
 ]
 
@@ -64,8 +63,8 @@ CHARACTERS = 'characters'
 #: rather than looping. A one-shot is held on its last frame when it runs out,
 #: which is what makes ``die`` a body left on the floor rather than one that
 #: springs up and dies again.
-MOVEMENT = ('idle', 'walk', 'run', 'jump', 'fall', 'land', 'die',
-            'turn_left', 'turn_right')
+MOVEMENT = ('idle', 'walk', 'run', 'walk_back', 'strafe_left', 'strafe_right',
+            'jump', 'fall', 'land', 'die', 'turn_left', 'turn_right')
 ONE_SHOTS = frozenset({'jump', 'land', 'die'})
 
 #: Metres a second below which somebody is standing still, and above which
@@ -92,6 +91,28 @@ WEAPON_FAMILY: Dict[str, str] = {
     'rocket': 'rocket',
     'grenade': 'rocket',
 }
+
+#: What to play instead, for a figure that has not got the clip its motion
+#: asked for. A model authored before the directional cycles existed still
+#: walks -- forwards, which is wrong, but a body that freezes because a clip is
+#: missing is worse and the contract says a missing clip is not an error.
+MOVEMENT_FALLBACK: Dict[str, str] = {
+    'walk_back': 'walk', 'strafe_left': 'walk', 'strafe_right': 'walk',
+    'run': 'walk',
+}
+
+#: How fast each movement clip is authored to travel, in metres a second, so a
+#: cycle can be played at the rate the body is actually going and its feet stay
+#: on the ground instead of sliding over it.
+CLIP_SPEED: Dict[str, float] = {
+    'walk': WALK_SPEED, 'run': RUN_SPEED,
+    'walk_back': WALK_SPEED, 'strafe_left': WALK_SPEED,
+    'strafe_right': WALK_SPEED,
+}
+
+#: How far a clip's rate may be pushed either way before it reads as a figure
+#: in fast-forward rather than one hurrying.
+RATE_RANGE = (0.55, 2.1)
 
 #: The stance a weapon nothing knows about is held in.
 DEFAULT_FAMILY = 'rifle'
@@ -125,21 +146,63 @@ class Motion:
     firing: bool = False
     aiming: bool = False
     dead: bool = False
+    #: Which way the body is moving **in its own frame**: how much of the
+    #: movement is across it and how much along it, as a unit pair, with
+    #: ``across`` positive to the body's right. Straight ahead by default,
+    #: which is what a body with nothing in view is doing by definition -- it
+    #: faces the way it walks.
+    #:
+    #: This is what tells a walk from a backward walk from a sidestep. Without
+    #: it a figure backing away from you runs at you while travelling
+    #: backwards, which is the single most obvious thing wrong with a bot.
+    direction: Tuple[float, float] = (0.0, 1.0)
 
 
-def motion_of(walker: Any, weapon: str = '', **named: Any) -> Motion:
+def motion_of(walker: Any, weapon: str = '', facing: Any = None,
+              **named: Any) -> Motion:
     """Read a :class:`~omi_physics.character.CharacterController` as a Motion.
 
     A body the physics has not been given yet -- a bot before its first tick,
     a match assembled without a world -- reads as standing still rather than
     as an error, because that is what it looks like.
+
+    ``facing`` is the world direction the body is pointed, which is what turns
+    a velocity into a *direction*: the same three metres a second is a walk, a
+    backward walk or a sidestep depending on where the walker is looking, and
+    only the caller knows that.
     """
-    velocity = getattr(walker, 'velocity', None) or (0.0, 0.0, 0.0)
+    velocity = getattr(walker, 'velocity', None)
+    if velocity is None:
+        velocity = (0.0, 0.0, 0.0)
     x, y, z = (float(velocity[0]), float(velocity[1]), float(velocity[2]))
-    return Motion(speed=math.hypot(x, z),
+    speed = math.hypot(x, z)
+    return Motion(speed=speed,
                   grounded=bool(getattr(walker, 'grounded', True)),
                   rising=y > 0.1 and not getattr(walker, 'grounded', True),
-                  weapon=weapon, **named)
+                  weapon=weapon, direction=heading_in((x, z), facing, speed),
+                  **named)
+
+
+def heading_in(velocity: Tuple[float, float], facing: Any,
+               speed: float) -> Tuple[float, float]:
+    """Movement in the body's own frame, as ``(across, along)``.
+
+    ``across`` is positive to the body's right. A body with nowhere to be, or
+    with nothing to face, is walking straight ahead: that is what a figure with
+    no target does, since it turns to face where it is going.
+    """
+    if speed < 1e-6 or facing is None:
+        return (0.0, 1.0)
+    forward = np.asarray((float(facing[0]), float(facing[2])), dtype='d')
+    length = float(np.linalg.norm(forward))
+    if length < 1e-9:
+        return (0.0, 1.0)
+    forward = forward / length
+    moving = np.asarray(velocity, dtype='d') / speed
+    # The figure faces +Z in its own frame with its right hand towards -X, so
+    # its right in the world is (-forward_z, forward_x).
+    right = np.array([-forward[1], forward[0]])
+    return (float(np.dot(moving, right)), float(np.dot(moving, forward)))
 
 
 class Locomotion:
@@ -178,13 +241,31 @@ class Locomotion:
             self.landing -= max(0.0, float(dt))
             if self.landing > 0.0:
                 return 'land'
-        if motion.speed >= RUN_SPEED:
-            return 'run'
         if motion.speed >= WALK_SPEED:
-            return 'walk'
+            return self.travelling(motion)
         if abs(motion.turning) >= TURN_RATE:
             return 'turn_left' if motion.turning > 0 else 'turn_right'
         return 'idle'
+
+    @staticmethod
+    def travelling(motion: Motion) -> str:
+        """Which way a body on the move is going, in its own frame.
+
+        Decided by whichever of across and along is the larger, so there is no
+        threshold to sit on the edge of and flicker across: a body going
+        forwards and slightly right walks forwards, and one going right and
+        slightly forwards sidesteps.
+
+        Only *forwards* tells a walk from a run. A body backing off or
+        sidestepping at speed is playing the same shape faster, which is what
+        the clip's own rate is for -- see :meth:`Character._play`.
+        """
+        across, along = motion.direction
+        if abs(along) >= abs(across):
+            if along < 0.0:
+                return 'walk_back'
+            return 'run' if motion.speed >= RUN_SPEED else 'walk'
+        return 'strafe_right' if across > 0.0 else 'strafe_left'
 
 
 def weapon_clip(motion: Motion) -> Optional[str]:
@@ -263,6 +344,15 @@ class Character:
     #: The layer the weapon clips play on, over the movement underneath.
     UPPER = 'upper'
 
+    #: What that layer is allowed to move: the arms, and nothing else.
+    #:
+    #: **Not the spine.** A weapon stance that owned the whole upper body would
+    #: take the run's lean and the walk's counter-rotation with it, and a
+    #: figure sprinting with a rifle would run bolt upright like a waiter. The
+    #: arms are the part that has to stop swinging and hold something; the back
+    #: is still doing what the legs are doing.
+    ARMS = ('leftShoulder', 'rightShoulder')
+
     def __init__(self, model: Any = None, group: Any = None,
                  armoury: Any = None) -> None:
         self.model = model
@@ -274,7 +364,13 @@ class Character:
         self.locomotion = Locomotion()
         self.holding: Optional[str] = None
         self._held: Any = None
-        self._upper_mask = frozenset() if model is None else model.mask('spine')
+        #: Whether the next clip should snap in rather than blend. True after
+        #: a reset, because what a fade would blend *from* is the rest pose --
+        #: and a body that comes back alive out of a T-pose is worse than the
+        #: cut it was trying to avoid.
+        self._fresh = True
+        self._upper_mask = (frozenset() if model is None
+                            else model.mask(*self.ARMS))
 
     # -- what it is holding -----------------------------------------------
     def hold(self, weapon: str, node: Any) -> bool:
@@ -290,6 +386,20 @@ class Character:
             return False
         self.holding, self._held = weapon, node
         return True
+
+    def reset(self) -> None:
+        """Start over: nothing played, nothing held, nothing remembered.
+
+        What a respawn needs. A body that comes back alive must not ease out of
+        dying, and :class:`Locomotion` latches death on purpose -- so a figure
+        that is not put back stays on the floor for the rest of the match while
+        it walks about.
+        """
+        self.locomotion.reset()
+        self.drop()
+        self._fresh = True
+        if self.model is not None:
+            self.model.reset()
 
     def drop(self) -> None:
         """Take whatever is in the weapon hand out of it."""
@@ -322,32 +432,76 @@ class Character:
         Returned rather than only applied so a test, and the developer
         overlay, can see what a body decided without a window.
         """
+        # **Coming back from the dead is a reset.** Death latches, on purpose,
+        # so that a body stays down; nothing else clears it, and a figure that
+        # respawned without this would walk the rest of the match lying on its
+        # face. Alive again, after having been dead, is exactly a respawn.
+        if self.locomotion.dead and not motion.dead:
+            self.reset()
         movement = self.locomotion.update(motion, dt)
         arms = weapon_clip(motion)
-        # What is in the hand follows the clip rather than the rules directly,
-        # so the one thing that decides a figure is empty-handed decides it
-        # once: a body playing no weapon clip is holding nothing, which is what
-        # takes the rifle out of a dead man's hand.
-        self.carry(motion.weapon if arms else '')
+        # **The dead keep what they were holding.** They stop *aiming* it --
+        # that is what `weapon_clip` answering None means -- but a weapon that
+        # blinks out of existence on the frame somebody is shot is the one
+        # thing here a player would call a bug outright.
+        self.carry(motion.weapon)
         if self.model is not None:
-            self._play(movement, arms, dt)
+            self._play(movement, arms, dt, speed=motion.speed)
         return (movement, arms)
 
-    def _play(self, movement: str, arms: Optional[str], dt: float) -> None:
+    def _play(self, movement: str, arms: Optional[str], dt: float,
+              speed: float = 0.0) -> None:
         clips = self.model.clips
-        if movement in clips:
-            self.model.play(movement, fade=self.FADE,
-                            loop=movement not in ONE_SHOTS)
+        fade = 0.0 if self._fresh else self.FADE
+        chosen = self.available(movement)
+        if chosen is not None:
+            self.model.play(chosen, fade=fade, loop=chosen not in ONE_SHOTS,
+                            speed=self.rate(chosen, speed))
+        self._fresh = False
         upper = self.model.layer(self.UPPER, mask=self._upper_mask)
         if arms and arms in clips:
             # A shot is a one-shot over the carry it returns to, and it is
             # faded in quickly: a recoil that eases in over a sixth of a second
             # is a recoil nobody connects to the trigger.
-            fade = self.QUICK_FADE if arms.startswith('fire_') else self.FADE
-            upper.play(arms, fade=fade, loop=not arms.startswith('fire_'))
+            upper.play(arms, loop=not arms.startswith('fire_'), fade=min(
+                fade, self.QUICK_FADE if arms.startswith('fire_') else self.FADE))
         elif upper.tracks:
             upper.stop(fade=self.FADE)
         self.model.update(dt)
+
+    def available(self, movement: str) -> Optional[str]:
+        """The clip to play for ``movement``, following the fallbacks.
+
+        A figure authored before the directional cycles existed has no
+        ``walk_back``; it walks forwards, which is wrong but is a great deal
+        better than standing still while it travels.
+        """
+        clips = self.model.clips
+        seen = set()
+        name: Optional[str] = movement
+        while name is not None and name not in seen:
+            if name in clips:
+                return name
+            seen.add(name)
+            name = MOVEMENT_FALLBACK.get(name)
+        return None
+
+    @staticmethod
+    def rate(clip: str, speed: float) -> float:
+        """How fast to play a cycle, so its feet keep up with the body.
+
+        A walk cycle authored at one speed and played at another is a figure
+        skating: the feet plant and then slide, which reads as ice rather than
+        as ground. Scaling the clip's own rate by how fast the body is really
+        going is what pins them. Bounded either way, because a cycle at three
+        times its rate is a figure in fast-forward and one at a third is a
+        figure wading.
+        """
+        nominal = CLIP_SPEED.get(clip)
+        if not nominal or speed <= 0.0:
+            return 1.0
+        low, high = RATE_RANGE
+        return max(low, min(high, float(speed) / nominal))
 
 
 def load(name: str, group: Any = None) -> Character:

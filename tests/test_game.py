@@ -931,3 +931,108 @@ class TestBodiesDrawnAsFigures:
         one.dead_for = 0.0
         game.move_bodies(found, bodies)
         assert float(bodies['bot1'].translation[1]) < -100.0
+
+
+class TestWhatABodyIsSeenDoing:
+    """The state the drawing reads, and where the rules keep it.
+
+    A figure plays what `twig_bb.characters` decides, and that decision is only
+    as good as what it is told. Every one of these is a thing a player watches
+    for and none of them was reaching the figure: the weapon in somebody's
+    hands, the direction they are pointing it, and the moment they pull the
+    trigger.
+    """
+
+    def _armed(self, weapon='rifle'):
+        from twig_bb import characters
+        found = started(bots=1)
+        one = found.combatant('bot1')
+        one.player.give(weapon)
+        one.player.selected = weapon
+        cast = characters.Cast([one.id for one in found.bots()])
+        _group, bodies = game.bot_bodies(found, cast=cast)
+        return found, cast, bodies
+
+    def test_the_motion_carries_the_selected_weapon(self):
+        found, cast, bodies = self._armed()
+        seen = {}
+
+        class Watching:
+            def update(self, id, motion, dt):
+                seen['motion'] = motion
+                return ('idle', None)
+
+            def subtree(self, id):
+                return None
+
+        game.move_bodies(found, bodies, cast=Watching(), dt=0.1)
+        assert seen['motion'].weapon == 'rifle'
+
+    def test_a_body_turns_to_where_it_is_looking(self):
+        """Somebody standing still and shooting at you faces you."""
+        found, cast, bodies = self._armed()
+        one = found.combatant('bot1')
+        one.facing = np.array([1.0, 0.0, 0.0])
+        game.move_bodies(found, bodies, cast=cast, dt=0.1)
+        turned = tuple(bodies['bot1'].rotation)
+        one.facing = np.array([0.0, 0.0, 1.0])
+        game.move_bodies(found, bodies, cast=cast, dt=0.1)
+        assert tuple(bodies['bot1'].rotation) != turned
+
+    def test_looking_beats_moving_for_which_way_a_body_faces(self):
+        """A figure strafing across you keeps its front towards you."""
+        found, cast, bodies = self._armed()
+        one = found.combatant('bot1')
+        one.facing = np.array([0.0, 0.0, -1.0])
+
+        class Walker:
+            velocity = (6.0, 0.0, 0.0)
+            grounded = True
+
+        class Walking:
+            def of(self, id):
+                return Walker()
+
+        game.move_bodies(found, bodies, cast=cast, walking=Walking(), dt=0.1)
+        facing = game.heading_rotation((0.0, 0.0, -1.0),
+                                       forward=game.charactersmod.FORWARD)
+        assert np.allclose(bodies['bot1'].rotation, facing)
+
+    def test_a_body_with_nothing_in_view_faces_the_way_it_walks(self):
+        found, cast, bodies = self._armed()
+
+        class Walker:
+            velocity = (6.0, 0.0, 0.0)
+            grounded = True
+
+        class Walking:
+            def of(self, id):
+                return Walker()
+
+        game.move_bodies(found, bodies, cast=cast, walking=Walking(), dt=0.1)
+        heading = game.heading_rotation((1.0, 0.0, 0.0),
+                                        forward=game.charactersmod.FORWARD)
+        assert np.allclose(bodies['bot1'].rotation, heading)
+
+    def test_pulling_the_trigger_reaches_the_figure(self):
+        found, cast, bodies = self._armed()
+        seen = {}
+
+        class Watching:
+            def update(self, id, motion, dt):
+                seen['motion'] = motion
+                return ('idle', None)
+
+            def subtree(self, id):
+                return None
+
+        found.combatant('bot1').firing = 0.2
+        game.move_bodies(found, bodies, cast=Watching(), dt=0.05)
+        assert seen['motion'].firing
+
+    def test_the_trigger_is_only_down_for_as_long_as_the_shot(self):
+        found, cast, bodies = self._armed()
+        one = found.combatant('bot1')
+        one.firing = 0.05
+        game.move_bodies(found, bodies, cast=cast, dt=0.1)
+        assert one.firing <= 0.0

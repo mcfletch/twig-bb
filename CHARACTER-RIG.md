@@ -66,6 +66,8 @@ Each is a separate glTF animation, named exactly:
 | `idle` | yes | standing, breathing, weight shifting |
 | `walk` | yes | one stride cycle |
 | `run` | yes | one stride cycle, at pace |
+| `walk_back` | yes | one stride cycle, going backwards |
+| `strafe_left`, `strafe_right` | yes | one sidestep: out and closed |
 | `jump` | no | the launch |
 | `fall` | yes | airborne |
 | `land` | no | the impact and the recovery out of it |
@@ -84,6 +86,16 @@ and, for each of `pistol`, `shotgun`, `rifle`, `rocket`:
 shoulder rather than from the hip, so `fire_rifle` opens where `aim_rifle`
 holds and comes down to where `hold_rifle` begins — which is the pose the game
 blends back to. A weapon with no `aim_` clip fires from the carry.
+
+**Which way a body is going decides which of these plays**, and it is decided
+in the body's own frame rather than the world's: a combatant facing you while
+it backs off is playing `walk_back`, and one crossing in front of you is
+sidestepping. A figure that has only `walk` still walks, forwards, because a
+missing clip is not an error — but it is the thing a player notices first.
+
+A cycle is played at **the rate the body is actually travelling**, so its feet
+stay on the ground rather than skating over it; `walk_back` and the sidesteps
+serve every speed that way rather than having a run of their own.
 
 **A looping clip's last frame is its first**, so the cycle closes. **A one-shot
 ends in the pose the game will hold** — `die` ends on the floor, because that

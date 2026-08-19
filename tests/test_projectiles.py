@@ -122,7 +122,7 @@ class TestHowLongAShotTakes:
     def test_it_is_monotonic_in_distance(self, rocket):
         earlier = [rocket.time_to(d) for d in range(0, 60, 5)]
         assert earlier == sorted(earlier)
-        assert all(b > a for a, b in zip(earlier, earlier[1:]))
+        assert all(b > a for a, b in zip(earlier, earlier[1:], strict=False))
 
     def test_a_round_that_cannot_move_never_arrives(self, kinds):
         still = projectiles.Projectile(key='still', speed=0.0, acceleration=0.0)

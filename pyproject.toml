@@ -56,6 +56,7 @@ twig-bb = "twig_bb.viewer:main"
 twig-bb-hud = "twig_bb.hudsample:main"
 twig-bb-fetch = "twig_bb.download:main"
 twig-bb-bsp = "twig_bb.maploader:main"
+twig-bb-bots = "twig_bb.botreview:main"
 
 [project.urls]
 Homepage = "https://github.com/mcfletch/twig-bb"

@@ -509,6 +509,15 @@ picks a different weapon up, and a dead body -- which plays no weapon clip --
 holds nothing. Each weapon is placed by the grip **it** declares rather than by
 its own origin; see [CHARACTER-RIG.md §4](CHARACTER-RIG.md).
 
+**The figures move the way the rules say (2026-08-19).** What the drawing reads
+was most of what was wrong with them: the weapon in somebody's hands, the
+direction they point it and the moment they pull a trigger were all decided by
+the rules and none of them reached the figure, so bots fought empty-handed,
+facing wherever they had last walked. All three are `Combatant` state now, read
+by `move_bodies`. Movement is chosen in the body's own frame -- `walk_back` and
+the two sidesteps are new clips -- and played at the speed the body is really
+going. `twig-bb-bots` is the review harness the lot was judged in.
+
 **What remains of this phase:** the artist brief for §7's weapons and §13's
 sounds is unwritten, and a figure's accent colour is paint on its texture
 rather than something a match changes at runtime -- a per-team colour is a

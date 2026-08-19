@@ -252,6 +252,18 @@ class Combatant:
     deaths: int = 0
     #: Seconds since dying, or None while alive.
     dead_for: Optional[float] = None
+    #: A unit heading this combatant is looking and shooting along, or a zero
+    #: vector for somebody with nothing in view.  The rules keep it because the
+    #: rules decide it -- a bot's mind from what it can see, a player's from
+    #: where the camera points -- and because what *draws* a body has to know
+    #: which way to turn it: somebody standing still and shooting at you faces
+    #: you, and a figure that only ever turned along its own velocity would
+    #: shoot you sideways.
+    facing: np.ndarray = field(default_factory=lambda: np.zeros(3))
+    #: Seconds of shot left to show.  A trigger pull is an instant and an
+    #: animation is not, so the moment is held for long enough to be seen and
+    #: counts itself down; see :data:`twig_bb.game.SHOT_SHOWN`.
+    firing: float = 0.0
     #: An impulse this combatant has been given and not yet spent, in metres
     #: per second.  **The rules say how hard somebody was shoved; what moves
     #: them decides what that means** — for the player it becomes the
