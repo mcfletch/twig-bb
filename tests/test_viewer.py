@@ -1797,7 +1797,7 @@ class TestTheMatchWiringStaysInStep:
         made.loaded = None
         made.weapons = weapons.default_table()
         made._audioEngine = lambda: None
-        for name in ('_buildMatch', '_bindPresenter'):
+        for name in ('_buildMatch', '_installMatch', '_bindPresenter'):
             setattr(made, name,
                     getattr(viewer.TwigContext, name).__get__(made))
         made._buildMatch()          # what OnInit does before a level exists

@@ -566,20 +566,46 @@ class Character:
         return max(low, min(high, float(speed) / nominal))
 
 
-def load(name: str, group: Any = None) -> Character:
+def _character_path(name: str) -> str:
+    """Where the build called ``name`` lives on disk."""
+    return art.path_for(os.path.join(CHARACTERS, '%s.glb' % name))
+
+
+def _parse_document(name: str) -> Any:
+    """Parse a build's file once for a whole cast to share, or None if it will not.
+
+    A :class:`~OpenGLContext.loaders.gltf.SharedDocument` carries the file's JSON
+    parse and its decoded vertex and animation arrays, so every figure of one
+    build is built from it without reading or decoding the file again.
+    """
+    path = _character_path(name)
+    try:
+        from OpenGLContext.loaders.gltf import parse_gltf
+        return parse_gltf(path)
+    except Exception:                       # noqa: BLE001 - art, not rules
+        log.warning('could not parse the character %s', path, exc_info=True)
+        return None
+
+
+def load(name: str, group: Any = None, document: Any = None) -> Character:
     """The character model called ``name``, or a body with no art.
 
     ``name`` is a file under ``assets/characters`` without its suffix, so the
     art a combatant is drawn as is a string in a table and never a code change
     -- which is the whole of what makes swapping the figures configuration.
+
+    ``document`` is a shared parse of that build (:func:`_parse_document`) to
+    build from, so a cast of one build reads its file once; without one the file
+    is read and decoded here.
     """
-    relative = os.path.join(CHARACTERS, '%s.glb' % name)
-    path = art.path_for(relative)
     try:
         from OpenGLContext.character import CharacterModel
-        return Character(CharacterModel.load(path))
+        if document is not None:
+            from OpenGLContext.loaders.gltf import load_gltf
+            return Character(CharacterModel.from_scene(load_gltf(document=document)))
+        return Character(CharacterModel.load(_character_path(name)))
     except Exception:                       # noqa: BLE001 - art, not rules
-        log.warning('could not load the character %s', path, exc_info=True)
+        log.warning('could not load the character %s', name, exc_info=True)
         return Character(group=group)
 
 
@@ -591,10 +617,13 @@ class Cast:
     whole way through. Which build each of them gets is taken round-robin from
     :data:`BUILDS`, so a room of bots is not a room of identical twins.
 
-    Every figure is loaded separately even where two share a build, because a
-    skinned mesh carries its own deformed vertices and its own materials --
-    which is also what lets one figure be recoloured without touching another
-    wearing the same suit.
+    Each figure is its own scenegraph even where two share a build, because a
+    skinned mesh carries its own deformed vertices and its own materials -- which
+    is also what lets one figure be recoloured without touching another wearing
+    the same suit. What figures of one build *do* share is the file behind them:
+    it is parsed once into a :class:`~OpenGLContext.loaders.gltf.SharedDocument`
+    and its immutable vertex and animation data are held in common, so a bigger
+    cast costs more posing but not more parsing.
     """
 
     def __init__(self, ids: Any, builds: Any = BUILDS,
@@ -604,9 +633,13 @@ class Cast:
         #: match however many people are carrying one.
         self.armoury = armoury
         self.figures: Dict[str, Character] = {}
+        documents: Dict[str, Any] = {}      # build name -> its parse, done once
         for index, id in enumerate(ids):
-            figure = load(chosen[index % len(chosen)],
-                          group=None if fallback is None else fallback())
+            name = chosen[index % len(chosen)]
+            if name not in documents:
+                documents[name] = _parse_document(name)
+            figure = load(name, group=None if fallback is None else fallback(),
+                          document=documents[name])
             figure.armoury = armoury
             self.figures[id] = figure
 

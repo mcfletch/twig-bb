@@ -1,7 +1,10 @@
 # Plan — scale animated characters to the hundreds
 
-**Status:** 🟡 Partial — the load path is fixed and landed in the engine; the
-per-frame animation path and off-thread loading are designed here, not yet built.
+**Status:** 🟡 Partial — the load path is fixed end to end: the engine decode and
+shared-document API landed (§2), the twig-bb `Cast` is wired to them (Task A), and
+the level load now runs off the render thread (Task B, level-granularity). The
+per-frame animation path (C1–C5) and the per-figure capsule→rig swap are designed
+here, not yet built.
 
 **Goal (engine-level).** A game built on OpenGLContext can put **hundreds of
 skinned, animated characters** on screen and animate them in parallel without the
@@ -79,8 +82,11 @@ own materials and its own deformable-mesh state. Exposed from
 - **Tests:** `tests/unit/test_gltf_shared_document.py` — equivalence to a plain
   load, shared-array identity, read-only enforcement, instance independence.
 
-**Not yet wired into twig-bb:** the `Cast` still calls `CharacterModel.load(path)`
-once per figure. Task **A** below wires it to `parse_gltf`.
+**Wired into twig-bb (Task A):** `characters.Cast` parses each distinct build once
+into a `SharedDocument` and builds every figure of it with `load_gltf(document=…)`;
+`characters._parse_document` / `characters.load(document=…)` are the seam. A
+six-bot cast (two builds) builds in **~0.72 s**, down from ~17 s. Test:
+`tests/test_characters_gl.py::test_a_cast_parses_each_build_once`.
 
 ---
 
@@ -153,8 +159,8 @@ docs (engine docs live in `openglcontext/docs/`, this plan and
 
 | # | Task | Lands in | Notes |
 |---|---|---|---|
-| **A** | Wire `Cast` to `parse_gltf`: parse each distinct build once, pass `document=` to every figure of it | twig-bb `characters.py` | Small; uses the shipped §2.2 API. Test: two ids of one build share `_base_positions`. |
-| **B** | Reusable background-load facility; twig-bb figures load off-thread, capsule→rig swap | OpenGLContext + twig-bb | Generalise `bin/view.py` async pattern. GL only on the render thread. |
+| ~~**A**~~ ✅ | Wire `Cast` to `parse_gltf`: parse each distinct build once, pass `document=` to every figure of it | twig-bb `characters.py` | **Done.** `_parse_document` + `load(document=…)`; test `test_a_cast_parses_each_build_once`. |
+| **B** 🟡 | Reusable background-load facility; twig-bb figures load off-thread, capsule→rig swap | OpenGLContext + twig-bb | **Level load is off-thread**: `viewer.load_level`/`build_match` are GL-free and run on a worker via `OpenGLContext.viewer.asyncscene.AsyncSceneMixin`; `_applyLevel` mounts on the render thread; capture stays synchronous. Tests: `tests/test_level_load.py`. **Left:** per-figure capsule→rig swap so a figure appears the instant its own load posts, rather than with the level. |
 | **C1** | Character LOD + per-frame update budget; use `*_lod1.glb`; skip off-screen/distant | OpenGLContext.character | Biggest cheap win for crowds. |
 | **C2** | Dedupe pose evaluation by `(clip, quantised time)` | OpenGLContext.character.mixer | |
 | **C4** | GPU skinning vertex-shader path (+ CPU fallback) | OpenGLContext passes + pbrmesh | The scalability keystone. |

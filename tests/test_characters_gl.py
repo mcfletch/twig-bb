@@ -48,6 +48,22 @@ def standing(cast, ids, at=AHEAD):
             for id, x in zip(ids, spread, strict=True)]
 
 
+def test_a_cast_parses_each_build_once(monkeypatch):
+    """Four bots of two builds read two files, not four.
+
+    The cast draws everyone from the same handful of builds, so a file read and
+    JSON-parsed once per figure is most of the loading cost paid over and over.
+    One :class:`~OpenGLContext.loaders.gltf.SharedDocument` per build is parsed
+    once and every figure of that build is built from it.
+    """
+    seen = []
+    real = characters._parse_document
+    monkeypatch.setattr(characters, '_parse_document',
+                        lambda name: seen.append(name) or real(name))
+    characters.Cast(['bot0', 'bot1', 'bot2', 'bot3'])
+    assert seen == list(characters.BUILDS)          # each build, once, in order
+
+
 class TestABotHoldingItsWeapon:
     def test_a_figure_reaches_the_framebuffer(self, render):
         cast = armed()

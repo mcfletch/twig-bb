@@ -49,6 +49,7 @@ import math
 import os
 import sys
 import time
+from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Tuple
 
 os.environ.setdefault('OPENGLCONTEXT_PROFILE', 'core')
@@ -76,6 +77,7 @@ from omi_physics.character import CharacterCapabilities         # noqa: E402
 from OpenGLContext.events.mouseevents import WHEEL_DOWN, WHEEL_UP  # noqa: E402
 from OpenGLContext.ui import bindings, dialogs, settings         # noqa: E402
 from OpenGLContext.ui.overlay import OverlayMixin                # noqa: E402
+from OpenGLContext.viewer.asyncscene import AsyncSceneMixin      # noqa: E402
 from OpenGLContext.ui.panel import Panel                         # noqa: E402
 
 from . import avatar                                            # noqa: E402
@@ -486,7 +488,79 @@ def choose_spawn(loaded: maploader.LoadedMap,
     return centre, 0.0
 
 
-class TwigContext(OverlayMixin , BaseContext):
+@dataclass
+class LevelBundle:
+    """A whole match built as data, ready to mount on the render thread.
+
+    Decoding a map and staging the match in it touches no GL, so it is done off
+    the render thread and its result crosses back as one of these: the map, the
+    arena, the drawn figures and the rules, all plain objects. ``loaded`` is None
+    for the map-less match the start screen shows before a level is chosen.
+    """
+
+    loaded: Any
+    arena: Any
+    player: Any
+    cast: Any
+    botGroup: Any
+    botBodies: Any
+    effects: Any
+    flight: Any
+    projectileGroup: Any
+    projectileBodies: Any
+    minds: Any
+    rules: Any
+    deathCamera: Any
+
+
+def build_match(config: Any, weapons: Any, loaded: Any) -> LevelBundle:
+    """Stage a match in ``loaded`` (map-less when None), touching no GL.
+
+    The whole of what :meth:`TwigContext._buildMatch` used to do inline, lifted
+    out so it runs on a worker thread and under test without a window. The player's
+    own record *is* the arena's, rather than a second copy: the HUD reads one and
+    the rules write one, and two of them would drift the first time a bot landed a
+    shot.
+    """
+    arena = game.start_match(loaded, match.MatchSetup(
+        bots=int(config.bots), difficulty=str(config.difficulty),
+        fragLimit=int(config.frag_limit),
+        timeLimit=float(config.time_limit)), weapons)
+    me = arena.combatant(game.PLAYER_ID)
+    if me is None:
+        raise RuntimeError('the match was started without the player in it')
+    # A drawn figure for each bot, made once for the match: a scenegraph rebuilt
+    # whenever somebody spawns is one rebuilt during a fight. A figure that will
+    # not load leaves that body a capsule and the match carries on.
+    cast = characters.Cast([one.id for one in arena.bots()],
+                           armoury=characters.Armoury(weapons))
+    botGroup, botBodies = game.bot_bodies(arena, cast=cast)
+    # Everything in the air, and one body per slot to draw it with, made once: a
+    # scenegraph edited every time a rocket is fired is one rebuilt at the rate
+    # somebody holds the trigger down.
+    flight = projectiles.Projectiles(projectiles.default_table())
+    projectileGroup, projectileBodies = game.projectile_bodies(
+        flight.capacity, flight.table)
+    # Given the same tables the player has, so a bot chooses between exactly the
+    # weapons the player can carry and knows what each throws.
+    minds = game.place_bots(arena, projectiles=flight.table)
+    return LevelBundle(
+        loaded=loaded, arena=arena, player=me.player, cast=cast,
+        botGroup=botGroup, botBodies=botBodies,
+        effects=effects.Effects(arena, intensity=str(config.effects)),
+        flight=flight, projectileGroup=projectileGroup,
+        projectileBodies=projectileBodies, minds=minds,
+        rules=rules.Rules(arena, minds=minds, flight=flight,
+                          capabilities=character_capabilities()),
+        deathCamera=deathcam.DeathCamera())
+
+
+def load_level(config: Any, weapons: Any, target: str) -> LevelBundle:
+    """Decode the map ``target`` names and stage a match in it. Touches no GL."""
+    return build_match(config, weapons, load_map(config, target))
+
+
+class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
     """The viewer window: a loaded map, a walking camera, and jump pads.
 
     :class:`~OpenGLContext.ui.overlay.OverlayMixin` comes first so its event
@@ -543,6 +617,9 @@ class TwigContext(OverlayMixin , BaseContext):
         disable_vsync()
         if self.config is None:
             self.config = build_parser().parse_args([self._target or ''])
+        # The handover for loading a level off the render thread (see
+        # :meth:`_loadLevel`); set up before any level can be chosen.
+        self.setupAsyncScene()
         self.loaded = None
         self._animator = SurfaceAnimator()
         self._started = time.time()
@@ -587,15 +664,39 @@ class TwigContext(OverlayMixin , BaseContext):
             self.showMenu()
 
     def _loadLevel(self, target: str) -> None:  # pragma: no cover - needs a window
-        """Load a map and start playing in it.
+        """Load a map and start playing in it, off the render thread.
 
-        Called from ``OnInit`` when a map was named on the command line, and
-        from the start screen when one is chosen — the two are the same thing
-        happening at different moments, which is the whole reason this is not
-        part of ``OnInit``.
+        Called from ``OnInit`` when a map was named on the command line, and from
+        the start screen when one is chosen. Decoding the map and staging the
+        match -- seconds of work on a big level, and touching no GL -- runs on a
+        worker (:func:`load_level`) so the window keeps drawing; the result is
+        mounted by :meth:`applyLoadedScene` on the render thread. A capture has no
+        loop to keep alive and needs the very frame it is about to grab, so it
+        loads in step instead.
         """
         self._target = target
-        self.loaded = load_map(self.config, target)
+        if self.config.capture:
+            self._applyLevel(load_level(self.config, self.weapons, target))
+            return
+        self.requestScene(lambda: load_level(self.config, self.weapons, target),
+                          label=target)
+
+    def applyLoadedScene(self, bundle: LevelBundle) -> None:  # pragma: no cover - GL
+        """Render thread: mount a level the worker finished decoding."""
+        self._applyLevel(bundle)
+
+    def applyFailedLoad(self, error: Optional[BaseException]) -> None:  # pragma: no cover - GL
+        """Render thread: a level would not load.  Say so and stay on the menu."""
+        log.error('could not load the level %s: %s', self._target, error)
+        self.showMenu()
+
+    def _applyLevel(self, bundle: LevelBundle) -> None:  # pragma: no cover - needs a window
+        """Install a freshly built level and start playing in it.
+
+        The render-thread half of :meth:`_loadLevel`: everything from here down
+        builds the scenegraph or touches GL, so it runs where a worker cannot.
+        """
+        self.loaded = bundle.loaded
         # Established with the map rather than when the acknowledgements are
         # opened: it reads the content roots, and by then a reload for missing
         # textures may have added more of them.
@@ -605,7 +706,7 @@ class TwigContext(OverlayMixin , BaseContext):
         # texture-coordinate buffer is dynamic.
         self._animator = SurfaceAnimator()
         self._started = time.time()
-        self._buildMatch()
+        self._installMatch(bundle)
         # What the map left lying about.  Built with the *map* rather than with
         # the scene, so that reloading a map's textures -- which rebuilds the
         # scene -- does not put every collected item back on the floor, for the
@@ -871,51 +972,35 @@ class TwigContext(OverlayMixin , BaseContext):
         self._buildMatch()
 
     def _buildMatch(self) -> None:              # pragma: no cover - GL
-        """The match this launch is playing, and the minds in it.
+        """Build the match this launch is playing and install it.
 
-        The player's own record *is* the arena's, rather than a second copy:
-        the HUD reads one and the rules write one, and two of them would drift
-        the first time a bot landed a shot.
+        The building is :func:`build_match`, lifted out so it runs under test and
+        off the render thread; installing it is :meth:`_installMatch`. Kept as one
+        call because the map-less start-screen match is built here synchronously,
+        where a worker would only add latency to a build that is already cheap.
         """
-        self.arena = game.start_match(self.loaded, match.MatchSetup(
-            bots=int(self.config.bots), difficulty=str(self.config.difficulty),
-            fragLimit=int(self.config.frag_limit),
-            timeLimit=float(self.config.time_limit)), self.weapons)
-        me = self.arena.combatant(game.PLAYER_ID)
-        if me is None:
-            raise RuntimeError('the match was started without the player in it')
-        self.player = me.player
-        # A drawn figure for each of them, made once for the match: a
-        # scenegraph rebuilt whenever somebody spawns is one rebuilt during a
-        # fight.  A figure that will not load leaves that body a capsule and
-        # the match carries on -- see `twig_bb.characters`.
-        self.cast = characters.Cast(
-            [one.id for one in self.arena.bots()],
-            armoury=characters.Armoury(self.weapons))
-        self.botGroup, self.botBodies = game.bot_bodies(self.arena,
-                                                        cast=self.cast)
-        self.effects = effects.Effects(self.arena,
-                                       intensity=str(self.config.effects))
-        # Everything in the air, and one body per slot to draw it with.  Both
-        # are made once: a scenegraph edited every time a rocket is fired is
-        # one rebuilt at the rate somebody holds the trigger down.
-        self.flight = projectiles.Projectiles(projectiles.default_table())
-        self.projectileGroup, self.projectileBodies = game.projectile_bodies(
-            self.flight.capacity, self.flight.table)
-        # Given the same tables the player has, so a bot chooses between
-        # exactly the weapons the player can carry and knows what each throws.
-        self.minds = game.place_bots(self.arena, projectiles=self.flight.table)
-        # What plays the tick.  Built here with no map in it, because the match
-        # is built before a level is chosen -- the start screen needs one --
-        # and given the map's spawns and hazards by `_start_physics`.
-        self.rules = rules.Rules(self.arena, minds=self.minds,
-                                 flight=self.flight,
-                                 capabilities=character_capabilities())
-        # One per match, because it holds the death it is showing.
-        self.deathCamera = deathcam.DeathCamera()
-        # **Every time**, because everything above has just been replaced.  A
-        # presenter left pointing at the previous build goes on drawing a match
-        # nobody is playing, into emitters that are no longer in the scene.
+        self._installMatch(build_match(self.config, self.weapons, self.loaded))
+
+    def _installMatch(self, bundle: LevelBundle) -> None:   # pragma: no cover - GL
+        """Point the context at a freshly built match. Render thread only.
+
+        Everything here has just replaced what came before, so the presenter is
+        rebound **every time**: one left pointing at the previous build goes on
+        drawing a match nobody is playing, into emitters no longer in the scene.
+        The rules are given the map's spawns and hazards later, by
+        :meth:`_start_physics`.
+        """
+        self.arena = bundle.arena
+        self.player = bundle.player
+        self.cast = bundle.cast
+        self.botGroup, self.botBodies = bundle.botGroup, bundle.botBodies
+        self.effects = bundle.effects
+        self.flight = bundle.flight
+        self.projectileGroup = bundle.projectileGroup
+        self.projectileBodies = bundle.projectileBodies
+        self.minds = bundle.minds
+        self.rules = bundle.rules
+        self.deathCamera = bundle.deathCamera
         self._bindPresenter()
 
     def _bindPresenter(self) -> None:           # pragma: no cover - GL
@@ -1538,6 +1623,10 @@ class TwigContext(OverlayMixin , BaseContext):
     def OnIdle(self, *args: Any) -> int:        # pragma: no cover - needs a window
         # A download runs on a worker and is *published* here, once a frame.
         self._pollDownload()
+        # So does a level load: the worker decodes it, and this is where the
+        # finished level crosses back to be mounted on the render thread.
+        if self.pollPendingScene():
+            return 1
         if self.loaded is None:
             # On the start screen: nothing to animate and nobody to walk, so
             # the loop should go quiet -- a static menu that redrew sixty times
