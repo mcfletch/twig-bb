@@ -230,8 +230,11 @@ def _apply(world: Any, match: arenamod.Arena, one: Any, command: Any,
     # Where a bot is looking is part of what it decided, and the only record of
     # it that outlives the tick: its mind is the AI's business, its facing is
     # the match's, and what draws a body reads the match.
-    if command.aim is not None:
-        one.facing = np.asarray(command.aim, dtype='d')
+    # Let go of it again when there is nothing in view: a facing that only
+    # ever gained values is a bot that saw somebody once and then walked
+    # sideways for the rest of the match, still pointing at where they were.
+    one.facing = (np.asarray(command.aim, dtype='d') if command.aim is not None
+                  else np.zeros(3))
     if walking is not None:
         # Every tick, whether or not it wanted to move: gravity, a slope and
         # whatever a burst threw it with do not wait for a decision.

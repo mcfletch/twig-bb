@@ -20,8 +20,8 @@ from omi_physics.world import PhysicsWorld
 
 from OpenGLContext.scenegraph.box import Box
 
-from twig_bb import (arena, art, avatar, game, match as matchmod, walkers,
-                        weapons)
+from twig_bb import (arena, art, avatar, bots, game, match as matchmod,
+                        walkers, weapons)
 
 
 class FakeSpawn:
@@ -1036,3 +1036,32 @@ class TestWhatABodyIsSeenDoing:
         one.firing = 0.05
         game.move_bodies(found, bodies, cast=cast, dt=0.1)
         assert one.firing <= 0.0
+
+
+class TestWhereABodyLooks:
+    """A bot's facing outlives the tick it was decided in -- but not for ever."""
+
+    def _bot(self):
+        found = started(bots=1)
+        return found, found.combatant('bot1')
+
+    def test_an_aim_is_remembered(self):
+        found, one = self._bot()
+        game._apply(None, found, one, bots.Command(id='bot1',
+                                                   aim=np.array([1.0, 0.0, 0.0])),
+                    None, 0.1, 0, None, None, None)
+        assert np.allclose(one.facing, (1.0, 0.0, 0.0))
+
+    def test_nothing_in_view_lets_it_go(self):
+        """Otherwise a bot that saw somebody once walks sideways for ever."""
+        found, one = self._bot()
+        one.facing = np.array([1.0, 0.0, 0.0])
+        game._apply(None, found, one, bots.Command(id='bot1'),
+                    None, 0.1, 0, None, None, None)
+        assert not np.any(one.facing)
+
+    def test_a_shot_is_held_long_enough_to_be_seen(self):
+        found, one = self._bot()
+        one.player.give('rifle')
+        one.player.selected = 'rifle'
+        assert one.firing == 0.0

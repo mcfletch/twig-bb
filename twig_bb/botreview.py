@@ -296,9 +296,17 @@ class Stage:
         walker = self.script.of(self.ID)
         walker.velocity = velocity
         walker.grounded = bool(state.get('grounded', True))
-        # A treadmill: the rules are told the body is travelling, and it is
-        # not moved. What a review is looking at is the cycle, and a figure
-        # that walks out of frame two seconds in cannot be looked at.
+        # A treadmill on the flat: the rules are told the body is travelling
+        # and it is not moved, because what a review is looking at is the
+        # cycle and a figure that walks out of frame cannot be looked at.
+        # **Height is not the same question.** Whether a jump leaves the
+        # ground at all is one of the things being watched for, so the
+        # vertical does move, and the floor is there to measure it against.
+        rise = float(velocity[1]) * dt
+        if rise:
+            one.position = np.asarray(one.position, dtype='d') + (0.0, rise, 0.0)
+            one.position[1] = max(0.0, float(one.position[1]))
+        walker.position = one.position
         one.facing = facing
         if state.get('dead'):
             one.player.health = 0
