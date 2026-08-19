@@ -64,8 +64,9 @@ CHARACTERS = 'characters'
 #: which is what makes ``die`` a body left on the floor rather than one that
 #: springs up and dies again.
 MOVEMENT = ('idle', 'walk', 'run', 'walk_back', 'strafe_left', 'strafe_right',
-            'jump', 'fall', 'land', 'die', 'turn_left', 'turn_right')
-ONE_SHOTS = frozenset({'jump', 'land', 'die'})
+            'jump', 'fall', 'land', 'die', 'die_forward',
+            'turn_left', 'turn_right')
+ONE_SHOTS = frozenset({'jump', 'land', 'die', 'die_forward'})
 
 #: Metres a second below which somebody is standing still, and above which
 #: they are running rather than walking. Our numbers: they are a statement
@@ -105,7 +106,7 @@ WEAPON_FAMILY: Dict[str, str] = {
 #: missing is worse and the contract says a missing clip is not an error.
 MOVEMENT_FALLBACK: Dict[str, str] = {
     'walk_back': 'walk', 'strafe_left': 'walk', 'strafe_right': 'walk',
-    'run': 'walk',
+    'run': 'walk', 'die_forward': 'die',
 }
 
 #: How fast each movement clip is authored to travel, in metres a second, so a
@@ -241,13 +242,23 @@ class Locomotion:
         self.airborne = False
         self.landing = 0.0
         self.dead = False
+        self.fell = 'die'
 
     def update(self, motion: Motion, dt: float) -> str:
         """The clip to play this frame, given ``motion`` over ``dt`` seconds."""
+        if motion.dead and not self.dead:
+            # **Which way a body falls is decided by where it was going.**
+            # Somebody sprinting at you does not sit down; somebody standing,
+            # or backing off, does not pitch onto their face. Read once, at
+            # the moment of death, because it is a fact about that moment and
+            # a corpse has no velocity to keep answering with.
+            self.fell = ('die_forward'
+                         if (motion.speed >= RUN_SPEED
+                             and motion.direction[1] > 0.4) else 'die')
         if motion.dead:
             self.dead = True
         if self.dead:
-            return 'die'
+            return self.fell
         if not motion.grounded:
             self.airborne = True
             self.landing = 0.0

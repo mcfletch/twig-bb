@@ -67,8 +67,9 @@ class TestLocomotion:
 
     def test_death_beats_everything_and_stays(self):
         machine = characters.Locomotion()
-        assert machine.update(moving(dead=True, speed=6.0), 0.1) == 'die'
-        assert machine.update(moving(speed=6.0), 0.1) == 'die'
+        fell = machine.update(moving(dead=True, speed=6.0), 0.1)
+        assert fell.startswith('die')
+        assert machine.update(moving(speed=6.0), 0.1) == fell
 
     def test_a_respawn_starts_over(self):
         machine = characters.Locomotion()
@@ -450,3 +451,37 @@ class TestACastThatIsArmed:
         # frame somebody is shot is the one thing a player would call a bug.
         cast.update('a', moving(weapon='rifle', dead=True), 0.1)
         assert figure.holding == 'rifle' and figure._held in list(grip.children)
+
+
+class TestWhichWayItFalls:
+    """Somebody sprinting at you does not sit down."""
+
+    def test_running_forwards_pitches_onto_the_face(self):
+        machine = characters.Locomotion()
+        assert machine.update(moving(speed=7.0, dead=True), 0.1) == 'die_forward'
+
+    def test_standing_still_folds_up(self):
+        machine = characters.Locomotion()
+        assert machine.update(moving(dead=True), 0.1) == 'die'
+
+    def test_backing_off_folds_up(self):
+        machine = characters.Locomotion()
+        assert machine.update(
+            moving(speed=7.0, direction=(0.0, -1.0), dead=True), 0.1) == 'die'
+
+    def test_it_is_read_once_and_kept(self):
+        """A corpse has no velocity to keep answering with."""
+        machine = characters.Locomotion()
+        machine.update(moving(speed=7.0, dead=True), 0.1)
+        assert machine.update(moving(dead=True), 0.1) == 'die_forward'
+
+    def test_a_respawn_forgets_it(self):
+        machine = characters.Locomotion()
+        machine.update(moving(speed=7.0, dead=True), 0.1)
+        machine.reset()
+        assert machine.update(moving(dead=True), 0.1) == 'die'
+
+    def test_a_figure_without_it_still_falls_over(self):
+        figure = characters.Character(_Model(clips=('idle', 'die')))
+        figure.update(moving(speed=7.0, dead=True), 0.1)
+        assert figure.model.played[-1][0] == 'die'

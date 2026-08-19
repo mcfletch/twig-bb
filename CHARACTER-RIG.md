@@ -97,9 +97,13 @@ A cycle is played at **the rate the body is actually travelling**, so its feet
 stay on the ground rather than skating over it; `walk_back` and the sidesteps
 serve every speed that way rather than having a run of their own.
 
+**Which way a body falls is decided by where it was going** at the moment it
+was hit, and read once then, because a corpse has no velocity to keep answering
+with. A figure with no `die_forward` falls the other way instead.
+
 **A looping clip's last frame is its first**, so the cycle closes. **A one-shot
-ends in the pose the game will hold** — `die` ends on the floor, because that
-is the frame a body stays in.
+ends in the pose the game will hold** — both deaths end on the floor, because
+that is the frame a body stays in.
 
 `twig_bb.characters` is what chooses between them, and it plays the movement
 clip over the whole body with the weapon clip layered over the spine and above,
