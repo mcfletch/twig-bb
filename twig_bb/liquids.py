@@ -122,6 +122,18 @@ class LiquidVolumes:
         sizes = np.where(inside, (self._maxs - self._mins).prod(axis=1), np.inf)
         return self._volumes[int(np.argmin(sizes))].kind
 
+    def medium_at(self, point: Sequence[float]) -> str:
+        """Which substance ``point`` is in, or '' for none.
+
+        The protocol
+        :func:`OpenGLContext.scenegraph.water.submersion.submerge` asks of any
+        set of volumes. This map's answer is :meth:`kind_at`'s -- smallest box
+        wins -- because a leaf's bound is the partition's shape rather than the
+        liquid's, and a pit of lava inside a flooded room is the answer that
+        matters.
+        """
+        return self.kind_at(point)
+
     def kind_along(self, feet: Sequence[float], height: float) -> str:
         """Which liquid an upright body standing at ``feet`` is in, or ''.
 
