@@ -736,6 +736,63 @@ It needs `OpenGLContext` with a GLFW backend, `omi_physics`, `numpy` and
 OpenGLContext resolver) or `simpleparse` (both script languages are hand-written
 token scanners).
 
+### As a binary, with no Python to install
+
+The releases page carries two builds of each tagged version:
+
+* **`twig-bb-<version>-windows-x64.zip`** — unzip it anywhere and run
+  `twig-bb.exe`. `twig-bb-fetch.exe` and `twig-bb-bsp.exe` are beside it.
+* **`twig-bb_<version>_amd64.deb`** — installs the game and the Python that runs
+  it under `/opt/twig-bb`, with the three commands in `/usr/games`, and puts the
+  game in the desktop menu. `apt install ./twig-bb_*.deb` rather than `dpkg -i`,
+  so that the OpenGL and X11 libraries it asks the machine for are resolved.
+  Sound is a *recommendation* rather than a requirement: without ALSA the game
+  runs silently, which is what a missing backend has always meant here.
+
+No map travels with either, for the same reason none travels with the wheel:
+the content is other people's, under licences of its own (see
+[Content Licensing Note](#content-licensing-note) and `NOTICES.md`). Both builds
+fetch it the way an installed copy does — `twig-bb --list-packs`, then
+`twig-bb openarena:oa_dm1`.
+
+### Building them yourself
+
+Both builds are cut by a tag — `dist/v3.0.0` builds the distributions for
+`3.0.0` and attaches them to a release — and the version in the tag has to be
+the one in `twig_bb/__init__.py`. This is deliberately separate from the version
+bump on `main` that publishes to PyPI (`release.yml`), so a source release and a
+binary release stay separate decisions. `.github/workflows/dist.yml` runs both,
+and `workflow_dispatch` builds them from whatever is checked out without
+spending a version number.
+
+`packaging/` holds what either build needs:
+
+| File | Holds |
+|---|---|
+| `requirements-stack.txt` | where the engine stack comes from, which is the one place either build says so |
+| `entry.py` | the commands a bundle offers, and what each one runs |
+| `twig-bb.spec` | the PyInstaller bundle |
+
+To build them by hand, in an environment with the game installed **not**
+editable — PyInstaller follows import statements and cannot see through an
+editable install's import hook:
+
+```bash
+pip install -r packaging/requirements-stack.txt ".[audio]" pyinstaller
+pyinstaller packaging/twig-bb.spec --noconfirm       # dist/twig-bb/
+
+uv python install --install-dir runtime 3.12
+oglc-deb --project . --extras audio --runtime runtime \
+    --requirement packaging/requirements-stack.txt \
+    --command twig-bb --command twig-bb-fetch --command twig-bb-bsp \
+    --recommends 'libasound2t64 | libasound2' --output dist
+```
+
+Almost nothing about the engine is in the spec file: PyOpenGL and OpenGLContext
+carry their own PyInstaller hooks, which PyInstaller finds by itself. `oglc-deb`
+is part of the engine too. Both are documented in [Packaging an
+application](https://github.com/mcfletch/openglcontext/blob/main/docs/packaging.html).
+
 ## Testing
 
 ```bash

@@ -7,3 +7,5 @@ __pycache__
 dist
 tests/*.pk3
 tests/*.zip
+# The relocatable interpreter oglc-deb is pointed at (uv python install --install-dir)
+runtime/
