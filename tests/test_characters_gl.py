@@ -120,40 +120,134 @@ class TestTheCastIsPosedTogether:
             assert cast.of(one).crowd is not None
 
     def test_a_figure_updated_alone_is_not_posed_until_the_cast_is(self):
-        """Updating says what to play; posing is what moves the joints."""
+        """Updating says what to play; posing is what moves the skeleton."""
+        import numpy as np
         from twig_bb import characters as charactersmod
 
         cast = self._cast()
         figure = cast.of('bot0')
-        rig = figure.model.mixer.rig
         cast.update('bot0', charactersmod.Motion(speed=4.0), 1 / 60.0)
-        settled = [tuple(x.rotation) for x in rig.transforms]
+        cast.pose(1 / 60.0)
+        settled = _skin_of(figure)
 
         cast.update('bot0', charactersmod.Motion(speed=4.0), 1 / 60.0)
-        assert [tuple(x.rotation) for x in rig.transforms] == settled
+        assert all(np.allclose(one, other) for one, other
+                   in zip(_skin_of(figure), settled, strict=True))
 
         cast.pose(1 / 60.0)
-        assert [tuple(x.rotation) for x in rig.transforms] != settled
+        assert not all(np.allclose(one, other) for one, other
+                       in zip(_skin_of(figure), settled, strict=True))
 
     def test_posing_the_cast_moves_every_figure_and_skins_it(self):
         import numpy as np
         from twig_bb import characters as charactersmod
 
         cast = self._cast()
-        rigs = [cast.of(one).model.mixer.rig for one in self.IDS]
-        before = [np.array([list(x.rotation) for x in rig.transforms])
-                  for rig in rigs]
-
         for _ in range(24):
             for one in self.IDS:
-                cast.update(one, charactersmod.Motion(speed=4.0, weapon='rifle'),
-                            1 / 60.0)
+                cast.update(one, charactersmod.Motion(speed=4.0), 1 / 60.0)
             cast.pose(1 / 60.0)
 
-        for rig, rest in zip(rigs, before, strict=True):
-            posed = np.array([list(x.rotation) for x in rig.transforms])
-            assert (np.abs(posed - rest).max(axis=1) > 1e-6).sum() > 10
         for one in self.IDS:
             model = cast.of(one).model
-            assert all(mesh._skin_matrices is not None
-                       for skin in model.mixer.skins for mesh in skin.meshes)
+            for skin in model.mixer.skins:
+                for mesh in skin.meshes:
+                    assert mesh._skin_matrices is not None
+            # A body that is running is not a body in its bind pose.
+            assert any(not np.allclose(matrices, np.eye(4))
+                       for matrices in _skin_of(cast.of(one)))
+
+    def test_only_the_joints_something_reaches_are_written(self):
+        """Nothing here reads a joint, so writing fifty of them is waste.
+
+        What a figure is holding hangs off its grip point, and the renderer
+        walks to it -- so that point, and the joints down to it, are written,
+        and the rest are not.
+        """
+        cast = self._cast()
+        bare = len(cast.of('bot0').model.mixer._writable())
+
+        holding = armed(ids=self.IDS)
+        written = len(holding.of('bot0').model.mixer._writable())
+        joints = holding.of('bot0').model.mixer.rig.n
+
+        assert bare == 0, 'a figure holding nothing has no joint to write'
+        assert 0 < written < joints, (written, joints)
+
+
+def _skin_of(figure):
+    return [mesh._skin_matrices for skin in figure.model.mixer.skins
+            for mesh in skin.meshes]
+
+
+class TestFiguresAreDrawnLighterAtRange:
+    """The lighter mesh that ships beside each build is actually used.
+
+    Both meshes are posed by the one skeleton, so carrying a second level costs
+    a figure nothing per frame; which of them is drawn is the renderer's
+    decision, taken from how far away the figure is.
+    """
+
+    def test_a_figure_carries_the_lighter_mesh_as_a_level(self):
+        from OpenGLContext.scenegraph.lod import LOD
+        from twig_bb import characters as charactersmod
+
+        cast = charactersmod.Cast(['bot0'])
+        figure = cast.of('bot0')
+
+        assert _levels(figure.group, LOD), 'no level of detail was taken'
+        for skin in figure.model.mixer.skins:
+            assert len(skin.meshes) == 2, 'both meshes should be posed as one'
+
+    def test_the_level_beyond_the_range_is_the_lighter_of_the_two(self):
+        from OpenGLContext.scenegraph.lod import LOD
+        from twig_bb import characters as charactersmod
+
+        cast = charactersmod.Cast(['bot0'])
+        node = _levels(cast.of('bot0').group, LOD)[0]
+
+        near = sum(len(mesh.positions) for mesh in _skinned(node.level[0]))
+        far = sum(len(mesh.positions) for mesh in _skinned(node.level[1]))
+
+        assert far < near, (near, far)
+
+    def test_both_levels_are_posed_together(self):
+        import numpy as np
+        from twig_bb import characters as charactersmod
+
+        cast = charactersmod.Cast(['bot0'])
+        for _ in range(6):
+            cast.update('bot0', charactersmod.Motion(speed=4.0), 1 / 60.0)
+            cast.pose(1 / 60.0)
+
+        for skin in cast.of('bot0').model.mixer.skins:
+            matrices = [mesh._skin_matrices for mesh in skin.meshes]
+            assert all(one is not None for one in matrices)
+            assert np.allclose(matrices[0], matrices[1])
+
+
+def _levels(node, kind, seen=None):
+    seen = seen if seen is not None else set()
+    if id(node) in seen:
+        return []
+    seen.add(id(node))
+    found = [node] if isinstance(node, kind) else []
+    for name in ('children', 'level'):
+        for child in (getattr(node, name, None) or ()):
+            found += _levels(child, kind, seen)
+    return found
+
+
+def _skinned(node, seen=None):
+    seen = seen if seen is not None else set()
+    if id(node) in seen:
+        return []
+    seen.add(id(node))
+    found = [node] if getattr(node, 'skin_joints', None) is not None else []
+    for name in ('children', 'geometry', 'level'):
+        value = getattr(node, name, None)
+        if value is None:
+            continue
+        for child in (value if isinstance(value, (list, tuple)) else [value]):
+            found += _skinned(child, seen)
+    return found

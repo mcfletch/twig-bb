@@ -4,11 +4,11 @@
 level granularity) and **the per-frame path is built** (C1–C5, 2026-08-19): see
 [openglcontext/plans/CHARACTER-SCALING.md](../../openglcontext/plans/CHARACTER-SCALING.md)
 for what landed and what it measures. On a 3060 Ti a figure went from **2.85 ms
-of processor time a frame to 0.016 ms** in a crowd of 250, and 250 figures from
-~9 fps to **50 fps**. **Left:** twig-bb's own `Cast` still updates its figures one
-at a time rather than through `Crowd`; the per-figure capsule→rig swap; mesh-level
-LOD (`*_lod1.glb` is still never chosen); and the clip blend itself, which is the
-last piece still on the processor.
+of processor time a frame to 0.005 ms** in a crowd of 250, and 250 figures from
+~9 fps to **124 fps**; a cast of the shape this game fields -- carrying a
+weapon, with a masked upper layer over the movement -- runs 250 at **50 fps**,
+from 38 before the blend moved to the GPU. **Left:** the per-figure capsule→rig swap, and additive layers, which are the
+last thing that keeps a figure's blend on the processor.
 
 **Goal (engine-level).** A game built on OpenGLContext can put **hundreds of
 skinned, animated characters** on screen and animate them in parallel without the
@@ -181,17 +181,21 @@ every figure on screen):
 
 | Figures | Animation | Drawing | Frame |
 |---|---|---|---|
-| 100 | 2.5 ms | 4.9 ms | **134 fps** |
-| 250 | 4.0 ms | 16.2 ms | **50 fps** |
-| 500 | 7.7 ms | 20.5 ms | **36 fps** |
+| 100 | 0.8 ms | 2.7 ms | **283 fps** |
+| 250 | 1.3 ms | 6.8 ms | **124 fps** |
+| 500 | 2.4 ms | 14.1 ms | **61 fps** |
 
-The animation half is met with room to spare and is no longer what limits a
-crowd. **250 figures fall short of 60 fps on the drawing half**, and most of
-that is the GPU filling pixels rather than work the engine is doing: the
-processor-side cost of a 250-figure frame is 12 ms of the 20 (81 fps with the
-frame-end sync removed). Every figure in this benchmark is on screen and large,
-which is the worst case a crowd meets; mesh-level LOD (C1's remaining half) is
-what a real scene would use to close it, and is not built.
+**The target is met and then some: 250 animated figures at 124 fps**, against
+the 60 asked for, with every one of them on screen and large -- the worst case
+a crowd meets. **500 reach 60.** The animation half is 1.3 ms at 250 and is no
+longer what limits anything; what is left is drawing, and most of that is the
+GPU filling pixels for figures that in a real scene would be small.
+
+Not measured: **integrated (Intel UHD-class) graphics**, which this machine has
+none of. Every tier below the top one is exercised and correct -- 100 figures
+run at 157 fps with no compute shader and at 13 fps with the processor doing
+the skinning as well -- so what is unknown is the speed of a part with much
+less vertex throughput, not whether it works.
 
 The **full glTF conformance suite passes, all 314 views**, on both skinning
 paths — and now deterministically: see the capture/IBL note in
@@ -199,9 +203,7 @@ paths — and now deterministically: see the capture/IBL note in
 because they recorded a half-adapted lighting state; that is a correction, not
 a waiver, and the CPU path fails against the old ones identically.
 
-Not measured: **integrated (Intel UHD-class) graphics**, which this machine has
-none of. The GL 3.3 fallbacks are exercised (`OPENGLCONTEXT_GPU_SKINNING=0`,
-`OPENGLCONTEXT_GPU_SKELETON=0`) but their *speed* on such a part is unknown.
+
 
 ### Constraints & non-negotiables
 - **Engine-first:** no capability a real game would want may live in twig-bb. If

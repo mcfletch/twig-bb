@@ -579,6 +579,28 @@ def _character_path(name: str) -> str:
     return art.path_for(os.path.join(CHARACTERS, '%s.glb' % name))
 
 
+#: Metres past which a figure is drawn as its lighter mesh. Far enough that the
+#: change is not something a player catches happening, near enough that a room
+#: of bots is mostly drawn at the lighter one -- most of a fight is at range.
+LOD_DISTANCE = 18.0
+
+#: Suffix of the lighter mesh that ships beside each build.
+LOD_SUFFIX = '_lod1'
+
+
+def _level_document(name: str) -> Any:
+    """The lighter mesh of a build, parsed once, or None where it ships none."""
+    path = art.path_for(os.path.join(CHARACTERS, '%s%s.glb' % (name, LOD_SUFFIX)))
+    if not os.path.exists(path):
+        return None
+    try:
+        from OpenGLContext.loaders.gltf import parse_gltf
+        return parse_gltf(path)
+    except Exception:                       # noqa: BLE001 - art, not rules
+        log.warning('could not parse the character level %s', path, exc_info=True)
+        return None
+
+
 def _parse_document(name: str) -> Any:
     """Parse a build's file once for a whole cast to share, or None if it will not.
 
@@ -595,7 +617,8 @@ def _parse_document(name: str) -> Any:
         return None
 
 
-def load(name: str, group: Any = None, document: Any = None) -> Character:
+def load(name: str, group: Any = None, document: Any = None,
+         level: Any = None) -> Character:
     """The character model called ``name``, or a body with no art.
 
     ``name`` is a file under ``assets/characters`` without its suffix, so the
@@ -604,14 +627,19 @@ def load(name: str, group: Any = None, document: Any = None) -> Character:
 
     ``document`` is a shared parse of that build (:func:`_parse_document`) to
     build from, so a cast of one build reads its file once; without one the file
-    is read and decoded here.
+    is read and decoded here. ``level`` is the same for the build's lighter
+    mesh, which is drawn instead beyond :data:`LOD_DISTANCE`.
     """
     try:
         from OpenGLContext.character import CharacterModel
         if document is not None:
             from OpenGLContext.loaders.gltf import load_gltf
-            return Character(CharacterModel.from_scene(load_gltf(document=document)))
-        return Character(CharacterModel.load(_character_path(name)))
+            model = CharacterModel.from_scene(load_gltf(document=document))
+        else:
+            model = CharacterModel.load(_character_path(name))
+        if level is not None:
+            model.add_level(None, LOD_DISTANCE, document=level)
+        return Character(model)
     except Exception:                       # noqa: BLE001 - art, not rules
         log.warning('could not load the character %s', name, exc_info=True)
         return Character(group=group)
@@ -652,20 +680,32 @@ class Cast:
         #: a joint means the same joint in all of them.
         self.crowds: Dict[str, Any] = {}
         documents: Dict[str, Any] = {}      # build name -> its parse, done once
+        levels: Dict[str, Any] = {}         # and the same for its lighter mesh
         for index, id in enumerate(ids):
             name = chosen[index % len(chosen)]
             if name not in documents:
                 documents[name] = _parse_document(name)
+                levels[name] = _level_document(name)
             figure = load(name, group=None if fallback is None else fallback(),
-                          document=documents[name])
+                          document=documents[name], level=levels.get(name))
             figure.armoury = armoury
             self._enlist(name, figure)
             self.figures[id] = figure
 
     def _enlist(self, build: str, figure: Character) -> None:
-        """Put a figure in its build's crowd, where it has a model to pose."""
+        """Put a figure in its build's crowd, where it has a model to pose.
+
+        **Only the joints something reaches are written back.** Nothing here
+        reads a combatant's joints: what a figure is holding hangs off its grip
+        point, and the renderer walks to that through the scenegraph, so that
+        point and the joints down to it are what have to say where they are.
+        Writing the other fifty is arithmetic nobody collects -- and it is what
+        lets the pose be worked out on the GPU, since only what is written has
+        to come back.
+        """
         if figure.model is None:
             return
+        figure.model.mixer.pose_write = 'exposed'
         crowd = self.crowds.get(build)
         if crowd is None:
             from OpenGLContext.character.crowd import Crowd
