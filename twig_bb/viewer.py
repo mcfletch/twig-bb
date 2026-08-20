@@ -74,6 +74,7 @@ from OpenGLContext.scenegraph.light import (                     # noqa: E402
 from OpenGLContext.scenegraph.scenegraph import SceneGraph      # noqa: E402
 from omi_physics.character import CharacterCapabilities         # noqa: E402
 
+from OpenGLContext.events import systemtime                     # noqa: E402
 from OpenGLContext.events.mouseevents import WHEEL_DOWN, WHEEL_UP  # noqa: E402
 from OpenGLContext.ui import bindings, dialogs, settings         # noqa: E402
 from OpenGLContext.ui.overlay import OverlayMixin                # noqa: E402
@@ -95,6 +96,7 @@ from . import match                                             # noqa: E402
 from . import rules                                             # noqa: E402
 from . import underwater                                        # noqa: E402
 from . import debug as twigdebug                              # noqa: E402
+from . import telemetry as gamemarks                            # noqa: E402
 from . import weapons as weapontable                            # noqa: E402
 from .firstperson import WeaponHand, aim_at_camera, view_rig    # noqa: E402
 from .frameclock import FrameClock                              # noqa: E402
@@ -570,6 +572,12 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
     """
 
     config: Any = None
+    #: What this game tells a session recording about itself; see
+    #: :mod:`twig_bb.telemetry`.  :meth:`OnInit` replaces it with one bound to
+    #: this window.  The class's own marks nowhere, so a context assembled
+    #: without one -- which is how a match is played out under test -- can mark
+    #: as freely as a running game does.
+    marks: Any = gamemarks.GameMarks(None)
     _target: Optional[str] = None
     #: The map in play, or None while the start screen is up.
     loaded: Any = None
@@ -620,9 +628,14 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         # The handover for loading a level off the render thread (see
         # :meth:`_loadLevel`); set up before any level can be chosen.
         self.setupAsyncScene()
+        # What this game tells a session recording about itself; see
+        # :mod:`twig_bb.telemetry`.  Built first, because everything below it
+        # marks and a mark made before there is anything to mark on is the one
+        # that would have said which map was being read when it went wrong.
+        self.marks = gamemarks.GameMarks(self)
         self.loaded = None
         self._animator = SurfaceAnimator()
-        self._started = time.time()
+        self._started = systemtime.systemTime()
         self.platform.setFrustum(near=NEAR_PLANE, far=FAR_PLANE)
         # The event system holds callbacks weakly by design, so a binding built
         # from a bare closure is collected the moment the binding call returns
@@ -637,7 +650,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         self._pushes: Optional[jumppads.PushSystem] = None
         self._liquids: Any = None
         self._clock = FrameClock()
-        self._clock.reset(time.time())
+        self._clock.reset(systemtime.systemTime())
         # The event system holds its callbacks weakly, so the wheel handlers
         # are kept here rather than being collected as soon as they are bound.
         self._wheelHandlers: List[Any] = []
@@ -675,6 +688,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         loads in step instead.
         """
         self._target = target
+        self.marks.loading(target)
         if self.config.capture:
             self._applyLevel(load_level(self.config, self.weapons, target))
             return
@@ -688,6 +702,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
     def applyFailedLoad(self, error: Optional[BaseException]) -> None:  # pragma: no cover - GL
         """Render thread: a level would not load.  Say so and stay on the menu."""
         log.error('could not load the level %s: %s', self._target, error)
+        self.marks.failed(self._target or '', error)
         self.showMenu()
 
     def _applyLevel(self, bundle: LevelBundle) -> None:  # pragma: no cover - needs a window
@@ -705,13 +720,18 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         # vertex buffers exist, since that is what decides whether its
         # texture-coordinate buffer is dynamic.
         self._animator = SurfaceAnimator()
-        self._started = time.time()
+        self._started = systemtime.systemTime()
         self._installMatch(bundle)
         # What the map left lying about.  Built with the *map* rather than with
         # the scene, so that reloading a map's textures -- which rebuilds the
         # scene -- does not put every collected item back on the floor, for the
         # same reason it does not restore the player's loadout.
         self.rules.pickups = itemsmod.Pickups(self.loaded.pickups())
+        # Marked here rather than at the end of this method: everything below
+        # is the level being *entered*, and a reader wants the line that says
+        # which level it is above the ones that say what happened in it.
+        self.marks.loaded(self.loaded, self.arena,
+                          title=str(getattr(self.notice, 'title', '') or ''))
         self.sg = SceneGraph(children=self._scene_children())
         if self.config.physics:
             # Walk mode also decides where the camera starts, so a capture runs
@@ -819,6 +839,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             on_resume=self._closeMenu if playing else None,
             subtitle=self._menuSubtitle())
         self.pushOverlay(self._menuPanel)
+        self.marks.screen('start')
 
     def _closeMenu(self) -> None:               # pragma: no cover - GL
         """Take the start screen down, if it is up.
@@ -882,6 +903,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         self._fetch = fetcher.FetchJob(packs, cache_dir=self.config.cache_dir,
                                        on_progress=lambda: self.triggerRedraw(1))
         self._fetch.start()
+        self.marks.downloading(packs)
         self._fetchPanel = menu.progress_screen(
             self._fetch, on_cancel=lambda: None)
         self.pushOverlay(self._fetchPanel)
@@ -900,6 +922,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         if not job.finished:
             return
         self._fetch = None
+        self.marks.downloaded(job)
         self.config.content = (list(self.config.content)
                                + [root for pack_root in job.roots
                                   for root in download.content_roots(pack_root)])
@@ -946,7 +969,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         # before its vertex buffers exist -- that is what decides whether its
         # texture-coordinate buffer is dynamic.
         self._animator = SurfaceAnimator()
-        self._started = time.time()
+        self._started = systemtime.systemTime()
         # The loadout is *not* rebuilt: this reloads the map's textures, and a
         # player who loses their health and their weapon for accepting a
         # download would rightly call that a bug.  The weapon's transform is
@@ -1090,13 +1113,18 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             me = self.arena.combatant(game.PLAYER_ID)
             if me is not None and not me.alive:
                 self.rules.ask_to_respawn(game.PLAYER_ID)
+                self.marks.asked_to_respawn(game.PLAYER_ID)
                 firing = False
-        for event in controls.apply_commands(commands, firing, self.player,
-                                             self.weapons, hudclock()):
+        events = controls.apply_commands(commands, firing, self.player,
+                                         self.weapons, hudclock())
+        for event in events:
             if event.kind == 'fire':
                 self._shoot()
             if event.text:
                 self.hud.post(event.text)
+        # After they have been applied, so the mark says what is in hand now
+        # rather than what was in hand a moment ago.
+        self.marks.commands(events, weapon=str(self.player.selected))
         self.triggerRedraw(1)
 
     def _aim(self) -> Tuple[np.ndarray, np.ndarray]:
@@ -1140,6 +1168,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             # them in a corridor they were not looking at, so the timer is
             # only the shortest a death may be.
             self.rules.ask_to_respawn(game.PLAYER_ID)
+            self.marks.asked_to_respawn(game.PLAYER_ID)
             return
         if world is None or weapon is None or me is None:
             return
@@ -1330,7 +1359,12 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             self.rules.publish(game.PLAYER_ID, nav.camera_position())
         tick = self.rules.advance(
             world, dt, self.weapons.by_key(self.player.selected),
-            seed=int(self._started * 1000) % 100000, surfaces=self._collision)
+            surfaces=self._collision)
+        # The second reader of the stream: what the match did, as marks on a
+        # session recording.  See :mod:`twig_bb.telemetry`.
+        self.marks.events(tick.events)
+        self.marks.respawned(tick.respawned)
+        self.marks.minds(self.minds)
         self._cameBack(tick.respawned)
         self._watchDeath(tick.events, dt)
         self._shovePlayer()
@@ -1531,6 +1565,8 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
                 self._free_manager.bind(self)
                 self.movementManager = self._free_manager
         self._walking = walking
+        self.marks.walking(walking, mode=str(getattr(
+            getattr(self.contextDefinition, 'movementMode', None), 'name', '')))
         self.triggerRedraw(1)
         return True
 
@@ -1566,7 +1602,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         # A map load is seconds the player did not experience as a stall, so
         # the clock starts here rather than carrying that gap into the first
         # frame of play as a clamped step and a debt.
-        self._clock.reset(time.time())
+        self._clock.reset(systemtime.systemTime())
         return True
 
     def getNavigationPlatform(self) -> Any:     # pragma: no cover - GL
@@ -1606,11 +1642,14 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         current = getattr(self.contextDefinition, 'movementMode', None)
         wanted = 'walk' if current is not None and current.name == 'fly' else 'fly'
         navigation.select(wanted)
+        self.marks.movement(wanted)
 
     def _cycle_mode(self, event: Any = None) -> None:   # pragma: no cover - key
         navigation = self.getNavigation()
         if navigation is not None:
             navigation.cycle()
+            self.marks.movement(str(getattr(getattr(
+                self.contextDefinition, 'movementMode', None), 'name', '')))
 
     def _screenshot(self, event: Any = None) -> None:   # pragma: no cover - key
         from OpenGLContext.capture import capture_to_png
@@ -1655,7 +1694,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
                 self.triggerRedraw(1)
                 return 1
             return 1 if animated else 0
-        dt = self._clock.tick(time.time())
+        dt = self._clock.tick(systemtime.systemTime())
         # The game update is subdivided because it is *all* of `OnIdle`, and
         # `OnIdle` is where this game's frame time goes -- the loop trace can
         # only say "idle" until something in here says which part of it.  The
@@ -1706,7 +1745,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         if not animator:
             return False
         now = (CAPTURE_TIME if self._capture is not None
-               else time.time() - self._started)
+               else systemtime.systemTime() - self._started)
         animator.update(now)
         self.triggerRedraw(1)
         return True

@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from OpenGLContext import entropy
 from OpenGLContext.scenegraph.appearance import Appearance
 from OpenGLContext.scenegraph.box import Box
 from OpenGLContext.scenegraph.group import Group
@@ -45,6 +46,14 @@ __all__ = ['BOT_SPEED', 'PLAYER_ID', 'bot_bodies', 'heading_rotation',
            'item_bodies', 'item_look', 'messages', 'move_items',
            'move_projectiles', 'place_bots', 'projectile_bodies', 'shoot',
            'spawn_for', 'start_match', 'step_bots', 'step_projectiles']
+
+#: The session stream the opponents' minds are seeded from when a caller pins
+#: no seed: see :func:`place_bots` and :mod:`OpenGLContext.entropy`.
+BOT_STREAM = 'twig-bots'
+
+#: How large a seed a bot is given. Comfortably inside a machine word, since
+#: each bot is handed this number plus its place in the room.
+BOT_SEED_BITS = 32
 
 #: The player's own id in the match.  A fixed string rather than a name,
 #: because a name is something a player types and an id is what the rules
@@ -182,9 +191,18 @@ def place_bots(match: arenamod.Arena, seed: Optional[int] = None,
     Each is given the match's own weapon table, so a bot chooses from exactly
     what the player can carry — and ``projectiles`` so it can tell a rocket
     from a rifle and keep out of its own blast.
+
+    ``seed`` pins the whole room of them, which is what a test does with it;
+    each bot is given that number plus its place in the room, so no two of them
+    arrive facing the same way.  Without one the numbers come from the
+    **session's** own stream (:mod:`OpenGLContext.entropy`), so a match staged
+    twice in one session is two different matches while a session run again
+    from its seed stages exactly the one it staged before.
     """
+    if seed is None:
+        seed = entropy.randomizer(BOT_STREAM).getrandbits(BOT_SEED_BITS)
     return {one.id: botsmod.Bot(one.id, difficulty=one.difficulty,
-                                seed=None if seed is None else seed + index,
+                                seed=seed + index,
                                 weapons=match.weapons,
                                 projectiles=projectiles)
             for index, one in enumerate(match.bots())}
@@ -192,7 +210,7 @@ def place_bots(match: arenamod.Arena, seed: Optional[int] = None,
 
 def step_bots(world: Any, match: arenamod.Arena,
               minds: Dict[str, botsmod.Bot], dt: float,
-              weapon: Any, seed: int = 0,
+              weapon: Any, seed: Optional[int] = None,
               surfaces: Optional[Any] = None,
               flight: Optional[Any] = None,
               walking: Optional[Any] = None) -> None:
@@ -222,7 +240,7 @@ def step_bots(world: Any, match: arenamod.Arena,
 
 
 def _apply(world: Any, match: arenamod.Arena, one: Any, command: Any,
-           weapon: Any, dt: float, seed: int,
+           weapon: Any, dt: float, seed: Optional[int],
            surfaces: Optional[Any] = None,
            flight: Optional[Any] = None,
            walking: Optional[Any] = None) -> None:
@@ -269,7 +287,8 @@ def _wanted(match: arenamod.Arena, command: Any, weapon: Any) -> Any:
 
 
 def shoot(world: Any, match: arenamod.Arena, shooter: str, weapon: Any,
-          origin: Any, direction: Any, spread: float = 0.0, seed: int = 0,
+          origin: Any, direction: Any, spread: float = 0.0,
+          seed: Optional[int] = None,
           surfaces: Optional[Any] = None,
           flight: Optional[Any] = None) -> None:
     """Fire one shot, however this weapon fires.

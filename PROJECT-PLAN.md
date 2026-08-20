@@ -1572,6 +1572,36 @@ presentation. What is *not* there is the fixed tick — the rules are still
 advanced with the frame's own `dt` — and that is the one seam a network layer
 would have to install.
 
+**A whole session now records and replays (2026-08-20).** The seams above were
+built for a network layer and the first thing to actually use them is
+`OpenGLContext.telemetry`: `OPENGLCONTEXT_TELEMETRY=<file>` writes a session and
+`OPENGLCONTEXT_TELEMETRY_REPLAY=<file>` plays it again, the same keys and clicks
+on the same frames. Two things had to change for that to mean anything, and both
+are the constraints above being taken seriously rather than nearly:
+
+- **One clock.** The frame's step, the surface animation and everything the HUD
+  measures (fire rate, the cone of fire opening, a pickup's wait) read
+  `systemtime.systemTime()`, which a recording drives. They read the wall clock
+  and the monotonic clock before, which is two clocks and neither of them
+  recorded.
+- **Nothing draws from nowhere.** A shot's scatter, the opponents' minds and the
+  choice between spawn points come from named session streams
+  (`OpenGLContext.entropy`), whose seed a recording keeps and a replay puts back.
+  A `seed` argument still pins any of them for a test. The bots' were seeded from
+  the system's entropy and every shot in a session scattered by exactly the same
+  angles, so this is a fix as much as it is a foundation.
+
+`twig_bb.telemetry` marks what the engine cannot know — the level, the match,
+the weapons, every shot and hit, the pickups, the deaths, the bots' targets — by
+reading the match's own event stream a second time. A replay makes those marks
+again and the engine compares them with the recorded ones, frame for frame, so a
+session says for itself whether it played out the same way;
+`tools/replay_check.py` plays a scripted match and reports that verdict. A
+fifteen-second match on `ztn3dm1` against three bots replays with **every mark
+made again on the frame it was recorded on** — 156 of them in the run this was
+written from, and how many there are depends on how the fight goes. What that gives §11 is the thing a network layer is hardest to
+test without: a reference run to reconcile against.
+
 **The seams §5–§7 must respect.**
 
 - **Input is a command, not an effect.** A key press does not move a character; it

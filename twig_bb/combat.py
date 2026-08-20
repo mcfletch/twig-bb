@@ -30,12 +30,20 @@ from numpy.typing import ArrayLike
 
 from omi_physics import model, raycast
 
+from OpenGLContext import entropy
+
 from . import avatar
 
 log = logging.getLogger(__name__)
 
-__all__ = ['Hit', 'NOBODY', 'aim_at', 'can_see', 'fire', 'stage',
-           'unstage', 'who_is_at']
+__all__ = ['Hit', 'NOBODY', 'SCATTER_STREAM', 'aim_at', 'can_see', 'fire',
+           'stage', 'unstage', 'who_is_at']
+
+#: The session stream a shot's scatter is drawn from when the caller pins no
+#: seed of its own.  Named, so that a weapon spreading has no effect on where a
+#: bot decides to walk and a session recording puts both back: see
+#: :mod:`OpenGLContext.entropy`.
+SCATTER_STREAM = 'twig-scatter'
 
 #: :attr:`Hit.target` for a trace that met the level rather than a person.
 #: The absence of a target rather than an invented name, so nothing has to
@@ -110,10 +118,14 @@ def fire(world: Any, arena: Any, shooter: str, weapon: Any,
     firing while running scatters exactly as widely as the crosshair says it
     will.
 
-    ``seed`` makes the scatter reproducible.  Given the same inputs a shot
-    produces the same result on one machine, which is what a replay test needs
-    and what client-side prediction will need; it is not a promise of
-    bit-identical results across machines, which is a much harder one.
+    ``seed`` pins this one shot's scatter, which is what a test does with it.
+    Without one the scatter comes from the **session's** own stream
+    (:mod:`OpenGLContext.entropy`), so successive shots spread differently --
+    a cone whose every shot took one path is a cone in name only -- while a
+    session run again from its seed spreads them all exactly as it did.  That
+    is what a recorded session replaying and, later, client-side prediction
+    both need; it is not a promise of bit-identical results across machines,
+    which is a much harder one.
 
     ``surfaces`` is the :class:`~twig_bb.collision.MapCollision` the level
     was built as, and is what a hit on the world takes its material from.
@@ -132,7 +144,8 @@ def fire(world: Any, arena: Any, shooter: str, weapon: Any,
         return []
     arena.fired(shooter, weapon.key, origin=start, direction=heading)
     bodies = stage(world, arena, without=shooter)
-    scatter = random.Random(seed)
+    scatter = (random.Random(seed) if seed is not None
+               else entropy.randomizer(SCATTER_STREAM))
     landed: List[Hit] = []
     for _pellet in range(max(1, int(weapon.pellets))):
         trace = _scattered(heading, spread, scatter) if spread > 0.0 else heading

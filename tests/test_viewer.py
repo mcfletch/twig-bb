@@ -840,6 +840,10 @@ class _Headless(ViewPlatformMixin):
     _collision = None
     #: Nothing in the air.  A hitscan weapon needs no batch at all.
     flight = None
+    #: What the game tells a session recording; the real context's own default
+    #: until :meth:`~twig_bb.viewer.TwigContext.OnInit` binds one to a window.
+    #: Nothing is recording here, so every mark made below goes nowhere.
+    marks = viewer.TwigContext.marks
 
     def __init__(self, nav):
         self.contextDefinition = viewer.context_definition()
@@ -1232,6 +1236,11 @@ from OpenGLContext.move.navigation import NavigationManager  # noqa: E402
 
 class _Recorder:
     """Records what a context would bind, without needing a window."""
+
+    #: The real context's own default marker, so ``__getattr__``'s stand-in
+    #: handler does not answer for it.  Nothing is recording here, so what the
+    #: game marks goes nowhere.
+    marks = viewer.TwigContext.marks
 
     def __init__(self):
         self.bindings = []
@@ -1665,6 +1674,81 @@ class _WheelRecorder(_Recorder):
         for state in (1, 0):
             for function in self.wheel.get((button, state), ()):
                 function(None)
+
+
+class TestWhatTheSessionRecordingIsTold:
+    """The viewer's half of :mod:`twig_bb.telemetry`.
+
+    What each mark *says* is checked in `tests/test_telemetry.py`, against the
+    marker on its own. What is checked here is the thing that file cannot see:
+    that the game is wired to it, and that the marks are made where the events
+    they describe actually happen.
+    """
+
+    def context(self):
+        from twig_bb import telemetry as gamemarks
+        recorder = _WheelRecorder()
+        recorder.weapons = weapons.default_table()
+        recorder.player = player.PlayerState.carrying(recorder.weapons)
+        recorder.weaponBindings = viewer.controls.WeaponBindings()
+        recorder.hud = _MessageSink()
+        recorder.arena = arena.Arena(weapons=recorder.weapons)
+        recorder.arena.add(game.PLAYER_ID, position=np.zeros(3), name='You')
+        recorder.telemetry = _Session()
+        recorder.marks = gamemarks.GameMarks(recorder)
+        recorder.mark = recorder.telemetry.mark
+        for name in ('_wheelWeapon', '_runCommands'):
+            setattr(recorder, name,
+                    getattr(viewer.TwigContext, name).__get__(recorder))
+        return recorder
+
+    def test_changing_weapons_is_marked(self):
+        held = self.context()
+        held._runCommands([viewer.controls.NEXT_WEAPON], firing=False)
+        assert [name for name, _fields in held.telemetry.marks] == [
+            'weapon-selected']
+
+    def test_the_mark_says_what_ended_up_in_the_player_s_hands(self):
+        """After the commands have been applied, not before: a mark naming the
+        weapon that was put down would be the one thing a reader trusts."""
+        held = self.context()
+        held._runCommands([viewer.controls.NEXT_WEAPON], firing=False)
+        assert held.telemetry.marks[0][1]['weapon'] == str(held.player.selected)
+
+    def test_a_frame_with_nothing_in_it_says_nothing(self):
+        held = self.context()
+        held._runCommands([], firing=False)
+        assert held.telemetry.marks == []
+
+    def test_asking_to_come_back_is_marked(self):
+        """A death that went on is either a player who never pulled the
+        trigger or a request that was swallowed, and those are different bugs."""
+        held = self.context()
+        held.rules = _AskedRules()
+        held.arena.damage(game.PLAYER_ID, 1000.0, by='bot1')
+        held._runCommands([], firing=True)
+        assert [name for name, _fields in held.telemetry.marks] == [
+            'respawn-asked']
+
+
+class _Session:
+    """A recording that keeps what it was told, as the engine's does."""
+
+    def __init__(self):
+        self.marks = []
+
+    def mark(self, name, /, **fields):
+        self.marks.append((name, fields))
+
+
+class _AskedRules:
+    """The rules, as much of them as a trigger pulled while dead touches."""
+
+    def __init__(self):
+        self.asked = []
+
+    def ask_to_respawn(self, who):
+        self.asked.append(who)
 
 
 class TestTheWeaponWheel:

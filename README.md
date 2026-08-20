@@ -285,6 +285,75 @@ The widgets themselves are OpenGLContext's
 ([docs/hud.html](../openglcontext/docs/hud.html)), because a crosshair and a bar
 meter are the same in every game; what is here is what the numbers *mean*.
 
+### Recording a session, and playing it again
+
+A whole session goes to one file — every input the platform delivered stamped
+with the frame that acted on it, every frame's time, every exception, the
+overlay's own sections sampled as it ran — and that file can be **run again**:
+
+```console
+$ OPENGLCONTEXT_TELEMETRY=/tmp/session.jsonl twig-bb some-map.pk3 --bots 4
+$ python -m OpenGLContext.telemetry /tmp/session.jsonl        # read it
+$ OPENGLCONTEXT_TELEMETRY_REPLAY=/tmp/session.jsonl twig-bb some-map.pk3 --bots 4
+```
+
+`OPENGLCONTEXT_TELEMETRY=1` writes a dated file under your application-data
+directory instead, which is what to ask a player for. The machinery is
+OpenGLContext's ([docs/telemetry.html](../openglcontext/docs/telemetry.html));
+what this game adds is what the engine cannot know — **the marks**:
+
+```
+0:03.204  frame  190  level-loaded map=ztn3dm1 pickups=37 triangles=51345
+2:41.067  frame 9640  bot-target bot=bot1 target=player
+2:41.910  frame 9691  fired by=bot1 weapon=rocket at=[-704.0, -832.0, 430.0]
+2:42.004  frame 9697  damaged target=player by=bot1 amount=63
+2:42.004  frame 9697  death target=player by=bot1
+```
+
+A level loading and failing to, a match starting and ending, weapons chosen and
+fired empty, every shot and hit and burst, what each pickup was and who took it,
+a death and where the respawn put them, and the moment a bot found somebody to
+fight or lost them again. They come from the match's own event stream — the one
+the HUD, the sounds and the effects already read — so a mark and what the player
+saw cannot drift apart. The whole list is in
+[`twig_bb/telemetry.py`](twig_bb/telemetry.py).
+
+**A replay says whether it reproduced the session.** Those marks are made again
+while the recording plays, the engine matches them against the recorded ones —
+same mark, same fields, same frame — and says how the two accounts compared, on
+the overlay while it runs and in the log as it ends:
+
+```
+replay of session.jsonl: 156 marks, all as recorded
+```
+
+Which is a thing you can run without a person at the keyboard:
+
+```console
+$ tools/replay_check.py ../tmp/q3/ztn3dm1.pk3 --map ztn3dm1 --bots 3
+recording a scripted match to /tmp/twig-bb-replay-check.jsonl
+replaying it
+156 marks, all as recorded
+```
+
+It plays a fixed fifteen seconds against three bots — walking, turning,
+changing weapons, firing — records it, replays it and answers 0 when the two
+agree. How many marks that is depends on how the fight goes, which is what the
+session's own seed decides; what matters is that every one of them is made
+again, with the same fields, on the same frame. A run that parts from its recording says where:
+
+```
+16 of 195 marks as recorded, then weapon-refused said=NO SHOTGUN
+  where the recording has fired at=[-5.7, 1.2, 2.7] by=player weapon=pistol
+```
+
+**What makes that work** is that nothing in the game draws from a clock or a
+random number generator of its own. Every timing is the engine's own time
+source, which a recording drives; the cone of fire, the opponents' minds and the
+choice between spawn points all draw from named session streams
+(`OpenGLContext.entropy`), whose seed the recording keeps and a replay puts back.
+`OPENGLCONTEXT_SEED=4242` fixes a whole run.
+
 ### Weapons, and what they are made of
 
 `twig-bb-hud` puts the whole HUD on screen over a small lit room with a
@@ -680,6 +749,11 @@ either run the viewer in a subprocess and check that a frame was rendered, or �
 for the combat effects — put the nodes in a scene, render, and check that pixels
 changed where pixels should have. They are deliberately shallow: a reference
 image of a particle system is a reference image of a random number generator.
+
+`tools/replay_check.py` is not part of the suite and takes a few minutes: it
+records a scripted match against a real map and replays it, which is the one
+check that a session recording is worth what it claims — see [Recording a
+session, and playing it again](#recording-a-session-and-playing-it-again).
 
 The timing budgets (the projectile batch) skip themselves when something is
 tracing, because a wall-clock budget measured under `--cov` is a measurement of

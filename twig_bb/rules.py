@@ -26,11 +26,17 @@ from typing import Any, Dict, List, Optional, Sequence, Set
 import numpy as np
 from omi_physics import character
 
+from OpenGLContext import entropy
+
 from . import combat, game, walkers
 
 log = logging.getLogger(__name__)
 
-__all__ = ['Rules', 'Tick']
+__all__ = ['Rules', 'SPAWN_STREAM', 'Tick']
+
+#: The session stream a respawn's choice between equally good spawn points is
+#: drawn from when a match pins no seed: see :mod:`OpenGLContext.entropy`.
+SPAWN_STREAM = 'twig-spawns'
 
 
 @dataclass
@@ -93,14 +99,22 @@ class Rules:
         self.on_request = {game.PLAYER_ID}
         self._asked: Set[str] = set()
         #: What decides between several equally good spawn points.  Its own
-        #: generator rather than the module's, so a match seeded the same way
+        #: stream rather than the module's, so a match seeded the same way
         #: plays out the same way -- which is what a replay and, later, a
-        #: server reconciling with a client both need.
-        self.chance = random.Random(seed)
+        #: server reconciling with a client both need.  ``seed`` pins this
+        #: match; without one the choices come from the session's own stream
+        #: (:mod:`OpenGLContext.entropy`), which a recording puts back.
+        self.chance = (random.Random(seed) if seed is not None
+                       else entropy.randomizer(SPAWN_STREAM))
 
-    def advance(self, world: Any, dt: float, weapon: Any, seed: int = 0,
+    def advance(self, world: Any, dt: float, weapon: Any,
+                seed: Optional[int] = None,
                 surfaces: Optional[Any] = None) -> Tick:
         """Play one tick; returns what happened.
+
+        ``seed`` pins the scatter of every shot taken in this tick, which is
+        what a test does with it; without one each draws from the session's own
+        stream (:mod:`twig_bb.combat`).
 
         The order is the one the outcomes require rather than the one the
         pieces were written in.  Projectiles land **before** the respawns are

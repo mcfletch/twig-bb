@@ -316,19 +316,26 @@ class TestTheWeaponBarFitting:
 class TestOneClock:
     """Everything on the HUD fades against the clock the layer is ticked with.
 
-    The layer is advanced by the context with :func:`time.monotonic`; a game
-    that fed it :func:`time.time` would have every fade computed from the
-    difference between two clocks, which is about fifty years. What that looks
-    like on screen is a damage wash and a hit mark that never go away.
+    That clock is the engine's own time source, which is what the context ticks
+    the layers with and what a recorded session replaces
+    (:mod:`OpenGLContext.telemetry`). A game that read a clock of its own would
+    compute every fade from the difference between two of them -- which is
+    about fifty years, and looks on screen like a damage wash and a hit mark
+    that never go away -- and would draw a replayed session against this
+    machine's clock rather than against the recorded one.
     """
 
     def tick(self, screen, at):
         """Advance the layer the way the context does."""
         screen.tick(at)
 
-    def test_the_hud_clock_is_the_one_the_layer_is_ticked_with(self):
-        import time
-        assert abs(hud.now() - time.monotonic()) < 1.0
+    def test_the_hud_clock_is_the_engine_s(self):
+        from OpenGLContext.events import systemtime
+        previous = systemtime.setTimeSource(lambda: 1234.5)
+        try:
+            assert hud.now() == 1234.5
+        finally:
+            systemtime.setTimeSource(previous)
 
     def test_a_hit_mark_put_up_on_that_clock_goes_away_again(self, screen):
         at = hud.now()

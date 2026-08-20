@@ -26,11 +26,11 @@ the difference between them.
 from __future__ import annotations
 
 import math
-import time
 from typing import Any, List, Optional, Sequence, Tuple
 
 from vrml import field
 
+from OpenGLContext.events import systemtime
 from OpenGLContext.ui.geometry import Rect
 from OpenGLContext.ui.hudwidgets import (
     BarMeter, Crosshair, DamageIndicator, HUDGroup, HUDLayer, HUDWidget,
@@ -46,18 +46,23 @@ __all__ = ['GameHUD', 'WeaponBar', 'WeaponSlot', 'AMMO_CRITICAL', 'now']
 def now() -> float:
     """The clock every reading on this HUD is taken against.
 
-    **One clock, and this is it.**  Everything on a HUD that fades, expires or
-    flashes is driven by :meth:`~OpenGLContext.ui.hudwidgets.HUDLayer.tick`,
-    which the context calls once a frame with :func:`time.monotonic`.  A game
-    that marked a hit with :func:`time.time` and let the layer expire it
-    against the monotonic clock would compute every fade from the difference
-    between two of them -- which is about fifty years, and looks on screen like
-    a damage wash and a hit mark that never go away.
+    **One clock, and this is it**: the engine's own time source
+    (:mod:`OpenGLContext.events.systemtime`), which the context ticks the HUD
+    layers with and which everything else time-driven in a scene already reads.
+    A game that marked a hit against a clock of its own and let the layer expire
+    it against this one would compute every fade from the difference between two
+    of them -- which is about fifty years, and looks on screen like a damage
+    wash and a hit mark that never go away.
 
-    Named here rather than left as a call to :mod:`time` at each site so there
-    is one place to be right, and so a test can say what the rule is.
+    It is also what makes a session replay: a recording drives that source
+    (:mod:`OpenGLContext.telemetry`), so a fire rate, a cone of fire opening and
+    a pickup coming back are all measured against the time the recording had
+    reached rather than against this machine's clock.
+
+    Named here rather than left as a call at each site so there is one place to
+    be right, and so a test can say what the rule is.
     """
-    return time.monotonic()
+    return systemtime.systemTime()
 
 #: Rounds left at or below which the ammunition readout turns red.  Enough for
 #: a shot or two, so it means "reload or run" rather than "you have already

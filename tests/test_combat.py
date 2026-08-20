@@ -19,12 +19,18 @@ from twig_bb.worldgeometry import SurfaceIndex
 
 
 def _imported_from(node):
-    """Every module name one AST node imports, or nothing for other nodes."""
+    """Every dotted name one AST node imports, or nothing for other nodes.
+
+    ``from x import y`` counts as ``x.y``, so a rule about what a module may
+    reach can name the one module it allows rather than the package it is in.
+    """
     import ast
     if isinstance(node, ast.Import):
         return [alias.name for alias in node.names]
     if isinstance(node, ast.ImportFrom):
-        return [node.module or '']
+        module = node.module or ''
+        return ['%s.%s' % (module, alias.name) if module else alias.name
+                for alias in node.names]
     return []
 
 
@@ -274,11 +280,19 @@ class TestWhatAShotSays:
                     origin=(0, 0, 0), direction=(0, 1, 0))
         assert not [e for e in found.events if isinstance(e, arena.Impact)]
 
+    #: What the shooting rules may reach inside the engine: the session's own
+    #: randomness, which is where a shot's scatter comes from and which holds
+    #: no window, no clock and nothing that draws.  A shot that drew from
+    #: nowhere in particular could not be recorded and run again.
+    ENGINE = ('OpenGLContext.entropy',)
+
     def test_nothing_in_the_shooting_rules_can_reach_the_presentation(self):
         import ast
         import inspect
         for node in ast.walk(ast.parse(inspect.getsource(combat))):
             for name in _imported_from(node):
+                if name in self.ENGINE:
+                    continue
                 assert not name.startswith('OpenGLContext')
                 assert name.rpartition('.')[2] not in (
                     'hud', 'effects', 'firstperson', 'viewer')
