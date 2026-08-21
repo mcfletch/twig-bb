@@ -801,6 +801,14 @@ pytest -m "not gl"          # skip the tests that open a window
 pytest -m "not slow"        # skip whole-map loads and timing checks
 ```
 
+The viewer's own tests are in three files rather than one:
+`tests/test_viewer.py` for the command line, spawn placement, packs, looking and
+walking; `tests/test_viewer_match.py` for the match a player meets -- dying and
+coming back, the weapon wheel, the scoreboard, and where a shot goes when the
+mouse aimed it; and `tests/viewersupport.py` for what all of them make up -- a
+synthetic map on disk, a platform standing in it, and a context with no window
+whose input path still runs.
+
 Tests that need a sample map skip themselves when it is absent. The GL tests
 either run the viewer in a subprocess and check that a frame was rendered, or —
 for the combat effects — put the nodes in a scene, render, and check that pixels

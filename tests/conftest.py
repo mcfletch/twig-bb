@@ -21,7 +21,8 @@ QUAKE3_MAP = os.path.join(WORKSPACE, 'tmp', 'q3', 'ztn', 'maps', 'ztn3dm1.bsp')
 try:
     from twig_bb import viewer as _viewer  # noqa: F401
 except Exception:
-    collect_ignore = ['test_viewer.py', 'test_hudsample.py']
+    collect_ignore = ['test_viewer.py', 'test_viewer_match.py',
+                      'test_hudsample.py']
 
 
 @pytest.fixture
