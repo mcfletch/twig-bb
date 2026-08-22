@@ -316,18 +316,14 @@ class Bot:
         me = arena.combatant(self.id)
         if me is None or not me.alive:
             return []
-        seen = []
-        for other in combat.visible_targets(world, arena, self.id):
-            them = arena.combatant(other)
-            to = np.asarray(them.position, dtype='d') - np.asarray(me.position,
-                                                                  dtype='d')
-            distance = float(np.linalg.norm(to))
-            if distance > SIGHT_RANGE or distance < 1e-9:
-                continue
-            if not self._in_view(to / distance):
-                continue
-            seen.append(other)
-        return seen
+        # Range and field of view go *into* the question rather than filtering
+        # its answer: they are two comparisons, the line of sight behind them is
+        # a ray cast, and asking the cheap ones first is the difference between
+        # casting at everybody in the level and casting at whoever could
+        # plausibly be seen.  See :func:`twig_bb.combat.visible_targets`.
+        return combat.visible_targets(world, arena, self.id,
+                                      within=SIGHT_RANGE, facing=self.facing,
+                                      cone=FIELD_OF_VIEW)
 
     def look(self, world: Any, arena: Any, dt: float) -> List[str]:
         """Everyone this bot can see, looked up again only now and then.

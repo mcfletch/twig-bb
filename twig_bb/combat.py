@@ -238,16 +238,33 @@ def aim_at(arena: Any, shooter: str, target: str) -> Optional[np.ndarray]:
     return _unit(_eye(to_other) - _eye(from_one))
 
 
-def visible_targets(world: Any, arena: Any, looker: str) -> List[str]:
+def visible_targets(world: Any, arena: Any, looker: str,
+                    within: Optional[float] = None,
+                    facing: Optional[Sequence[float]] = None,
+                    cone: Optional[float] = None) -> List[str]:
     """Everyone alive that ``looker`` can see, nearest first.
 
     The question a bot's perception asks each time it thinks.  It goes through
     the *same* line of sight every difficulty uses — a bot that could see
     through a wall would not be difficult, it would be annoying.
+
+    ``within`` is how far the looker can see, in metres; ``facing`` and ``cone``
+    are which way it is looking and how wide, in degrees either side.  Both are
+    optional and both are **rejections applied before the line of sight**,
+    because casting a ray is the expensive half of a bot and a target that is
+    too far away or behind them was never going to count.  Asking the cheap
+    questions first does not change the answer, only the work: looking is
+    quadratic in how many are in the room, and every difficulty pays it.
     """
     from_one = arena.combatant(looker)
     if from_one is None or not from_one.alive:
         return []
+    here = np.asarray(from_one.position, dtype='d')
+    furthest = None if within is None else float(within) ** 2
+    ahead, least = None, -1.0
+    if facing is not None and cone is not None:
+        ahead = _unit(np.asarray(facing, dtype='d'))
+        least = math.cos(math.radians(float(cone)))
     seen = []
     for other in arena.ids():
         if other == looker:
@@ -255,9 +272,14 @@ def visible_targets(world: Any, arena: Any, looker: str) -> List[str]:
         target = arena.combatant(other)
         if target is None or not target.alive:
             continue
+        to = np.asarray(target.position, dtype='d') - here
+        gap = float(to.dot(to))
+        if gap < 1e-18 or (furthest is not None and gap > furthest):
+            continue
+        if ahead is not None and float(ahead.dot(to)) < least * math.sqrt(gap):
+            continue
         if can_see(world, arena, looker, other):
-            seen.append((float(np.linalg.norm(target.position - from_one.position)),
-                         other))
+            seen.append((math.sqrt(gap), other))
     return [other for _distance, other in sorted(seen)]
 
 
