@@ -157,6 +157,16 @@ CORE_TEXTURE_PACK = 'quake3-core'
 #: the common `sin` waves somewhere visible.
 CAPTURE_TIME = 0.35
 
+#: Seconds between looks at who is under the crosshair.
+#:
+#: The answer is a ray cast with every combatant staged into the world around
+#: it -- the same work a shot does -- and it was being asked on every frame to
+#: keep a name under a reticule.  A tenth of a second is well below the time a
+#: player needs to read a name, and far below the reaction the name informs, so
+#: nothing about aiming or shooting changes: the *shot* still traces when it is
+#: fired.  What is rate-limited is the label.
+TARGET_NAME_INTERVAL = 0.1
+
 
 def build_parser(prog: str = 'twig-bb') -> argparse.ArgumentParser:
     """The viewer's command line."""
@@ -1300,6 +1310,11 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             context.addEventHandler('keyboard', name=name, state=1,
                                     function=getattr(self, attribute))
 
+    #: When the crosshair's name was last looked up, and what it said.  See
+    #: :data:`TARGET_NAME_INTERVAL`.
+    _namedAt = -1e9
+    _named = ''
+
     def renderShaderOverlay(self, pass_: Any) -> None:   # pragma: no cover - GL
         """Bring the HUD up to date, then let the layers draw themselves.
 
@@ -1444,7 +1459,23 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             hud.score(me.frags, limit=int(self.arena.fragLimit))
         if self.deathCamera is not None:
             hud.dying(self.deathCamera.wash())
-        hud.looking_at(self._targetName())
+        hud.looking_at(self._namedTarget())
+
+    def _namedTarget(self) -> str:              # pragma: no cover - GL
+        """Whoever is under the crosshair, looked up again only now and then.
+
+        :meth:`_targetName` is the *answer* and is unchanged; this is how often
+        it is asked.  It is a ray cast with the combatants staged into the world
+        around it, which is the same work a shot does -- and it was being done
+        on every frame to keep a name under a reticule.  A tenth of a second is
+        far below what a player can read a name in, and the name still comes
+        from the trace a shot would take rather than from a cheaper rule.
+        """
+        now = hudclock()
+        if now - self._namedAt >= TARGET_NAME_INTERVAL:
+            self._namedAt = now
+            self._named = self._targetName()
+        return self._named
 
     def _targetName(self) -> str:               # pragma: no cover - GL
         """Whoever is under the crosshair right now, or ''.
