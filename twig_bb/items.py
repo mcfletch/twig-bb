@@ -473,6 +473,20 @@ class Pickups:
                     item.waiting = None
         return self._collect(arena, table)
 
+    def _placed(self) -> np.ndarray:
+        """Where every item stands, as one array.
+
+        Built once: an item is placed by the map and does not move, and being
+        *taken* is a flag rather than a position.
+        """
+        found = getattr(self, '_positions', None)
+        if found is None or len(found) != len(self.items):
+            found = self._positions = (
+                np.stack([np.asarray(one.position, dtype='d')
+                          for one in self.items])
+                if self.items else np.zeros((0, 3), dtype='d'))
+        return found
+
     def _collect(self, arena: Any, table: Any = None) -> List[Taken]:
         """Hand each available item to the first living body standing in it."""
         took: List[Taken] = []
@@ -482,11 +496,15 @@ class Pickups:
                     if one is not None and one.alive]
         if not standing:
             return took
-        for item in self.items:
+        # Every item against every body at once.  A map places fifty of these
+        # and a match holds a dozen people, so asked one pair at a time this is
+        # six hundred calls a frame for an answer that is almost always "no".
+        touching = _touching(self._placed(), np.stack([f for _id, f in standing]))
+        for index, item in enumerate(self.items):
             if not item.available:
                 continue
-            for id, feet in standing:
-                if not _reaches(feet, item.position):
+            for at, (id, feet) in enumerate(standing):
+                if not touching[index, at]:
                     continue
                 one = arena.combatant(id)
                 if one is None:
@@ -516,6 +534,20 @@ class Pickups:
         return {'items': len(self.items),
                 'items waiting': sum(1 for one in self.items
                                      if not one.available)}
+
+
+def _touching(items: np.ndarray, feet: np.ndarray) -> np.ndarray:
+    """``(items, bodies)`` of who is standing in what.
+
+    The batch form of :func:`_reaches`, and the same test: a cylinder about
+    each item, and a body's own upright span against it.
+    """
+    if not len(items) or not len(feet):
+        return np.zeros((len(items), len(feet)), dtype=bool)
+    across = items[:, None, [0, 2]] - feet[None, :, [0, 2]]
+    near = np.einsum('ijk,ijk->ij', across, across) <= REACH * REACH
+    above = items[:, None, 1] - feet[None, :, 1]
+    return near & (above >= -REACH_HEIGHT) & (above <= avatar.HEIGHT + REACH_HEIGHT)
 
 
 def _reaches(feet: np.ndarray, item: np.ndarray) -> bool:

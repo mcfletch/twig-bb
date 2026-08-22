@@ -9,6 +9,7 @@ with. That is what was reported.
 
 from __future__ import annotations
 
+import random
 import numpy as np
 import pytest
 
@@ -499,3 +500,30 @@ class TestTakingAWeaponPutsItInHand:
         placed(kind(key='h', title='H', health=25)).advance(made, 0.0,
                                                             table=table)
         assert player.selected == 'pistol'
+
+
+class TestReachingForManyAtOnce:
+    """The batch test and the single one are the same test.
+
+    A map places fifty items and a match holds a dozen people, so the question
+    is asked six hundred times a frame; it is asked of the whole set at once,
+    and what has to be true is that the answer is unchanged.
+    """
+
+    def spread(self, count=25, seed=7):
+        chooser = random.Random(seed)
+        return np.array([[chooser.uniform(-8, 8), chooser.uniform(-3, 3),
+                          chooser.uniform(-8, 8)] for _ in range(count)])
+
+    def test_it_agrees_with_asking_one_pair_at_a_time(self):
+        placed, standing = self.spread(25, 7), self.spread(9, 11)
+        batch = items._touching(placed, standing)
+        for i, item in enumerate(placed):
+            for j, feet in enumerate(standing):
+                assert bool(batch[i, j]) == items._reaches(feet, item), (i, j)
+
+    def test_nothing_placed_is_an_empty_answer(self):
+        assert items._touching(np.zeros((0, 3)), self.spread(3)).shape == (0, 3)
+
+    def test_nobody_standing_is_an_empty_answer(self):
+        assert items._touching(self.spread(4), np.zeros((0, 3))).shape == (4, 0)
