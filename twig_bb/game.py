@@ -221,7 +221,8 @@ def step_bots(world: Any, match: arenamod.Arena,
               surfaces: Optional[Any] = None,
               flight: Optional[Any] = None,
               walking: Optional[Any] = None,
-              visibility: Any = None) -> None:
+              visibility: Any = None,
+              rooms: Any = None) -> None:
     """Run every bot's mind for one tick and apply what it decided.
 
     The command a bot produces is consumed here, and the same shape of record
@@ -243,7 +244,7 @@ def step_bots(world: Any, match: arenamod.Arena,
     # cast twice -- once from each end of the same segment.  The memo lives for
     # this tick only: anybody may have moved by the next one.
     seen: Dict[tuple, bool] = {}
-    rooms = CombatantRooms(visibility, match)
+    rooms = (CombatantRooms(visibility, match) if rooms is None else rooms)
     for id, mind in minds.items():
         one = match.combatant(id)
         if one is None or not one.alive:
@@ -796,6 +797,10 @@ class CombatantRooms:
                 self._rooms[id] = visibility.cluster_at(
                     to_map_points([one.position])[0])
 
+    def __bool__(self) -> bool:
+        """Whether this can say anything about anybody."""
+        return bool(self._rooms)
+
     def may_see(self, looker: str, target: str) -> bool:
         """Whether the map allows these two to see each other at all."""
         if not self._rooms:
@@ -807,42 +812,30 @@ class CombatantRooms:
         return self._visibility.sees(here, there)
 
 
-def _unseen_combatants(match: Any, visibility: Any) -> frozenset:
+def _unseen_combatants(match: Any, rooms: Any) -> frozenset:
     """Who is standing in a room the player cannot see, by id.
 
-    Empty whenever the question cannot be answered -- no map visibility, no
-    player to look from, a combatant outside every room -- because the set is
-    what may be *left out*, and not knowing has to mean drawing them.
+    The same rooms the bots reason with (:class:`CombatantRooms`), asked from
+    the player's own: "not drawn" and "cannot be seen by that one" are the same
+    question, and the tree walk behind them is worth doing once a tick.
+
+    Empty whenever it cannot be answered, because the set is what may be *left
+    out* and not knowing has to mean drawing them.
     """
-    if not visibility:
+    if rooms is None or not rooms:
         return frozenset()
-    watcher = match.combatant(PLAYER_ID)
-    if watcher is None:
-        return frozenset()
-    seen = visibility.visible_from(to_map_points([watcher.position])[0])
-    if seen is None:
-        return frozenset()
-    hidden = []
-    for id in match.ids():
-        if id == PLAYER_ID:
-            continue
-        one = match.combatant(id)
-        if one is None:
-            continue
-        cluster = visibility.cluster_at(to_map_points([one.position])[0])
-        if 0 <= cluster < len(seen) and not seen[cluster]:
-            hidden.append(id)
-    return frozenset(hidden)
+    return frozenset(id for id in match.ids()
+                     if id != PLAYER_ID and not rooms.may_see(PLAYER_ID, id))
 
 
 def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
                 cast: Optional[Any] = None, walking: Optional[Any] = None,
                 dt: float = 0.0, mode: Any = None,
-                visibility: Any = None) -> None:
+                rooms: Any = None) -> None:
     """Put each bot's body where the rules say it is, and play what it is doing.
 
-    ``visibility`` is the map's own account of which rooms can be seen from
-    which (:mod:`twig_bb.visibility`).  A combatant standing in a room the
+    ``rooms`` is the :class:`CombatantRooms` this tick was stepped with -- the
+    same one the bots reasoned with.  A combatant standing in a room the
     player cannot see is not drawn and has its pose worked out at the far rate:
     the frustum cannot reject it -- it is straight ahead, behind a wall -- and a
     figure is thirty-odd shapes and a skeleton.  Conservative, like the set
@@ -859,7 +852,7 @@ def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
     :class:`~twig_bb.walkers.Walkers` the bodies move in, which is what knows
     a bot's speed and whether it is on the ground.
     """
-    unseen = _unseen_combatants(match, visibility)
+    unseen = _unseen_combatants(match, rooms)
     for id, body in bodies.items():
         one = match.combatant(id)
         if one is None:

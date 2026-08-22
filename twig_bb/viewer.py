@@ -1390,8 +1390,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         self._shovePlayer()
         game.move_bodies(self.arena, self.botBodies, cast=self.cast,
                          walking=self.rules.walking, dt=dt, mode=self,
-                         visibility=self.loaded.visibility()
-                         if self.loaded is not None else None)
+                         rooms=self.rules.rooms)
         game.move_items(self.rules.pickups, self.itemBodies, hudclock(),
                         near=self._nav.camera_position() if self._nav else None,
                         rooms=getattr(self, 'itemRooms', None))
