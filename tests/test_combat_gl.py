@@ -150,14 +150,14 @@ class TestARocket:
 
     def test_a_rocket_in_flight_is_drawn(self, render):
         flight = _flight()
-        group, bodies = game.projectile_bodies(flight.capacity)
+        group, bodies = game.projectile_bodies(flight.table)
         empty = render([group])
         game.move_projectiles(flight, bodies)
         assert _lit(render()) > _lit(empty)
 
     def test_it_is_drawn_somewhere_else_when_it_moves(self, render):
         flight = _flight(at=(-1.5, 0.0, AHEAD))
-        group, bodies = game.projectile_bodies(flight.capacity)
+        group, bodies = game.projectile_bodies(flight.table)
         game.move_projectiles(flight, bodies)
         before = render([group])
         flight.position[0] = (1.5, 0.0, AHEAD)
@@ -167,7 +167,7 @@ class TestARocket:
     def test_nothing_in_the_air_draws_nothing(self, render):
         """The bodies are parked out of sight rather than left where they were."""
         flight = _flight()
-        group, bodies = game.projectile_bodies(flight.capacity)
+        group, bodies = game.projectile_bodies(flight.table)
         game.move_projectiles(flight, bodies)
         lit = _lit(render([group]))
         assert lit > 0

@@ -8,6 +8,7 @@ something constructed.
 
 from __future__ import annotations
 
+import math
 import random
 from unittest import mock
 
@@ -681,11 +682,12 @@ class TestWhatABurstDoesToSomebodyStandingOnIt:
 
 
 class TestDrawingWhatIsInFlight:
-    """A body per slot, parked out of sight when nothing is using it.
+    """One instanced model per kind, placed once per thing of that kind aloft.
 
     A scenegraph edited every time a rocket is fired is a scenegraph rebuilt
     at the rate somebody holds the trigger down, and everything the render
-    pass had gathered goes with it.
+    pass had gathered goes with it.  So nothing here is built or unbuilt while
+    a match runs: firing writes matrices onto nodes that are already there.
     """
 
     def flight(self, count=0):
@@ -698,49 +700,71 @@ class TestDrawingWhatIsInFlight:
                         owner='player')
         return made
 
-    def test_there_is_one_body_per_slot_of_each_kind(self):
-        from twig_bb import projectiles
-        group, bodies = game.projectile_bodies(4)
-        assert all(len(row) == 4 for row in bodies.values())
-        assert len(group.children) == 4 * len(bodies)
-        assert projectiles.ROCKET in bodies
+    def placements(self, model):
+        """Every part's placements, as ``(parts, copies, 4, 4)``."""
+        return np.stack([
+            np.asarray(part.placements, dtype='f').reshape(-1, 4, 4)
+            for part in model.children])
 
-    def test_an_unused_body_is_out_of_sight(self):
-        from twig_bb import projectiles
-        _group, bodies = game.projectile_bodies(2)
-        game.move_projectiles(self.flight(), bodies)
-        assert tuple(bodies[projectiles.ROCKET][0].translation) == game.OFFSTAGE
+    def positions(self, model):
+        """Where each copy puts each part, as ``(parts, copies, 3)``."""
+        return self.placements(model)[:, :, 3, :3]
 
-    def test_a_flying_projectile_is_drawn_where_it_is(self):
-        from twig_bb import projectiles
-        _group, bodies = game.projectile_bodies(4)
-        flight = self.flight(2)
-        game.move_projectiles(flight, bodies)
-        rockets = bodies[projectiles.ROCKET]
-        assert tuple(rockets[0].translation) == pytest.approx((0.0, 1.0, 0.0))
-        assert tuple(rockets[1].translation) == pytest.approx((1.0, 1.0, 0.0))
-        assert tuple(rockets[2].translation) == game.OFFSTAGE
+    def drawn(self, model):
+        """How many copies of the model are being drawn."""
+        first = model.children[0].instancePlacements()
+        return 0 if first is None else len(first)
 
-    def test_each_kind_of_projectile_gets_its_own_shape(self):
+    def test_every_kind_gets_a_model_of_its_own(self):
         """A grenade is not a rocket, and neither is a ball."""
         from twig_bb import projectiles
-        _group, bodies = game.projectile_bodies(2)
+        group, bodies = game.projectile_bodies()
         assert set(bodies) == {projectiles.ROCKET, projectiles.GRENADE}
+        assert len(group.children) == len(bodies)
 
-    def test_a_grenade_in_the_air_is_drawn_as_a_grenade(self):
+    def test_nothing_in_the_air_draws_nothing(self):
         from twig_bb import projectiles
-        table = projectiles.default_table()
-        flight = projectiles.Projectiles(table, capacity=4)
-        flight.launch(table.by_key(projectiles.GRENADE), origin=(3, 1, 0),
-                      direction=(1, 0, 0), owner='player')
-        _group, bodies = game.projectile_bodies(4)
-        game.move_projectiles(flight, bodies)
-        assert tuple(bodies[projectiles.GRENADE][0].translation) \
-            == pytest.approx((3.0, 1.0, 0.0))
-        assert all(tuple(body.translation) == game.OFFSTAGE
-                   for body in bodies[projectiles.ROCKET])
+        _group, bodies = game.projectile_bodies()
+        game.move_projectiles(self.flight(), bodies)
+        assert self.drawn(bodies[projectiles.ROCKET]) == 0
 
-    def test_two_kinds_at_once_each_go_to_their_own_bodies(self):
+    def test_a_copy_is_drawn_for_each_thing_of_that_kind_aloft(self):
+        from twig_bb import projectiles
+        _group, bodies = game.projectile_bodies()
+        game.move_projectiles(self.flight(3), bodies)
+        assert self.drawn(bodies[projectiles.ROCKET]) == 3
+        assert self.drawn(bodies[projectiles.GRENADE]) == 0
+
+    def test_a_projectile_is_drawn_where_it_is(self):
+        """Every part of the model moves with the projectile, and by as much.
+
+        Measured as a *change*, because a part sits at its own offset within
+        the model and the question here is whose position it follows.
+        """
+        from twig_bb import projectiles
+        _group, bodies = game.projectile_bodies()
+        flight = self.flight(1)
+        game.move_projectiles(flight, bodies)
+        before = self.positions(bodies[projectiles.ROCKET])
+        flight.position[0] = (5.0, 2.0, -3.0)
+        game.move_projectiles(flight, bodies)
+        after = self.positions(bodies[projectiles.ROCKET])
+        moved = after - before
+        assert moved == pytest.approx(
+            np.broadcast_to(np.array([5.0, 1.0, -3.0], dtype='f'), moved.shape),
+            abs=1e-4)
+
+    def test_two_projectiles_are_drawn_a_projectile_apart(self):
+        from twig_bb import projectiles
+        _group, bodies = game.projectile_bodies()
+        game.move_projectiles(self.flight(2), bodies)
+        places = self.positions(bodies[projectiles.ROCKET])
+        # Launched a metre apart along x, so every part's two copies are too.
+        assert (places[:, 1] - places[:, 0]) == pytest.approx(
+            np.broadcast_to(np.array([1.0, 0.0, 0.0], dtype='f'),
+                            places[:, 0].shape), abs=1e-4)
+
+    def test_two_kinds_at_once_each_go_to_their_own_model(self):
         from twig_bb import projectiles
         table = projectiles.default_table()
         flight = projectiles.Projectiles(table, capacity=4)
@@ -748,26 +772,37 @@ class TestDrawingWhatIsInFlight:
                       direction=(1, 0, 0), owner='player')
         flight.launch(table.by_key(projectiles.GRENADE), origin=(2, 0, 0),
                       direction=(1, 0, 0), owner='player')
-        _group, bodies = game.projectile_bodies(4)
+        _group, bodies = game.projectile_bodies()
         game.move_projectiles(flight, bodies)
-        assert tuple(bodies[projectiles.ROCKET][0].translation)[0] == pytest.approx(1.0)
-        assert tuple(bodies[projectiles.GRENADE][0].translation)[0] == pytest.approx(2.0)
+        assert self.drawn(bodies[projectiles.ROCKET]) == 1
+        assert self.drawn(bodies[projectiles.GRENADE]) == 1
 
-    def test_they_all_share_one_body_so_the_pass_can_batch_them(self):
-        """Two hundred rockets are two hundred matrices, not two hundred models.
+    def test_what_the_pass_gathers_does_not_grow_with_the_batch(self):
+        """The whole point: two hundred rockets are matrices, not nodes.
 
-        The pass batches on the identity of the geometry, so every slot has to
-        be handed the *same* subtree rather than its own copy of one.
+        A model placed by hand is one subtree per copy and the render pass pays
+        for every part of every one of them, on every frame, whether or not any
+        can be seen.
         """
+        from vrml.vrml97 import nodetypes
+        from OpenGLContext import visitor
         from twig_bb import projectiles
-        _group, bodies = game.projectile_bodies(3)
-        held = {id(body.children[0]) for body in bodies[projectiles.ROCKET]}
-        assert len(held) == 1
+        group, bodies = game.projectile_bodies()
+        parked = len(visitor.find(group, nodetypes.Rendering))
+        table = projectiles.default_table()
+        flight = projectiles.Projectiles(table, capacity=256)
+        for index in range(200):
+            flight.launch(table.by_key(projectiles.ROCKET),
+                          origin=(float(index), 0.0, 0.0), direction=(1, 0, 0),
+                          owner='player')
+        game.move_projectiles(flight, bodies)
+        assert self.drawn(bodies[projectiles.ROCKET]) == 200
+        assert len(visitor.find(group, nodetypes.Rendering)) == parked
 
     def test_a_projectile_is_drawn_as_a_rocket(self):
         from twig_bb import projectiles
-        _group, bodies = game.projectile_bodies(1)
-        assert list(art.shapes(bodies[projectiles.ROCKET][0])), \
+        _group, bodies = game.projectile_bodies()
+        assert len(bodies[projectiles.ROCKET]), \
             'the rocket model brought no shapes'
 
     def test_a_missing_model_still_leaves_something_to_see(self):
@@ -775,15 +810,14 @@ class TestDrawingWhatIsInFlight:
         from twig_bb import projectiles
         table = projectiles.ProjectileTable(kinds=[
             projectiles.Projectile(key='ghost', model='weapons/absent.glb')])
-        _group, bodies = game.projectile_bodies(2, table=table)
-        assert len(bodies['ghost']) == 2
-        assert list(art.shapes(bodies['ghost'][0]))
+        _group, bodies = game.projectile_bodies(table=table)
+        assert len(bodies['ghost']), 'nothing at all would be drawn'
 
-    def test_no_batch_at_all_parks_everything(self):
-        _group, bodies = game.projectile_bodies(2)
+    def test_no_batch_at_all_draws_nothing(self):
+        _group, bodies = game.projectile_bodies()
         game.move_projectiles(None, bodies)
-        assert all(tuple(body.translation) == game.OFFSTAGE
-                   for row in bodies.values() for body in row)
+        assert all(model.children[0].instancePlacements() is None
+                   for model in bodies.values())
 
 
 class TestPointingARocketWhereItIsGoing:
@@ -822,16 +856,52 @@ class TestPointingARocketWhereItIsGoing:
     def test_going_nowhere_is_left_alone(self):
         assert game.heading_rotation((0.0, 0.0, 0.0))[3] == 0.0
 
+    def spun(self, direction):
+        """Where the nose ends up under the batch form's quaternion."""
+        x, y, z, w = game.heading_quaternions([direction])[0]
+        nose = np.asarray(game.MODEL_FORWARD, dtype=float)
+        axis = np.array([x, y, z])
+        # Rodrigues, from the quaternion's own axis and angle.
+        length = float(np.linalg.norm(axis))
+        if length < 1e-12:
+            return nose
+        axis = axis / length
+        angle = 2.0 * math.atan2(length, float(w))
+        return (nose * math.cos(angle)
+                + np.cross(axis, nose) * math.sin(angle)
+                + axis * float(np.dot(axis, nose)) * (1 - math.cos(angle)))
+
+    @pytest.mark.parametrize('direction', [
+        (1, 0, 0), (0, 1, 0), (0, 0, 1), (0, 0, -1), (1, 2, -3), (-4, 0.5, 2),
+    ])
+    def test_the_batch_form_turns_a_nose_where_the_single_one_does(self, direction):
+        """A projectile placed with the batch faces where one placed alone does.
+
+        The two are used in different places -- a whole flight at once, and a
+        single body -- and a picture that disagreed between them would be a
+        projectile that pointed one way while its own trail went another.
+        """
+        assert self.spun(direction) == pytest.approx(self.turned(direction),
+                                                     abs=1e-6)
+
+    def test_a_batch_going_nowhere_is_left_as_it_was_authored(self):
+        assert tuple(game.heading_quaternions([(0.0, 0.0, 0.0)])[0]) \
+            == pytest.approx((0.0, 0.0, 0.0, 1.0))
+
     def test_a_flying_projectile_is_turned_to_face_its_flight(self):
+        """Two rockets on different headings are not drawn at the same angle."""
         from twig_bb import projectiles
         table = projectiles.default_table()
         flight = projectiles.Projectiles(table, capacity=2)
         flight.launch(table.by_key(projectiles.ROCKET), origin=(0, 1, 0),
                       direction=(1, 0, 0), owner='player')
-        _group, bodies = game.projectile_bodies(2)
+        flight.launch(table.by_key(projectiles.ROCKET), origin=(0, 1, 0),
+                      direction=(0, 1, 0), owner='player')
+        _group, bodies = game.projectile_bodies()
         game.move_projectiles(flight, bodies)
-        assert tuple(bodies[projectiles.ROCKET][0].rotation) == pytest.approx(
-            game.heading_rotation((1, 0, 0)))
+        placed = np.asarray(bodies[projectiles.ROCKET].children[0].placements,
+                            dtype='f').reshape(-1, 4, 4)
+        assert not np.allclose(placed[0][:3, :3], placed[1][:3, :3])
 
 
 class TestSayingHowSomebodyDied:

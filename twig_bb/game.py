@@ -25,6 +25,9 @@ from OpenGLContext import entropy
 from OpenGLContext.scenegraph.appearance import Appearance
 from OpenGLContext.scenegraph.box import Box
 from OpenGLContext.scenegraph.group import Group
+from OpenGLContext.scenegraph.instancedshape import (
+    InstancedModel, placement_matrices,
+)
 from OpenGLContext.scenegraph.material import Material
 from OpenGLContext.scenegraph.quadrics import Cylinder, Sphere
 from OpenGLContext.scenegraph.shape import Shape
@@ -44,7 +47,8 @@ log = logging.getLogger(__name__)
 
 __all__ = ['BOT_SPEED', 'PLAYER_ID', 'bot_bodies', 'heading_rotation',
            'item_bodies', 'item_look', 'messages', 'move_items',
-           'move_projectiles', 'place_bots', 'projectile_bodies', 'shoot',
+           'heading_quaternions', 'move_projectiles', 'place_bots',
+           'projectile_bodies', 'shoot',
            'spawn_for', 'start_match', 'step_bots', 'step_projectiles']
 
 #: The session stream the opponents' minds are seeded from when a caller pins
@@ -429,42 +433,68 @@ def _spark() -> Shape:
     return Shape(geometry=Sphere(radius=PROJECTILE_DRAW_RADIUS), appearance=look)
 
 
-def projectile_bodies(capacity: int,
-                      table: Any = None) -> Tuple[Group, Dict[str, List[Transform]]]:
+def projectile_bodies(table: Any = None
+                      ) -> Tuple[Group, Dict[str, InstancedModel]]:
     """Bodies for things in flight, keyed by which kind of thing they are.
 
-    One body per slot in the batch **per kind**, made once and parked out of
-    sight when unused: a scenegraph edited every time a rocket is fired is a
-    scenegraph rebuilt at the rate somebody holds down the trigger, and what
-    the render pass has gathered would be thrown away with it.
+    One :class:`~OpenGLContext.scenegraph.instancedshape.InstancedModel` per
+    kind, made once: the model's parts are the nodes, and how many are in the
+    air is an array of matrices on them rather than a subtree apiece.  What the
+    render pass gathers is therefore a handful of objects whatever the batch's
+    capacity, and firing edits no scenegraph -- a level that has never seen a
+    rocket costs the same as one in the middle of a firefight.
 
-    A row per kind rather than one row that changes shape, because a rocket and
-    a grenade are different models and swapping a slot's child when a grenade
-    lands in a slot a rocket used is the same scenegraph edit by another name.
-    The cost is a handful of parked transforms, which is nothing; what it buys
-    is that nothing is ever rebuilt.
-
-    **Every slot of a kind is handed the same subtree**, the way VRML's ``USE``
-    shares one node between parents.  The render pass batches on the identity
-    of the geometry it finds, so sharing is what collapses two hundred rockets
-    into one instanced draw per part of the model -- a copy each would be two
-    hundred draws, and nothing here would have said anything different.
+    A model per kind rather than one that changes shape, because a rocket and a
+    grenade are different models; each is placed from its own array.
     """
     if table is None:
         table = projectilesmod.default_table()
-    slots = max(0, int(capacity))
-    bodies: Dict[str, List[Transform]] = {}
-    children: List[Transform] = []
+    bodies: Dict[str, InstancedModel] = {}
+    children: List[Any] = []
     for kind in table.kinds:
         look = art.load(str(kind.model)) if str(kind.model) else None
         if look is None:
             look = _spark()
-        scale = (float(kind.modelScale),) * 3
-        row = [Transform(translation=OFFSTAGE, scale=scale, children=[look])
-               for _slot in range(slots)]
-        bodies[str(kind.key)] = row
-        children.extend(row)
+        model = InstancedModel(model=look)
+        bodies[str(kind.key)] = model
+        children.append(model)
     return (Group(children=children), bodies)
+
+
+def heading_quaternions(directions: Any,
+                        forward: Sequence[float] = MODEL_FORWARD) -> np.ndarray:
+    """``(N,4)`` ``(x,y,z,w)`` rotations turning ``forward`` onto each direction.
+
+    The batch form of :func:`heading_rotation`, for placing a whole set of
+    projectiles in one pass.  A direction of nothing leaves the model facing the
+    way it was authored, and one pointing straight backwards is turned about an
+    axis picked across the model, since every axis across it turns it equally.
+    """
+    headings = np.asarray(directions, dtype='d').reshape(-1, 3)
+    lengths = np.linalg.norm(headings, axis=1)
+    safe = lengths > 0.0
+    unit = np.zeros_like(headings)
+    unit[safe] = headings[safe] / lengths[safe, None]
+    facing = np.asarray(forward, dtype='d')
+    axes = np.cross(np.broadcast_to(facing, unit.shape), unit)
+    sines = np.linalg.norm(axes, axis=1)
+    angles = np.arctan2(sines, unit @ facing)
+    # Straight backwards: no axis comes out of the cross product, so one is
+    # chosen across the model rather than derived from it.
+    across = (1.0, 0.0, 0.0) if abs(facing[0]) < 0.9 else (0.0, 1.0, 0.0)
+    reversed_ = safe & (sines < 1e-9) & (angles > 1e-9)
+    if reversed_.any():
+        axes[reversed_] = np.cross(facing, np.asarray(across, dtype='d'))
+        sines = np.linalg.norm(axes, axis=1)
+    turning = safe & (sines > 0.0)
+    quaternions = np.zeros((len(headings), 4), dtype='d')
+    quaternions[:, 3] = 1.0
+    if turning.any():
+        unit_axes = axes[turning] / np.linalg.norm(axes[turning], axis=1)[:, None]
+        half = angles[turning] / 2.0
+        quaternions[turning, :3] = unit_axes * np.sin(half)[:, None]
+        quaternions[turning, 3] = np.cos(half)
+    return quaternions
 
 
 def heading_rotation(direction: Sequence[float],
@@ -501,29 +531,36 @@ def heading_rotation(direction: Sequence[float],
     return (float(axis[0]), float(axis[1]), float(axis[2]), float(angle))
 
 
-def move_projectiles(flight: Any, bodies: Dict[str, List[Transform]]) -> None:
-    """Put each body where its projectile is, aim it, and park the rest.
+def move_projectiles(flight: Any, bodies: Dict[str, InstancedModel]) -> None:
+    """Place each kind's model once per projectile of that kind in the air.
 
     The batch keeps its living entries packed at the front, but *its* slot
-    numbering mixes the kinds together and each kind has bodies of its own, so
-    the two are matched up by taking the next unused body of whatever kind is
-    in hand rather than by index.
+    numbering mixes the kinds together, so the slots are sorted by kind and each
+    kind's model is handed its own set in one go.  A kind with nothing in the
+    air is placed nowhere, which is what draws nothing.
     """
-    used = {key: 0 for key in bodies}
     live = 0 if flight is None else len(flight)
+    slots: Dict[str, List[int]] = {key: [] for key in bodies}
     for slot in range(live):
         kind = flight.kind_at(slot)
-        row = bodies.get(str(kind.key)) if kind is not None else None
-        if row is None or used[str(kind.key)] >= len(row):
+        if kind is not None and str(kind.key) in slots:
+            slots[str(kind.key)].append(slot)
+    scales = {}
+    if flight is not None:
+        for kind in getattr(flight.table, 'kinds', ()):
+            scales[str(kind.key)] = float(kind.modelScale)
+    for key, model in bodies.items():
+        mine = slots[key]
+        if not mine:
+            model.place(())
             continue
-        body = row[used[str(kind.key)]]
-        used[str(kind.key)] += 1
-        body.translation = tuple(float(value) for value in flight.position[slot])
-        body.rotation = heading_rotation(flight.velocity[slot])
-    for key, row in bodies.items():
-        for body in row[used[key]:]:
-            if tuple(body.translation) != OFFSTAGE:
-                body.translation = OFFSTAGE
+        index = np.asarray(mine, dtype='i4')
+        scale = scales.get(key, 1.0)
+        model.place(placement_matrices(
+            translations=flight.position[index],
+            rotations=heading_quaternions(flight.velocity[index]),
+            scales=np.full((len(index), 3), scale, dtype='f'),
+        ))
 
 
 #: How big a pickup is drawn, in metres, and how fast it turns in radians a

@@ -537,12 +537,11 @@ def build_match(config: Any, weapons: Any, loaded: Any) -> LevelBundle:
     cast = characters.Cast([one.id for one in arena.bots()],
                            armoury=characters.Armoury(weapons))
     botGroup, botBodies = game.bot_bodies(arena, cast=cast)
-    # Everything in the air, and one body per slot to draw it with, made once: a
-    # scenegraph edited every time a rocket is fired is one rebuilt at the rate
-    # somebody holds the trigger down.
+    # Everything in the air, and one instanced model per kind to draw it with,
+    # made once: a scenegraph edited every time a rocket is fired is one rebuilt
+    # at the rate somebody holds the trigger down.
     flight = projectiles.Projectiles(projectiles.default_table())
-    projectileGroup, projectileBodies = game.projectile_bodies(
-        flight.capacity, flight.table)
+    projectileGroup, projectileBodies = game.projectile_bodies(flight.table)
     # Given the same tables the player has, so a bot chooses between exactly the
     # weapons the player can carry and knows what each throws.
     minds = game.place_bots(arena, projectiles=flight.table)

@@ -419,6 +419,14 @@ top speed, its zero gravity, its zero bounce and zero fuse against the grenade's
 arc and its timer — and in nothing else: two weapons needing two code paths
 would mean the table was not carrying the design.
 
+**What a kind is drawn with is one node, not one per shot.** Each kind gets an
+[`InstancedModel`](../openglcontext/docs/instancing.html#instancedmodel), and how
+many are in the air is an array of matrices written onto it. The renderer
+therefore sees as many objects as the model has parts however full the sky is,
+firing edits no scenegraph, and a match that has never fired costs nothing for
+the ones it has not. `capacity` on the batch stays a *simulation* budget — how
+many may be aloft at once — and no longer decides anything about the scene.
+
 ### What the five are for
 
 Range is what tells them apart, and it is written in the table rather than left
