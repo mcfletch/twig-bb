@@ -182,7 +182,7 @@ class TestLookingAroundCostsSomething:
         """How many real looks a run of ticks costs."""
         counted = []
         real = brain.perceive
-        brain.perceive = lambda *a: counted.append(1) or real(*a)
+        brain.perceive = lambda *a, **k: counted.append(1) or real(*a, **k)
         for _ in range(times):
             brain.look(w, found, dt)
         return len(counted)
@@ -226,8 +226,8 @@ class TestLookingAroundCostsSomething:
         for brain in (one, two):
             counted = []
             real = brain.perceive
-            brain.perceive = (lambda *a, _c=counted, _r=real:
-                              _c.append(1) or _r(*a))
+            brain.perceive = (lambda *a, _c=counted, _r=real, **k:
+                              _c.append(1) or _r(*a, **k))
             ticks = []
             for tick in range(12):
                 before = len(counted)

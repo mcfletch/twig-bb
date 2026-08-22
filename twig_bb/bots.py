@@ -305,7 +305,8 @@ class Bot:
         self._offset = self._phase
 
     # -- the senses, identical at every difficulty -----------------------
-    def perceive(self, world: Any, arena: Any) -> List[str]:
+    def perceive(self, world: Any, arena: Any,
+                 seen: Optional[dict] = None) -> List[str]:
         """Everyone this bot can *actually* see, nearest first.
 
         Line of sight through the physics world, plus a field of view.  There
@@ -323,9 +324,10 @@ class Bot:
         # plausibly be seen.  See :func:`twig_bb.combat.visible_targets`.
         return combat.visible_targets(world, arena, self.id,
                                       within=SIGHT_RANGE, facing=self.facing,
-                                      cone=FIELD_OF_VIEW)
+                                      cone=FIELD_OF_VIEW, seen=seen)
 
-    def look(self, world: Any, arena: Any, dt: float) -> List[str]:
+    def look(self, world: Any, arena: Any, dt: float,
+             seen: Optional[dict] = None) -> List[str]:
         """Everyone this bot can see, looked up again only now and then.
 
         :meth:`perceive` is the *sense* and is unchanged; this is how often it
@@ -342,7 +344,7 @@ class Bot:
             # looks is answered by one, which is what a look *is*.  The offset
             # is spent here, on the first look after a reset.
             self._since_look, self._offset = self._offset, 0.0
-            self._seen = self.perceive(world, arena)
+            self._seen = self.perceive(world, arena, seen=seen)
             return self._seen
         return [id for id in self._seen if _alive(arena, id)]
 
@@ -353,7 +355,8 @@ class Bot:
         return cosine >= math.cos(math.radians(FIELD_OF_VIEW))
 
     # -- thinking ---------------------------------------------------------
-    def think(self, world: Any, arena: Any, dt: float) -> Command:
+    def think(self, world: Any, arena: Any, dt: float,
+              seen: Optional[dict] = None) -> Command:
         """One tick of this bot's mind; returns what it wants to do.
 
         It writes nothing.  Applying the command is somebody else's job, which
@@ -366,8 +369,8 @@ class Bot:
         if me is None or not me.alive:
             self.reset()
             return Command(id=self.id)
-        seen = self.look(world, arena, step)
-        self._watch(seen, step)
+        looked = self.look(world, arena, step, seen=seen)
+        self._watch(looked, step)
         if not self.target:
             self._watch_drift(None, step)
             return Command(id=self.id, move=self._wander(step))

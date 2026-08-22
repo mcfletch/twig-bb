@@ -216,7 +216,7 @@ def who_is_at(world: Any, arena: Any, looker: str, origin: ArrayLike,
     return NOBODY if found is None else bodies.get(found.body, NOBODY)
 
 
-def can_see(world: Any, arena: Any, looker: str, target: str) -> bool:
+def can_see(world: Any, arena: Any, looker: str, target: str, seen: Optional[dict] = None) -> bool:
     """Whether ``looker`` has an unobstructed view of ``target``.
 
     Eyes to eyes.  The dead cannot be seen, which is what stops a bot aiming at
@@ -226,7 +226,19 @@ def can_see(world: Any, arena: Any, looker: str, target: str) -> bool:
     to_other = arena.combatant(target)
     if from_one is None or to_other is None or not to_other.alive:
         return False
-    return raycast.line_of_sight(world, _eye(from_one), _eye(to_other))
+    # Whether two people can see each other is one fact about the pair, not two
+    # about each of them: the segment between their eyes is the same segment
+    # either way round.  ``seen`` is a caller's memo for one tick, so a room in
+    # which everybody looks at everybody casts each ray once instead of twice.
+    key = (looker, target) if looker < target else (target, looker)
+    if seen is not None:
+        found = seen.get(key)
+        if found is not None:
+            return found
+    answer = raycast.line_of_sight(world, _eye(from_one), _eye(to_other))
+    if seen is not None:
+        seen[key] = answer
+    return answer
 
 
 def aim_at(arena: Any, shooter: str, target: str) -> Optional[np.ndarray]:
@@ -241,7 +253,8 @@ def aim_at(arena: Any, shooter: str, target: str) -> Optional[np.ndarray]:
 def visible_targets(world: Any, arena: Any, looker: str,
                     within: Optional[float] = None,
                     facing: Optional[Sequence[float]] = None,
-                    cone: Optional[float] = None) -> List[str]:
+                    cone: Optional[float] = None,
+                    seen: Optional[dict] = None) -> List[str]:
     """Everyone alive that ``looker`` can see, nearest first.
 
     The question a bot's perception asks each time it thinks.  It goes through
@@ -265,7 +278,7 @@ def visible_targets(world: Any, arena: Any, looker: str,
     if facing is not None and cone is not None:
         ahead = _unit(np.asarray(facing, dtype='d'))
         least = math.cos(math.radians(float(cone)))
-    seen = []
+    found = []
     for other in arena.ids():
         if other == looker:
             continue
@@ -278,9 +291,9 @@ def visible_targets(world: Any, arena: Any, looker: str,
             continue
         if ahead is not None and float(ahead.dot(to)) < least * math.sqrt(gap):
             continue
-        if can_see(world, arena, looker, other):
-            seen.append((math.sqrt(gap), other))
-    return [other for _distance, other in sorted(seen)]
+        if can_see(world, arena, looker, other, seen=seen):
+            found.append((math.sqrt(gap), other))
+    return [other for _distance, other in sorted(found)]
 
 
 # -- putting people in the world ---------------------------------------------

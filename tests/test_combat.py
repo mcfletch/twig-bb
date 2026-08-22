@@ -698,3 +698,60 @@ class TestAimingAtSomebody:
 
     def test_aiming_at_yourself_gives_nothing(self):
         assert combat.aim_at(match(), 'player', 'player') is None
+
+
+class TestSeeingIsOneFactAboutAPair:
+    """Line of sight is symmetric, so a tick need cast each pair once.
+
+    Every bot asks about every other combatant, which is quadratic in how many
+    are in the room; without a memo the same segment is traced from both ends.
+    """
+
+    def world_and_match(self):
+        from test_game import floor, started
+        return floor(), started(bots=3, spawns=((0, 1, 0), (6, 1, 0),
+                                                (0, 1, 6), (6, 1, 6)))
+
+    def casts(self, world, found, seen):
+        """How many rays a full round of mutual looking costs."""
+        from omi_physics import raycast
+        counted = []
+        real = raycast.line_of_sight
+
+        def spy(*args, **named):
+            counted.append(1)
+            return real(*args, **named)
+
+        raycast.line_of_sight = spy
+        try:
+            for looker in found.ids():
+                combat.visible_targets(world, found, looker, seen=seen)
+        finally:
+            raycast.line_of_sight = real
+        return len(counted)
+
+    def test_a_shared_memo_casts_each_pair_once(self):
+        world, found = self.world_and_match()
+        alone = self.casts(world, found, None)
+        shared = self.casts(world, found, {})
+        assert shared < alone
+        # Every ordered pair without it; every unordered pair with it.
+        assert shared == alone // 2
+
+    def test_the_answer_is_the_same_either_way(self):
+        world, found = self.world_and_match()
+        without = {id: combat.visible_targets(world, found, id)
+                   for id in found.ids()}
+        memo = {}
+        with_memo = {id: combat.visible_targets(world, found, id, seen=memo)
+                     for id in found.ids()}
+        assert without == with_memo
+
+    def test_the_memo_is_read_in_either_order(self):
+        world, found = self.world_and_match()
+        ids = list(found.ids())
+        memo = {}
+        combat.can_see(world, found, ids[0], ids[1], seen=memo)
+        assert len(memo) == 1
+        combat.can_see(world, found, ids[1], ids[0], seen=memo)
+        assert len(memo) == 1

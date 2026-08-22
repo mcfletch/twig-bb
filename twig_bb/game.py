@@ -234,11 +234,16 @@ def step_bots(world: Any, match: arenamod.Arena,
     stands and fights, which is what a match assembled without a physics world
     can honestly do.
     """
+    # Whether two people can see each other is one fact about the pair, and in
+    # a tick where several of them look around, each pair would otherwise be
+    # cast twice -- once from each end of the same segment.  The memo lives for
+    # this tick only: anybody may have moved by the next one.
+    seen: Dict[tuple, bool] = {}
     for id, mind in minds.items():
         one = match.combatant(id)
         if one is None or not one.alive:
             continue
-        command = mind.think(world, match, dt)
+        command = mind.think(world, match, dt, seen=seen)
         _apply(world, match, one, command, weapon, dt, seed, surfaces,
                flight, walking)
 
