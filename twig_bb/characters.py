@@ -52,6 +52,19 @@ __all__ = [
 #: so it is stated here rather than shared with them.
 FORWARD = (0.0, 0.0, 1.0)
 
+#: How near a figure has to be, in metres, for its pose to be worked out on
+#: every frame.  Its *body* is placed every frame whatever the distance, so a
+#: figure across the level still walks smoothly and arrives where the rules say;
+#: what this governs is how often its limbs are recomputed.  Twenty metres is
+#: roughly where a figure is a hundred pixels tall on a 1080p screen, so a limb
+#: travels under a pixel between frames.
+POSE_RANGE = 20.0
+
+#: How often a figure past :data:`POSE_RANGE` has its pose worked out, in times
+#: a second.  Ten is faster than the eye reads a gait at that size, and it is
+#: the crowd's own rate mechanism rather than anything added here.
+POSE_FAR_RATE = 10.0
+
 #: The figures that ship with the game, in the order combatants are handed
 #: them, so a match of several bots is not several copies of one person.
 BUILDS = ('male_character', 'female_character')
@@ -710,7 +723,7 @@ class Cast:
         if crowd is None:
             from OpenGLContext.character.crowd import Crowd
             crowd = self.crowds[build] = Crowd()
-        crowd.add(figure.model)
+        figure.member = crowd.add(figure.model)
         figure.crowd = crowd
 
     def __len__(self) -> int:
@@ -739,13 +752,30 @@ class Cast:
         return (None, 0.0) if figure is None else figure.face(wanted, dt)
 
     def pose(self, dt: float, mode: Any = None,
-             budget: Optional[int] = None) -> None:
+             budget: Optional[int] = None,
+             distances: Optional[Dict[str, float]] = None) -> None:
         """Pose the whole cast, once, after every figure has chosen its clips.
 
         ``mode`` is the rendering context, which is what lets the skeletons and
         joint palettes be composed on the GPU; without it the same arithmetic
         runs in numpy. ``budget`` caps how many figures are brought up to date
         this frame, taken in turn so none is starved.
+
+        ``distances`` is how far each figure is from whoever is watching, and
+        sets **how often its limbs are worked out** -- not how often it moves.
+        A figure's body is placed every frame either way, so one across the
+        level still walks smoothly; what slows with distance is the rate its
+        pose is recomputed, and at :data:`POSE_RANGE` a limb travels less than a
+        pixel between frames.  Without it every figure is posed every frame,
+        which is what a cinematic or a test wants.
         """
+        if distances is not None:
+            for id, figure in self.figures.items():
+                member = getattr(figure, 'member', None)
+                if member is None:
+                    continue
+                gap = distances.get(id)
+                member.rate = (0.0 if gap is None or gap <= POSE_RANGE
+                               else POSE_FAR_RATE)
         for crowd in self.crowds.values():
             crowd.update(dt, budget=budget, mode=mode)

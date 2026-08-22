@@ -753,8 +753,21 @@ def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
                                              forward=charactersmod.FORWARD)
     if cast is not None and hasattr(cast, 'pose'):
         # Every figure has now said what it is playing; posing them is one run
-        # of arithmetic over the lot rather than one each.
-        cast.pose(dt, mode=mode)
+        # of arithmetic over the lot rather than one each.  How far each is from
+        # the player decides how often its limbs are worked out -- see
+        # :meth:`twig_bb.characters.Cast.pose`; where it *is* was set above,
+        # every frame, whatever the distance.
+        watcher = match.combatant(PLAYER_ID)
+        gaps = None
+        if watcher is not None:
+            here = np.asarray(watcher.position, dtype='d')
+            gaps = {}
+            for id in match.ids():
+                one = match.combatant(id)
+                if one is not None:
+                    gaps[id] = float(np.linalg.norm(
+                        np.asarray(one.position, dtype='d') - here))
+        cast.pose(dt, mode=mode, distances=gaps)
 
 
 def _wanted_facing(one: Any, walker: Any) -> Optional[Tuple[float, ...]]:

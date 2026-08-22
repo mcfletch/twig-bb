@@ -419,6 +419,14 @@ top speed, its zero gravity, its zero bounce and zero fuse against the grenade's
 arc and its timer — and in nothing else: two weapons needing two code paths
 would mean the table was not carrying the design.
 
+**A figure's limbs are worked out at the rate its distance earns.** Where a
+figure *is* is set every frame whatever the distance, so one across the level
+still walks smoothly and arrives where the rules say. What slows with distance
+is how often its pose is recomputed — every frame within `POSE_RANGE`, and
+`POSE_FAR_RATE` times a second beyond it, through the crowd's own rate
+mechanism. At twenty metres a figure is about a hundred pixels tall and a limb
+travels under a pixel between frames.
+
 **A pickup turns at the rate its distance earns.** Turning is what makes a
 pickup readable across a room, and writing that transform is cheap — but every
 part of the model beneath it then has its place in the world worked out again,
