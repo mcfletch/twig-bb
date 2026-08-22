@@ -1162,3 +1162,73 @@ class TestWhereABodyLooks:
         one.player.give('rifle')
         one.player.selected = 'rifle'
         assert one.firing == 0.0
+
+
+class TestHowOftenAPickupTurns:
+    """Turning is what makes a pickup readable across a room, and it has a cost.
+
+    Writing the transform is not the cost; every part of the model beneath it
+    having its place worked out again is, and a map places fifty of them. So a
+    pickup too far away for its turning to be read turns in steps instead.
+    """
+
+    def pickups(self, *positions):
+        from twig_bb import items
+        kind = items.ItemKind(key='test', title='TEST', health=25)
+        return items.Pickups([
+            items.Pickup(kind=kind, position=np.array(at, dtype='d'))
+            for at in positions])
+
+    def angles(self, bodies):
+        return [float(tuple(body.rotation)[3]) for body in bodies]
+
+    def test_a_near_pickup_turns_on_every_frame(self):
+        where = self.pickups((0.0, 0.0, 0.0))
+        _group, bodies = game.item_bodies(where)
+        seen = set()
+        for frame in range(1, 6):
+            game.move_items(where, bodies, frame / 60.0, near=(0.0, 0.0, 0.0))
+            seen.add(self.angles(bodies)[0])
+        assert len(seen) == 5
+
+    def test_a_far_pickup_turns_in_steps(self):
+        far = game.ITEM_SPIN_RANGE * 3
+        where = self.pickups((far, 0.0, 0.0))
+        _group, bodies = game.item_bodies(where)
+        seen = set()
+        for frame in range(1, 13):                 # a fifth of a second at sixty
+            game.move_items(where, bodies, frame / 60.0, near=(0.0, 0.0, 0.0))
+            seen.add(self.angles(bodies)[0])
+        assert 1 <= len(seen) <= 2
+
+    def test_a_far_pickup_is_still_turning(self):
+        """Stepped, not stopped: a still pickup reads as part of the wall."""
+        far = game.ITEM_SPIN_RANGE * 3
+        where = self.pickups((far, 0.0, 0.0))
+        _group, bodies = game.item_bodies(where)
+        game.move_items(where, bodies, 0.0, near=(0.0, 0.0, 0.0))
+        first = self.angles(bodies)[0]
+        game.move_items(where, bodies, 1.0, near=(0.0, 0.0, 0.0))
+        assert self.angles(bodies)[0] != first
+
+    def test_walking_up_to_one_shows_no_jump(self):
+        """Both rates track the same clock, so the angle never leaps."""
+        far = game.ITEM_SPIN_RANGE * 3
+        where = self.pickups((far, 0.0, 0.0))
+        _group, bodies = game.item_bodies(where)
+        now = 4.0 / game.ITEM_SPIN_FAR_RATE   # exactly on a step boundary
+        game.move_items(where, bodies, now, near=(0.0, 0.0, 0.0))
+        stepped = self.angles(bodies)[0]
+        game.move_items(where, bodies, now, near=(far, 0.0, 0.0))
+        assert self.angles(bodies)[0] == pytest.approx(stepped)
+
+    def test_with_no_viewer_everything_turns_every_time(self):
+        """A test and a fly-through both want the whole set moving."""
+        far = game.ITEM_SPIN_RANGE * 3
+        where = self.pickups((far, 0.0, 0.0))
+        _group, bodies = game.item_bodies(where)
+        seen = set()
+        for frame in range(1, 6):
+            game.move_items(where, bodies, frame / 60.0)
+            seen.add(self.angles(bodies)[0])
+        assert len(seen) == 5

@@ -419,6 +419,14 @@ top speed, its zero gravity, its zero bounce and zero fuse against the grenade's
 arc and its timer — and in nothing else: two weapons needing two code paths
 would mean the table was not carrying the design.
 
+**A pickup turns at the rate its distance earns.** Turning is what makes a
+pickup readable across a room, and writing that transform is cheap — but every
+part of the model beneath it then has its place in the world worked out again,
+and a map places fifty of them. Past `ITEM_SPIN_RANGE` a pickup turns in steps
+at `ITEM_SPIN_FAR_RATE` instead of on every frame. It tracks the same clock
+either way, so walking up to one shows no jump: what changes with distance is
+the size of the step, and at thirty metres that is a fraction of a pixel.
+
 **What a kind is drawn with is one node, not one per shot.** Each kind gets an
 [`InstancedModel`](../openglcontext/docs/instancing.html#instancedmodel), and how
 many are in the air is an array of matrices written onto it. The renderer

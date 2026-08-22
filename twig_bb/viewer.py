@@ -1369,7 +1369,8 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         self._shovePlayer()
         game.move_bodies(self.arena, self.botBodies, cast=self.cast,
                          walking=self.rules.walking, dt=dt, mode=self)
-        game.move_items(self.rules.pickups, self.itemBodies, hudclock())
+        game.move_items(self.rules.pickups, self.itemBodies, hudclock(),
+                        near=self._nav.camera_position() if self._nav else None)
         game.move_projectiles(self.flight, self.projectileBodies)
         flying = len(self.flight)
         self.effects.trail(self.flight.position[:flying], dt,

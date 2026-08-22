@@ -571,6 +571,18 @@ def move_projectiles(flight: Any, bodies: Dict[str, InstancedModel]) -> None:
 ITEM_SIZE = 0.36
 ITEM_SPIN = 1.6
 
+#: How far away a pickup has to be, in metres, before it is turned in steps
+#: rather than continuously.  "Across a room" is what the turning is *for*, and
+#: thirty metres is past the far wall of the largest room these maps have.  At
+#: that distance a pickup is under a dozen pixels across on a 1080p screen, so
+#: a step of the turn moves an edge by a fraction of one.
+ITEM_SPIN_RANGE = 30.0
+
+#: How often a pickup past :data:`ITEM_SPIN_RANGE` is turned, in steps a second.
+#: It still tracks the same clock, so approaching one shows no jump: what
+#: changes with distance is the size of the step, not the angle it is at.
+ITEM_SPIN_FAR_RATE = 5.0
+
 #: How much of a pickup's own colour it emits regardless of what is lighting
 #: it.  A map places **no dynamic lights at all** — both families bake their
 #: lighting into lightmaps — so an item dropped into an unlit corner is a black
@@ -642,14 +654,36 @@ def item_bodies(pickups: Any) -> Tuple[Group, List[Transform]]:
     return (Group(children=list(bodies)), bodies)
 
 
-def move_items(pickups: Any, bodies: List[Transform], now: float) -> None:
+def move_items(pickups: Any, bodies: List[Transform], now: float,
+               near: Any = None) -> None:
     """Turn each pickup on the spot, and park the ones that have been taken.
 
     ``now`` is a clock the caller reads, because turning is presentation and
     the rules must not know what time it is; the rules decide only whether a
     thing is *there*.
+
+    ``near`` is where the viewer is, and decides **how often** a pickup is
+    turned rather than whether it turns.  Writing a transform is not the cost:
+    the cost is that every part of the model beneath it then has its place in
+    the world worked out again, and a map places fifty of these
+    (``SPEC-Q3ENTITIES §3.1.1``).  Turning all of them on every frame was the
+    single largest thing the renderer did per frame with nothing else going on.
+
+    So a pickup far enough away that its turning cannot be *read* is turned at
+    :data:`ITEM_SPIN_FAR_RATE` instead, in steps rather than continuously.  It
+    is still turning, and it is still at the angle the clock says, so walking
+    towards one shows no jump -- only the size of the step it moves in changes,
+    and at that distance a step is a fraction of a pixel.  A caller with no
+    viewer to measure from turns everything every time, which is what a test and
+    a fly-through both want.
     """
     live = pickups.items if pickups is not None else []
+    angle = (now * ITEM_SPIN) % (2.0 * math.pi)
+    # The same angle, held for a step: floor to the far rate's tick so the value
+    # written is unchanged between ticks and the assignment below is skipped.
+    stepped = ((math.floor(now * ITEM_SPIN_FAR_RATE) / ITEM_SPIN_FAR_RATE)
+               * ITEM_SPIN) % (2.0 * math.pi)
+    watching = None if near is None else tuple(float(v) for v in near[:3])
     for slot, body in enumerate(bodies):
         if slot >= len(live) or not live[slot].available:
             if tuple(body.translation) != OFFSTAGE:
@@ -659,7 +693,15 @@ def move_items(pickups: Any, bodies: List[Transform], now: float) -> None:
         where = tuple(float(value) for value in item.position)
         if tuple(body.translation) != where:
             body.translation = where
-        body.rotation = (0.0, 1.0, 0.0, (now * ITEM_SPIN) % (2.0 * math.pi))
+        turn = angle
+        if watching is not None:
+            gap = ((where[0] - watching[0]) ** 2 + (where[1] - watching[1]) ** 2
+                   + (where[2] - watching[2]) ** 2)
+            if gap > ITEM_SPIN_RANGE * ITEM_SPIN_RANGE:
+                turn = stepped
+        spun = (0.0, 1.0, 0.0, turn)
+        if tuple(body.rotation) != spun:
+            body.rotation = spun
 
 
 def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
