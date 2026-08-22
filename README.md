@@ -419,6 +419,13 @@ top speed, its zero gravity, its zero bounce and zero fuse against the grenade's
 arc and its timer — and in nothing else: two weapons needing two code paths
 would mean the table was not carrying the design.
 
+**Nor is a combatant standing in one.** The same answer covers the cast: a
+figure is thirty-odd shapes and a skeleton, and one behind a wall is straight
+ahead of the camera as far as the frustum is concerned. It keeps playing — the
+rules, its physics and its mind run whatever the walls say — but it is not drawn,
+and its limbs are worked out at the far rate so it is already in step when it
+walks back into view.
+
 **A pickup in a room you cannot see is not drawn.** A level is mostly walls and
 the frustum is not told about them: a pickup two rooms ahead is straight in front
 of the camera and passes every test the renderer has. The map was compiled

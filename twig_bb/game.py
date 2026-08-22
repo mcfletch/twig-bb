@@ -766,10 +766,46 @@ def move_items(pickups: Any, bodies: List[Transform], now: float,
             body.rotation = spun
 
 
+def _unseen_combatants(match: Any, visibility: Any) -> frozenset:
+    """Who is standing in a room the player cannot see, by id.
+
+    Empty whenever the question cannot be answered -- no map visibility, no
+    player to look from, a combatant outside every room -- because the set is
+    what may be *left out*, and not knowing has to mean drawing them.
+    """
+    if not visibility:
+        return frozenset()
+    watcher = match.combatant(PLAYER_ID)
+    if watcher is None:
+        return frozenset()
+    seen = visibility.visible_from(to_map_points([watcher.position])[0])
+    if seen is None:
+        return frozenset()
+    hidden = []
+    for id in match.ids():
+        if id == PLAYER_ID:
+            continue
+        one = match.combatant(id)
+        if one is None:
+            continue
+        cluster = visibility.cluster_at(to_map_points([one.position])[0])
+        if 0 <= cluster < len(seen) and not seen[cluster]:
+            hidden.append(id)
+    return frozenset(hidden)
+
+
 def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
                 cast: Optional[Any] = None, walking: Optional[Any] = None,
-                dt: float = 0.0, mode: Any = None) -> None:
+                dt: float = 0.0, mode: Any = None,
+                visibility: Any = None) -> None:
     """Put each bot's body where the rules say it is, and play what it is doing.
+
+    ``visibility`` is the map's own account of which rooms can be seen from
+    which (:mod:`twig_bb.visibility`).  A combatant standing in a room the
+    player cannot see is not drawn and has its pose worked out at the far rate:
+    the frustum cannot reject it -- it is straight ahead, behind a wall -- and a
+    figure is thirty-odd shapes and a skeleton.  Conservative, like the set
+    itself, so nobody who could be seen is ever taken away.
 
     A dead bot is moved out of sight rather than removed, because editing the
     scenegraph every time somebody dies costs a rebuild of what the pass has
@@ -782,9 +818,17 @@ def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
     :class:`~twig_bb.walkers.Walkers` the bodies move in, which is what knows
     a bot's speed and whether it is on the ground.
     """
+    unseen = _unseen_combatants(match, visibility)
     for id, body in bodies.items():
         one = match.combatant(id)
         if one is None:
+            continue
+        if id in unseen:
+            # Behind a wall: park it rather than place it, so it costs neither a
+            # draw nor a world matrix.  Written only on the frame it goes out of
+            # sight, because the value is already what it is being set to.
+            if tuple(body.translation) != OFFSTAGE:
+                body.translation = OFFSTAGE
             continue
         if one.alive:
             body.translation = tuple(float(value) for value in one.position)
@@ -826,9 +870,17 @@ def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
             gaps = {}
             for id in match.ids():
                 one = match.combatant(id)
-                if one is not None:
-                    gaps[id] = float(np.linalg.norm(
-                        np.asarray(one.position, dtype='d') - here))
+                if one is None:
+                    continue
+                if unseen and id in unseen:
+                    # In a room the player cannot see: it is not being drawn, so
+                    # working out where its elbows are is arithmetic nobody
+                    # collects.  Given the far rate rather than skipped outright,
+                    # so it is already in step when it walks back into view.
+                    gaps[id] = charactersmod.POSE_RANGE * 1e3
+                    continue
+                gaps[id] = float(np.linalg.norm(
+                    np.asarray(one.position, dtype='d') - here))
         cast.pose(dt, mode=mode, distances=gaps)
 
 
