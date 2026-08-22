@@ -82,6 +82,11 @@ class Rules:
         #: What the map left lying about, or None for a match with no map.
         #: See :mod:`twig_bb.items`.
         self.pickups: Any = None
+        #: Which of the map's rooms can be seen from which, or None for a match
+        #: with no map.  The bots use it to know when there is a wall between
+        #: two of them without asking the physics; see
+        #: :class:`twig_bb.game.CombatantRooms`.
+        self.visibility: Any = None
         #: The capsule everybody the rules move walks in, or None to take the
         #: controller's own defaults.  The player's, so a bot can go wherever
         #: a player can.
@@ -130,7 +135,7 @@ class Rules:
         if weapon is not None:
             game.step_bots(world, self.arena, self.minds, step, weapon,
                            seed=seed, surfaces=surfaces, flight=self.flight,
-                           walking=self.walking)
+                           walking=self.walking, visibility=self.visibility)
         game.step_projectiles(world, self.arena, self.flight, step)
         # Before the hazards, so a medikit taken in the same tick as a bite of
         # lava is health the player had when it bit rather than health they

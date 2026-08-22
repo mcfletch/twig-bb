@@ -419,6 +419,13 @@ top speed, its zero gravity, its zero bounce and zero fuse against the grenade's
 arc and its timer — and in nothing else: two weapons needing two code paths
 would mean the table was not carrying the design.
 
+**And a bot does not trace towards a room it cannot see into.** Line of sight is
+the expensive half of a bot; where the map says two rooms cannot see each other
+there is a wall, and the cast has nothing to find. It is the cheapest of the
+questions a bot asks and it goes first, ahead of range and field of view. The
+set is conservative in the safe direction: a "no" is certain, a "yes" is only
+permission to go and look, and anything it cannot answer is a "yes".
+
 **Nor is a combatant standing in one.** The same answer covers the cast: a
 figure is thirty-odd shapes and a skeleton, and one behind a wall is straight
 ahead of the camera as far as the frustum is concerned. It keeps playing — the

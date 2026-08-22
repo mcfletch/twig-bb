@@ -46,7 +46,8 @@ from .worldgeometry import to_map_points
 
 log = logging.getLogger(__name__)
 
-__all__ = ['BOT_SPEED', 'ItemRooms', 'PLAYER_ID', 'bot_bodies',
+__all__ = ['BOT_SPEED', 'CombatantRooms', 'ItemRooms', 'PLAYER_ID',
+           'bot_bodies',
            'heading_rotation',
            'item_bodies', 'item_look', 'messages', 'move_items',
            'heading_quaternions', 'move_projectiles', 'place_bots',
@@ -219,7 +220,8 @@ def step_bots(world: Any, match: arenamod.Arena,
               weapon: Any, seed: Optional[int] = None,
               surfaces: Optional[Any] = None,
               flight: Optional[Any] = None,
-              walking: Optional[Any] = None) -> None:
+              walking: Optional[Any] = None,
+              visibility: Any = None) -> None:
     """Run every bot's mind for one tick and apply what it decided.
 
     The command a bot produces is consumed here, and the same shape of record
@@ -241,11 +243,12 @@ def step_bots(world: Any, match: arenamod.Arena,
     # cast twice -- once from each end of the same segment.  The memo lives for
     # this tick only: anybody may have moved by the next one.
     seen: Dict[tuple, bool] = {}
+    rooms = CombatantRooms(visibility, match)
     for id, mind in minds.items():
         one = match.combatant(id)
         if one is None or not one.alive:
             continue
-        command = mind.think(world, match, dt, seen=seen)
+        command = mind.think(world, match, dt, seen=seen, rooms=rooms)
         _apply(world, match, one, command, weapon, dt, seed, surfaces,
                flight, walking)
 
@@ -764,6 +767,44 @@ def move_items(pickups: Any, bodies: List[Transform], now: float,
         spun = (0.0, 1.0, 0.0, turn)
         if tuple(body.rotation) != spun:
             body.rotation = spun
+
+
+class CombatantRooms:
+    """Which room each combatant is standing in, for the length of one tick.
+
+    Line of sight between two people is a ray cast, and the map already knows
+    that two rooms cannot see each other at all -- so where it says so, there is
+    a wall and the cast has nothing to find. It is the cheapest question of the
+    lot and it goes first.
+
+    Safe in the direction that matters: the set is *potentially* visible, so a
+    "no" is certain and a "yes" is only permission to go and look. Anything it
+    cannot answer is a "yes".
+
+    Built once a tick because everybody moves; a room is a dozen plane tests, so
+    a match's worth is nothing against the casts it saves.
+    """
+
+    def __init__(self, visibility: Any, match: Any) -> None:
+        self._visibility = visibility
+        self._rooms: Dict[str, int] = {}
+        if not visibility:
+            return
+        for id in match.ids():
+            one = match.combatant(id)
+            if one is not None:
+                self._rooms[id] = visibility.cluster_at(
+                    to_map_points([one.position])[0])
+
+    def may_see(self, looker: str, target: str) -> bool:
+        """Whether the map allows these two to see each other at all."""
+        if not self._rooms:
+            return True
+        here = self._rooms.get(looker)
+        there = self._rooms.get(target)
+        if here is None or there is None:
+            return True
+        return self._visibility.sees(here, there)
 
 
 def _unseen_combatants(match: Any, visibility: Any) -> frozenset:

@@ -788,6 +788,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         # drawn: the frustum cannot reject them, and the map already knows.
         self.itemRooms = game.ItemRooms(self.loaded.visibility(),
                                         self.rules.pickups)
+        self.rules.visibility = self.loaded.visibility()
         children.append(self.itemGroup)
         # One emitter per kind of impact, never moved: the bursts arrive at
         # their own places through `burst_at`, so this group is built once and

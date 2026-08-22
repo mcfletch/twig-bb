@@ -254,7 +254,8 @@ def visible_targets(world: Any, arena: Any, looker: str,
                     within: Optional[float] = None,
                     facing: Optional[Sequence[float]] = None,
                     cone: Optional[float] = None,
-                    seen: Optional[dict] = None) -> List[str]:
+                    seen: Optional[dict] = None,
+                    rooms: Any = None) -> List[str]:
     """Everyone alive that ``looker`` can see, nearest first.
 
     The question a bot's perception asks each time it thinks.  It goes through
@@ -290,6 +291,10 @@ def visible_targets(world: Any, arena: Any, looker: str,
         if gap < 1e-18 or (furthest is not None and gap > furthest):
             continue
         if ahead is not None and float(ahead.dot(to)) < least * math.sqrt(gap):
+            continue
+        # Cheapest of the lot: where the map says two rooms cannot see each
+        # other there is a wall, and the cast has nothing to find.
+        if rooms is not None and not rooms.may_see(looker, other):
             continue
         if can_see(world, arena, looker, other, seen=seen):
             found.append((math.sqrt(gap), other))
