@@ -107,16 +107,22 @@ class Visibility:
         """
         if self.nodes is None or self.planes is None or not len(self.nodes):
             return -1
-        point = np.asarray(where, dtype='d')[:3]
+        # Plain floats rather than numpy: this walks a dozen planes per body
+        # per frame, and at three components a call into numpy costs more than
+        # the arithmetic it does.
+        px, py, pz = (float(where[0]), float(where[1]), float(where[2]))
+        nodes, planes = self.nodes, self.planes
         index = 0
         # Bounded by the tree's own size: a malformed file whose children point
         # back up the tree must not spin here for ever.
         for _step in range(len(self.nodes) + 1):
             if index < 0:
                 return -index - 1
-            node = self.nodes[index]
-            plane = self.planes[int(node['plane'])]
-            side = float(np.dot(point, plane['normal']) - plane['distance'])
+            node = nodes[index]
+            plane = planes[int(node['plane'])]
+            normal = plane['normal']
+            side = (px * float(normal[0]) + py * float(normal[1])
+                    + pz * float(normal[2]) - float(plane['distance']))
             index = int(node['children'][0 if side >= 0.0 else 1])
         log.warning('the node tree did not reach a leaf; the map may be damaged')
         return -1
