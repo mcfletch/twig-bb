@@ -290,6 +290,18 @@ only world surfaces may ignore this lump.
 in bytes — followed by that many bytes of bit vectors, one bit per cluster. A
 renderer that draws the whole map or does its own culling does not need it.
 
+**4.15.2** The vectors are indexed by cluster and so is each bit within one:
+vector *n* is the one belonging to cluster *n*, and bit *m* of it stands for
+cluster *m*. Bit *m* lies in byte `m >> 3` of the vector, at mask `1 << (m & 7)`.
+A cluster of −1 (§4.4) is not in the set at all and no vector belongs to it.
+
+The vectors are stored flat, at `sz_vecs` bytes each, with no run-length or other
+encoding — the lump's length is exactly `8 + n_vecs × sz_vecs`, which is what
+lets it be indexed arithmetically rather than scanned. This follows from §4.15.1
+and §4.4 and is recorded here because those two state the layout without saying
+how it is addressed; no other source was consulted for it, and what the bits are
+*used for* remains out of scope (§E.2).
+
 ### 5. The entity lump
 
 **5.1** Lump 0 is a plain-text block with the same syntax as v38: brace-delimited

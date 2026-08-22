@@ -76,6 +76,21 @@ class LoadedMap:
     def entities(self) -> Sequence[Entity]:
         return self.bsp.entities
 
+    def visibility(self) -> Any:
+        """Which of this map's rooms can be seen from which.
+
+        Built once and kept: the tables are the file's own and do not change,
+        and a level asks about them every frame.  A map compiled without
+        visibility data yields one that rejects nothing, so a caller never has
+        to ask whether there is any.
+        """
+        found = getattr(self, '_visibility', None)
+        if found is None:
+            from .visibility import Visibility
+            found = Visibility.from_bsp(self.bsp)
+            self._visibility = found
+        return found
+
     @property
     def gravity(self) -> float:
         """The map's gravity in units per second squared (``SPEC-TRIGGER-PUSH §8``)."""

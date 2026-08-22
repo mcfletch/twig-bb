@@ -419,6 +419,15 @@ top speed, its zero gravity, its zero bounce and zero fuse against the grenade's
 arc and its timer — and in nothing else: two weapons needing two code paths
 would mean the table was not carrying the design.
 
+**A pickup in a room you cannot see is not drawn.** A level is mostly walls and
+the frustum is not told about them: a pickup two rooms ahead is straight in front
+of the camera and passes every test the renderer has. The map was compiled
+knowing which of its rooms can be seen from which (`SPEC-BSP46 §4.15`), and that
+answer ships in the file — on `oa_dm3`, seven of fifty-five pickups are visible
+from an average spawn. It is a *potentially* visible set and so conservative:
+what it rejects is certainly out of sight, so nothing a player could see is ever
+taken away. A map compiled without the data draws everything, as before.
+
 **A figure's limbs are worked out at the rate its distance earns.** Where a
 figure *is* is set every frame whatever the distance, so one across the level
 still walks smoothly and arrives where the rules say. What slows with distance

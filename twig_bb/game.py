@@ -42,10 +42,12 @@ from . import characters as charactersmod
 from . import combat
 from . import falling
 from . import projectiles as projectilesmod
+from .worldgeometry import to_map_points
 
 log = logging.getLogger(__name__)
 
-__all__ = ['BOT_SPEED', 'PLAYER_ID', 'bot_bodies', 'heading_rotation',
+__all__ = ['BOT_SPEED', 'ItemRooms', 'PLAYER_ID', 'bot_bodies',
+           'heading_rotation',
            'item_bodies', 'item_look', 'messages', 'move_items',
            'heading_quaternions', 'move_projectiles', 'place_bots',
            'projectile_bodies', 'shoot',
@@ -659,8 +661,56 @@ def item_bodies(pickups: Any) -> Tuple[Group, List[Transform]]:
     return (Group(children=list(bodies)), bodies)
 
 
+class ItemRooms:
+    """Which room of the map each pickup stands in, worked out once.
+
+    A level is mostly walls and the frustum is not told about them, so a pickup
+    two rooms ahead is straight in front of the camera and passes every test the
+    renderer has.  The map was compiled knowing which of its rooms can be seen
+    from which (``SPEC-BSP46 §4.15``), and on a real level that rejects the
+    great majority of them: seven of ``oa_dm3``'s fifty-five are visible from an
+    average spawn.
+
+    This is a *potentially* visible set and therefore conservative -- what it
+    rejects is certainly out of sight, and some of what it keeps is behind a
+    wall anyway -- so nothing a player could see is ever taken away.
+
+    A map with no visibility data, or a pickup standing outside every room,
+    yields "draw it", which is what not knowing has to mean.
+    """
+
+    def __init__(self, visibility: Any, pickups: Any) -> None:
+        self._visibility = visibility
+        items = pickups.items if pickups is not None else []
+        if visibility and items:
+            where = to_map_points([one.position for one in items])
+            self._clusters = np.array(
+                [visibility.cluster_at(point) for point in where], dtype='i4')
+        else:
+            self._clusters = np.zeros(0, dtype='i4')
+
+    def __len__(self) -> int:
+        return len(self._clusters)
+
+    def drawable(self, camera: Any) -> Optional[np.ndarray]:
+        """A mask over the pickups of those in rooms ``camera`` may see.
+
+        ``None`` when nothing can be said, which a caller reads as "all of
+        them" rather than "none of them".
+        """
+        if not len(self._clusters) or camera is None:
+            return None
+        seen = self._visibility.visible_from(to_map_points([camera])[0])
+        if seen is None:
+            return None
+        drawn = np.ones(len(self._clusters), dtype=bool)
+        known = (self._clusters >= 0) & (self._clusters < len(seen))
+        drawn[known] = seen[self._clusters[known]]
+        return drawn
+
+
 def move_items(pickups: Any, bodies: List[Transform], now: float,
-               near: Any = None) -> None:
+               near: Any = None, rooms: Any = None) -> None:
     """Turn each pickup on the spot, and park the ones that have been taken.
 
     ``now`` is a clock the caller reads, because turning is presentation and
@@ -689,7 +739,14 @@ def move_items(pickups: Any, bodies: List[Transform], now: float,
     stepped = ((math.floor(now * ITEM_SPIN_FAR_RATE) / ITEM_SPIN_FAR_RATE)
                * ITEM_SPIN) % (2.0 * math.pi)
     watching = None if near is None else tuple(float(v) for v in near[:3])
+    drawn = None if rooms is None else rooms.drawable(near)
     for slot, body in enumerate(bodies):
+        if drawn is not None and slot < len(drawn) and not drawn[slot]:
+            # In a room this one cannot see: park it rather than turn it, so it
+            # costs neither a draw nor a transform anybody has to work out.
+            if tuple(body.translation) != OFFSTAGE:
+                body.translation = OFFSTAGE
+            continue
         if slot >= len(live) or not live[slot].available:
             if tuple(body.translation) != OFFSTAGE:
                 body.translation = OFFSTAGE

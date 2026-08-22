@@ -31,6 +31,17 @@ def to_scene_points(points: Any) -> np.ndarray:
     return np.column_stack((array[:, 0], array[:, 2], -array[:, 1])) * SCENE_SCALE
 
 
+def to_map_points(points: Any) -> np.ndarray:
+    """Scene-space positions back to map space: the inverse of
+    :func:`to_scene_points`.
+
+    Anything that answers a question the *file* was asked -- which leaf a point
+    is in, which cluster can see it -- has to ask it in the file's own units.
+    """
+    array = np.asarray(points, dtype='d').reshape(-1, 3) / SCENE_SCALE
+    return np.column_stack((array[:, 0], -array[:, 2], array[:, 1]))
+
+
 def to_scene_directions(vectors: Any) -> np.ndarray:
     """Map-space directions to scene space: the same rotation, no scale.
 

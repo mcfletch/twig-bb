@@ -612,6 +612,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
     #: The pickups' bodies, and the group holding them.
     itemGroup: Any = None
     itemBodies: Any = ()
+    itemRooms: Any = None
     #: Where the view goes while the player is dead; see
     #: :mod:`twig_bb.deathcam`.
     deathCamera: Any = None
@@ -783,6 +784,10 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         # gathered again whenever the scene is rebuilt, and what has been
         # *taken* is the rules' business rather than the scene's.
         self.itemGroup, self.itemBodies = game.item_bodies(self.rules.pickups)
+        # Which room each pickup stands in, so the ones behind walls are not
+        # drawn: the frustum cannot reject them, and the map already knows.
+        self.itemRooms = game.ItemRooms(self.loaded.visibility(),
+                                        self.rules.pickups)
         children.append(self.itemGroup)
         # One emitter per kind of impact, never moved: the bursts arrive at
         # their own places through `burst_at`, so this group is built once and
@@ -1385,7 +1390,8 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         game.move_bodies(self.arena, self.botBodies, cast=self.cast,
                          walking=self.rules.walking, dt=dt, mode=self)
         game.move_items(self.rules.pickups, self.itemBodies, hudclock(),
-                        near=self._nav.camera_position() if self._nav else None)
+                        near=self._nav.camera_position() if self._nav else None,
+                        rooms=getattr(self, 'itemRooms', None))
         game.move_projectiles(self.flight, self.projectileBodies)
         flying = len(self.flight)
         self.effects.trail(self.flight.position[:flying], dt,
