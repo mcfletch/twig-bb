@@ -66,7 +66,14 @@ def test_a_cast_parses_each_build_once(monkeypatch):
 
 class TestABotHoldingItsWeapon:
     def test_a_figure_reaches_the_framebuffer(self, render):
-        cast = armed()
+        """The body itself, with nothing in its hands.
+
+        **Empty-handed on purpose.**  A rifle lights a few dozen pixels and a
+        body several hundred, so a figure holding one answers "did anything
+        appear?" whatever became of its meshes -- and every other case in this
+        file arms it.  This is the one that asks about the figure.
+        """
+        cast = characters.Cast(['bot0'])
         assert _lit(render(standing(cast, ['bot0']))) > 0
 
     def test_the_weapon_draws_as_well_as_the_body(self, render):
