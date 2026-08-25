@@ -1147,9 +1147,6 @@ class _KeyStub(eventhandlermixin.EventHandlerMixin):
     def _bindings(self, event):
         self.opened.append('bindings')
 
-    def _screenshot(self, event):
-        self.opened.append('screenshot')
-
     def press(self, name):
         event = keyboardevents.KeyboardEvent()
         event.name, event.state, event.modifiers = name, 1, (0, 0, 0)
@@ -1160,9 +1157,9 @@ def test_pressing_the_screen_keys_actually_reaches_their_handlers():
     """Through the real registry and a real event, because the binding this
     replaced was accepted by the registry and then never delivered."""
     stub = _KeyStub()
-    for name in ('<F10>', '<F6>', '<F2>'):
+    for name in ('<F10>', '<F6>'):
         stub.press(name)
-    assert stub.opened == ['settings', 'bindings', 'screenshot']
+    assert stub.opened == ['settings', 'bindings']
 
 
 def test_a_key_nothing_binds_reaches_nothing():

@@ -23,7 +23,7 @@ Keys::
     1 - 5                   choose a weapon; [ ] and the wheel step through them
     left mouse button       fire (held); ctrl does the same
     alt + f                 the developer overlay
-    F2                      save a screenshot
+    F2                      save a screenshot (alt + s does the same)
     F6 / F10                key bindings / rendering settings
 
 The keys are not fixed here: each way of moving is a declared ``MovementMode``
@@ -48,7 +48,6 @@ import logging
 import math
 import os
 import sys
-import time
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Tuple
 
@@ -1690,13 +1689,6 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             self.marks.movement(str(getattr(getattr(
                 self.contextDefinition, 'movementMode', None), 'name', '')))
 
-    def _screenshot(self, event: Any = None) -> None:   # pragma: no cover - key
-        from OpenGLContext.capture import capture_to_png
-        name = time.strftime('twig-bb-%Y%m%d-%H%M%S.png')
-        if capture_to_png(name):
-            sys.stdout.write('saved %s\n' % (name,))
-            sys.stdout.flush()
-
     # -- frame -----------------------------------------------------------
     def OnIdle(self, *args: Any) -> int:        # pragma: no cover - needs a window
         # A download runs on a worker and is *published* here, once a frame.
@@ -1804,15 +1796,16 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         if velocity is not None:
             nav.apply_impulse(velocity)
 
-    def SwapBuffers(self, *args: Any) -> Any:   # pragma: no cover - needs a window
+    def presentFrame(self) -> Any:              # pragma: no cover - needs a window
+        """Present the frame, and take the capture from it before the swap."""
         if self._capture is not None and self._capture.tick():
-            result = super(TwigContext, self).SwapBuffers(*args)
+            result = super(TwigContext, self).presentFrame()
             self.setCurrent()
             sys.stdout.write('captured %s\n' % (self.config.capture,))
             sys.stdout.flush()
             os._exit(0)
             return result
-        return super(TwigContext, self).SwapBuffers(*args)
+        return super(TwigContext, self).presentFrame()
 
 
 def hud_default_fov() -> float:
@@ -1846,15 +1839,15 @@ def view_fov(platform: Any) -> float:
     return math.radians(float(frustum[0]))
 
 
-#: Keys that open a screen or take a screenshot, and the handler each runs.
-#: Bound as ``keyboard`` key-downs; see ``TwigContext.bindScreenKeys``.
+#: Keys that open a screen, and the handler each runs.  Bound as ``keyboard``
+#: key-downs; see ``TwigContext.bindScreenKeys``.  F2 is not here: every
+#: OpenGLContext context binds it to a screenshot for itself.
 #: The key that shows the whole scoreboard while it is held.  Tab, because
 #: that is where every game in this genre puts it and a player will try it
 #: before they read anything.
 SCOREBOARD_KEY = '<tab>'
 
 SCREEN_KEYS = (
-    ('<F2>', '_screenshot'),
     ('<F6>', '_bindings'),
     ('<F10>', '_settings'),
 )
