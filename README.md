@@ -104,8 +104,7 @@ this lives.
 | right mouse button, or `z` | sight (held) — narrows the view for a weapon that has a scope, which is the rifle |
 | tab | the scoreboard (held) — everybody's frags and deaths |
 | alt + `f` | developer overlay — frame rate, loop timing, draw counts, where you are |
-| `F2` | save a screenshot — `twig-bb-<date>-<time>.png`, in the directory you launched from |
-| alt + `s` | the engine's own screenshot key — `twig-bb-screen-0001.png`, same place |
+| `F2`, or alt + `s` | save a screenshot — named for the window title, in your picture folder |
 | `F6` | key bindings — rebind any command, over the map |
 | `F10` | rendering settings — shadows, lighting, detail, over the map |
 | escape | the menu — **Resume** first, then Quit. Escape again resumes. It never ends the match on its own: a key pressed to close something else must not throw a match away |

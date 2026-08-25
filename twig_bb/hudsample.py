@@ -42,7 +42,6 @@ import logging
 import math
 import os
 import sys
-import time
 from typing import Any, List, Sequence, Tuple
 
 os.environ.setdefault('OPENGLCONTEXT_PROFILE', 'core')
@@ -203,8 +202,6 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
         for name, method in (('p', self._pickup), ('h', self._hurt),
                              ('j', self._heal), ('k', self._armour)):
             self.addEventHandler('keypress', name=name, function=method)
-        self.addEventHandler('keyboard', name='<F2>', state=1,
-                             function=self._screenshot)
         self.addEventHandler('keyboard', name='<F6>', state=1,
                              function=self._bindingsScreen)
         self.addEventHandler('keyboard', name='<F10>', state=1,
@@ -262,13 +259,6 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
         self.player.give_armour(25)
         self.triggerRedraw(1)
 
-    def _screenshot(self, event: Any = None) -> None:
-        from OpenGLContext.capture import capture_to_png
-        name = time.strftime('twig-bb-hud-%Y%m%d-%H%M%S.png')
-        if capture_to_png(name):
-            sys.stdout.write('saved %s\n' % (name,))
-            sys.stdout.flush()
-
     def _bindingsScreen(self, event: Any = None) -> None:
         bindings.open_bindings(self, navigation=controls.Controls(
             self.getNavigation(), self.weaponBindings))
@@ -315,15 +305,16 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
                             float(getattr(platform, 'frustum', (90,))[0])))
         super(HUDSampleContext, self).renderShaderOverlay(pass_)
 
-    def SwapBuffers(self, *args: Any) -> Any:
+    def presentFrame(self) -> Any:
+        """Present the frame, and take the capture from it before the swap."""
         if self._capture is not None and self._capture.tick():
-            result = super(HUDSampleContext, self).SwapBuffers(*args)
+            result = super(HUDSampleContext, self).presentFrame()
             self.setCurrent()
             sys.stdout.write('captured %s\n' % (self.config.capture,))
             sys.stdout.flush()
             os._exit(0)
             return result
-        return super(HUDSampleContext, self).SwapBuffers(*args)
+        return super(HUDSampleContext, self).presentFrame()
 
     # -- reporting --------------------------------------------------------
     def _demoRows(self) -> List[Tuple[str, Any]]:
