@@ -51,7 +51,6 @@ import sys
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Tuple
 
-os.environ.setdefault('OPENGLCONTEXT_PROFILE', 'core')
 os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
 # A map's own baked lighting is the point; a full-strength analytic sky washes

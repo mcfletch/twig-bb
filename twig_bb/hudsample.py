@@ -44,7 +44,6 @@ import os
 import sys
 from typing import Any, List, Sequence, Tuple
 
-os.environ.setdefault('OPENGLCONTEXT_PROFILE', 'core')
 os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
 

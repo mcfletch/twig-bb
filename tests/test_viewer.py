@@ -20,9 +20,14 @@ from twig_bb import collision, maploader, viewer
 
 # -- rendering environment ----------------------------------------------------
 
-def test_the_viewer_asks_for_the_core_profile_and_the_pbr_pass():
-    """The plan requires the core profile and the PBR render pass."""
-    assert os.environ['OPENGLCONTEXT_PROFILE'] == 'core'
+def test_the_viewer_draws_in_a_core_profile_with_the_pbr_pass():
+    """The plan requires the core profile and the PBR render pass.
+
+    Core is what OpenGLContext resolves to on its own, so the viewer names
+    the renderer and the backend and leaves the profile to the engine.
+    """
+    from OpenGLContext.contextdefinition import ContextDefinition
+    assert ContextDefinition().profile == 'core'
     assert os.environ['OPENGLCONTEXT_RENDERER'] == 'pbr'
     assert os.environ['OPENGLCONTEXT_BACKEND'] == 'glfw'
 

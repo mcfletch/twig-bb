@@ -29,7 +29,6 @@ import os
 import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-os.environ.setdefault('OPENGLCONTEXT_PROFILE', 'core')
 os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
 os.environ.setdefault('OPENGLCONTEXT_SHADOWS', '0')
