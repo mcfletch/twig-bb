@@ -120,3 +120,11 @@ markers = [
     "sample: needs a sample map under tmp/ (skipped when absent)",
     "slow: whole-map loads and timing checks",
 ]
+
+# uv decides whether its cached metadata for a source tree is still current
+# from pyproject.toml, setup.py and setup.cfg alone. This project's version
+# lives in twig_bb/__init__.py, so name that file too: without it a version
+# bump leaves uv answering with the previous number, and a dependent requiring
+# the new one resolves against PyPI rather than this checkout.
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { file = "twig_bb/__init__.py" }]
