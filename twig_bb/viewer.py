@@ -783,6 +783,14 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             # menu; a menu over a half-built one is a bug waiting to be found.
             return children
         children.append(self.loaded.scene(self._animator))
+        # The light the map baked for everything that is not the map: a
+        # combatant, a pickup and a rocket all carry lightmap coordinates for
+        # nothing, so without this they are black shapes in a lit room.  A node
+        # in the scene rather than a call anywhere, because the render pass is
+        # what samples it, once per object per frame.
+        grid = self.loaded.lightGrid()
+        if grid is not None:
+            children.append(grid)
         # The map's own ambience.  Nothing has to drive it: the render pass
         # collects audible nodes while it gathers the frame and the camera is
         # the listener, so putting the emitters in the scene is the whole of
@@ -827,7 +835,9 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             # A scene with no lights at all gets the pass's default headlight,
             # which for a map is a second, unwanted lighting model on top of the
             # baked one.  A light of zero intensity is still a light, so the
-            # substitution does not happen and the lightmaps stand alone.
+            # substitution does not happen and the map's own baked lighting --
+            # the lightmaps on its surfaces, the grid on everything else --
+            # stands alone.
             children.append(DirectionalLight(direction=(0, -1, 0), intensity=0.0))
         return children
 

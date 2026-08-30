@@ -91,6 +91,23 @@ class LoadedMap:
             self._visibility = found
         return found
 
+    def lightGrid(self) -> Any:
+        """The baked light this map has for the things that move through it.
+
+        A scene node the render pass samples per object, or None where the map
+        compiled no grid -- see :mod:`twig_bb.lighting`.  Built once and kept:
+        the samples are the file's own and do not change.
+
+        Read at the same exposure the map's lightmaps are drawn at, since the
+        two are one baked solve and a figure scaled differently from the floor
+        it stands on reads as pasted onto the room.
+        """
+        if '_lightGrid' not in self.__dict__:
+            from . import lighting
+            self._lightGrid = lighting.light_grid(
+                self.bsp, strength=self.library.lightmap_strength)
+        return self._lightGrid
+
     @property
     def gravity(self) -> float:
         """The map's gravity in units per second squared (``SPEC-TRIGGER-PUSH §8``)."""

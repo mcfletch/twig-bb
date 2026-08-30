@@ -284,6 +284,45 @@ grid has to be derived.
 **4.14.1** A grid of samples used to light moving models. A renderer that lights
 only world surfaces may ignore this lump.
 
+**4.14.2** The lump records samples and nothing else — no origin, no
+dimensions — so where the samples are has to be derived from the map. The
+spacing is 64 × 64 × 128 units unless the `worldspawn` entity (§5) carries a
+`gridsize` key, which gives three numbers replacing it. The samples sit on the
+lattice of points whose coordinates are whole multiples of the spacing and
+which lie inside model 0's bounding box (§4.7), so along each axis *i*:
+
+```
+first[i] = ceil(mins[i] / spacing[i])
+last[i]  = floor(maxs[i] / spacing[i])
+count[i] = last[i] - first[i] + 1
+origin[i] = first[i] * spacing[i]
+```
+
+**4.14.3** The samples are stored with x varying fastest, then y, then z:
+sample (x, y, z) is record `x + count[0] * (y + count[1] * z)`.
+
+**4.14.4** §4.14.2 and §4.14.3 were derived from the file bytes rather than from
+any description of them, and hold for all seventeen maps in this workspace's
+sample content. §4.14.2 predicts each lump's record count exactly — the count is
+`count[0] × count[1] × count[2]` and the lump length is eight times that, which
+no other placement satisfies. §4.14.3 was settled by comparing neighbouring
+samples: a grid samples a light field 64 units apart, so the reading that is
+right is the one whose neighbours agree, and reading x fastest gives about half
+the sample-to-sample variation that reading z fastest does, in every map.
+
+**4.14.5** The direction bytes are angles in units of 2π/255 radians: the first
+is measured from +Z and the second about +Z from +X, giving
+
+```
+towards = (sin(phi) cos(theta), sin(phi) sin(theta), cos(phi))
+```
+
+as a unit vector pointing **towards** the light. Also derived from the bytes:
+of the four readings the two bytes admit, this is the one whose vectors agree
+with the direction the sampled brightness increases in, and the only one that
+also points upwards on average — which is where a map lit by a sky and by
+ceiling lights is lit from.
+
 #### 4.15 Visdata (lump 16) — variable
 
 **4.15.1** Two int32 values — the number of cluster vectors and the size of each
@@ -381,5 +420,8 @@ draws the whole map (§4.15.1), and out of scope here for the same reason as
 Arena shader manual and treated as a separate concern; §7 records only where the
 files live.
 
-**E.4 — Lightvol sampling.** §4.14 records the record layout; how a renderer
-would light dynamic models from the grid is renderer design.
+**E.4 — What a renderer does with a sampled lightvol.** §4.14 records the
+record layout, where the samples are and how to read the two angle bytes —
+everything needed to get the same values out of the file that wrote them. How
+those values are then turned into shading is renderer design and is not
+recorded here.

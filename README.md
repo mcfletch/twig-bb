@@ -702,6 +702,35 @@ One other gap is deliberate. Skyboxes are not drawn: a sky surface is a hole the
 sky shows through (`SPEC-Q3SHADER §2.2`), and the hole shows the viewer's own
 backdrop.
 
+## Lighting: the map lights everything in it
+
+A Quake 3 map places no lamps at all. Its lighting was solved when it was
+compiled and it carries the answer in two forms, and the game uses both.
+
+**Lightmaps** are that light painted onto the map's own surfaces, packed into
+atlas pages and wired into each batch's material. `--lightmap SCALE` sets the
+exposure they are read at.
+
+**The light grid** (`SPEC-BSP46 §4.14`) is the same solve sampled on a coarse
+grid across the level, and it is what lights everything that is *not* the map:
+combatants, pickups, projectiles. None of them existed when the map was
+compiled, so none carries a lightmap coordinate, and without the grid they are
+black shapes in a lit room. The render pass looks each object's own position up
+in it, so a figure standing under a lamp is lit and the same figure in a corridor
+is not — and the direction the light comes from puts a lit side and a shaded side
+on it, which is most of what makes a figure readable at a distance.
+
+The lump records the samples but not where they are, so `twig_bb.lighting` works
+that out from the map's own bounds and turns the samples into the engine's
+[`LightGrid`](../openglcontext/OpenGLContext/scenegraph/lightgrid.py) node. A map
+whose sample count does not match the placement is refused rather than
+approximated: a grid put down in the wrong place lights the level from the wrong
+places, which looks like a bug in the lighting rather than an absence of one.
+Both records are read at the same exposure, since a figure scaled differently
+from the floor it stands on reads as pasted onto the room.
+
+`--headlight` adds a lamp at the camera, for a map that baked no lighting at all.
+
 ## How it is put together
 
 | Module | What it does |
@@ -713,6 +742,7 @@ backdrop.
 | `worldgeometry` | batched triangles in scene space, and the map-to-scene axis convention |
 | `q3geometry` | faces into those batches |
 | `lightmapatlas` | thousands of small baked-light blocks into a few GPU pages |
+| `lighting` | the map's light grid, for lighting everything that is not the map |
 | `q3shader` | Quake 3 `.shader` material scripts |
 | `materials` | texture names to images, surface styles to PBR materials |
 | `scene` | one shape per batch, with its lightmap page wired in |
