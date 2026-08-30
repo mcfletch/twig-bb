@@ -364,6 +364,14 @@ Of the 1076 image files, 1012 are `.crn` or `.webp`, formats postdating Quake 3
 by a decade or more. The 47 `.jpg` and 17 `.tga` it could read are editor
 preview images and 1×1 colour swatches. §4.6 turns this into a count of surfaces.
 
+**3.3a** `[OBSERVED]` A map ships its own picture at `meta/<name>/<name>.<ext>`,
+beside the `.arena` of §3.3, rather than in a shared `levelshots/` directory --
+which does not occur anywhere in the corpus. Two of the three maps ship it as
+`.crn` at 3840x2160 and one as `.webp` at 2560x1600; read, they are in-game
+screenshots. `[DERIVED]` The file is named for the map, which is also the name
+of the directory holding it, so that is what distinguishes it from anything else
+under `meta/`.
+
 **3.3** `[OBSERVED]` A map ships `meta/<name>/<name>.arena`, a single
 brace-delimited block of key/value pairs in the Quake 3 `.arena` style, with the
 keys `map`, `longname`, `author` and `type`. Observed `type` values are

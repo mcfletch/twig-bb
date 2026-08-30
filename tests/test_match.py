@@ -153,3 +153,82 @@ class TestWhatCanBePlayedNow:
         root.mkdir(parents=True)
         (root / 'oa_dm1.bsp').write_bytes(b'IBSP')
         assert match.levels_available(cache_dir=str(tmp_path))[0].pack == pack.key
+
+
+class TestWhereALevelsPictureLives:
+    """Two conventions, because the content this reads uses two.
+
+    Quake 3 puts every map's picture in one shared `levelshots/`; Unvanquished
+    puts each map's in a metadata directory named after the map
+    (``SPEC-UNVASSETS §3.3``). A reader that knows only the first lists the
+    second's levels blank.
+    """
+
+    def _picture(self, path, size=(4, 2)):
+        from PIL import Image
+        path.parent.mkdir(parents=True, exist_ok=True)
+        Image.new('RGB', size, (10, 20, 30)).save(path)
+
+    def test_the_shared_directory_still_works(self, tmp_path):
+        self._picture(tmp_path / 'levelshots' / 'oa_dm1.jpg')
+        assert match._levelshots(str(tmp_path))['oa_dm1'].endswith('oa_dm1.jpg')
+
+    def test_a_picture_in_a_metadata_directory_is_found(self, tmp_path):
+        self._picture(tmp_path / 'meta' / 'plat23' / 'plat23.webp')
+        assert match._levelshots(str(tmp_path))['plat23'].endswith('plat23.webp')
+
+    def test_only_the_file_named_for_its_directory_counts(self, tmp_path):
+        """A metadata directory holds other things, and they are not portraits.
+
+        The name is the whole of the rule here: unlike `levelshots/`, where
+        every file is a picture of the map it is named for, `meta/<map>/` is a
+        directory of oddments that happens to contain one.
+        """
+        self._picture(tmp_path / 'meta' / 'plat23' / 'plat23.webp')
+        self._picture(tmp_path / 'meta' / 'plat23' / 'loading_bar.png')
+        found = match._levelshots(str(tmp_path))
+        assert set(found) == {'plat23'}
+
+    def test_a_picture_loose_under_meta_is_not_a_levelshot(self, tmp_path):
+        """One directory deep is the rule; `meta/x.png` names no map."""
+        self._picture(tmp_path / 'meta' / 'banner.png')
+        assert match._levelshots(str(tmp_path)) == {}
+
+    def test_the_shared_directory_wins_where_a_map_has_both(self, tmp_path):
+        """First wins, and `os.walk` reaches `levelshots/` first by name."""
+        self._picture(tmp_path / 'levelshots' / 'plat23.jpg')
+        self._picture(tmp_path / 'meta' / 'plat23' / 'plat23.webp')
+        assert match._levelshots(str(tmp_path))['plat23'].endswith('.jpg')
+
+    def test_the_formats_the_content_actually_ships_are_searched(self):
+        """Two of the three Unvanquished maps ship Crunch, one ships WebP."""
+        assert '.webp' in match.LEVELSHOT_EXTENSIONS
+        assert '.crn' in match.LEVELSHOT_EXTENSIONS
+
+
+class TestReadingThosePictures:
+    """The toolkit decodes through the imaging library, which has no Crunch."""
+
+    def test_registering_teaches_the_picture_cache_crunch(self):
+        from OpenGLContext.ui import pictures
+        saved = dict(pictures._decoders)
+        try:
+            pictures._decoders.clear()
+            assert pictures.decoderFor('x.crn') is None
+            match.register_picture_decoders()
+            assert pictures.decoderFor('x.crn') is not None
+        finally:
+            pictures._decoders.clear()
+            pictures._decoders.update(saved)
+
+    def test_registering_twice_is_harmless(self):
+        match.register_picture_decoders()
+        match.register_picture_decoders()
+        from OpenGLContext.ui import pictures
+        assert pictures.decoderFor('x.crn') is not None
+
+    def test_webp_is_left_to_the_imaging_library(self):
+        """It reads WebP already; a decoder here would be a layer for nothing."""
+        from OpenGLContext.ui import pictures
+        match.register_picture_decoders()
+        assert pictures.decoderFor('x.webp') is None

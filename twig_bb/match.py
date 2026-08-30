@@ -174,7 +174,36 @@ def _restore(setup: MatchSetup, name: str, value: Any, path: str) -> None:
 #: called.  A level shot is what tells one arena from another at a glance, and
 #: 93 of them ship with the content this project can fetch.
 LEVELSHOT_DIR = 'levelshots'
-LEVELSHOT_EXTENSIONS = ('.jpg', '.tga', '.png', '.jpeg')
+
+#: The other place a picture lives.  Unvanquished keeps a map's metadata in a
+#: directory named after the map, and its picture beside the `.arena` file
+#: there rather than in a shared `levelshots/` (``SPEC-UNVASSETS §3.3``); a
+#: reader that knows only the shared directory lists those levels blank.  The
+#: file is named for the map, which is also the name of the directory holding
+#: it, and that is what tells it apart from anything else under `meta/`.
+METADATA_DIR = 'meta'
+
+#: `.webp` and `.crn` are here because that is what the pictures actually are:
+#: of the three Unvanquished maps this build offers, two ship Crunch and one
+#: ships WebP.  Crunch needs :mod:`twig_bb.crnfile`, which
+#: :func:`register_picture_decoders` wires into the toolkit's picture cache.
+LEVELSHOT_EXTENSIONS = ('.jpg', '.tga', '.png', '.jpeg', '.webp', '.crn')
+
+
+def register_picture_decoders() -> None:
+    """Let the UI's picture cache read the formats this content ships.
+
+    The toolkit decodes through the imaging library, which reads WebP and has
+    never heard of Crunch, so a `.crn` level shot would be a blank plate.
+    ``OpenGLContext.ui.pictures`` takes a decoder per suffix for exactly this,
+    which keeps a game-texture container and its optional dependency here, with
+    the content, rather than in the general toolkit.
+
+    Idempotent, and safe to call before a window exists.
+    """
+    from OpenGLContext.ui import pictures
+    from . import crnfile
+    pictures.registerDecoder(crnfile.EXTENSION, crnfile.load)
 
 
 @dataclass(frozen=True)
@@ -224,14 +253,23 @@ def _levelshots(root: str) -> Dict[str, str]:
     """
     found: Dict[str, str] = {}
     for base, _dirs, files in os.walk(root):
-        if os.path.basename(base).lower() != LEVELSHOT_DIR:
+        directory = os.path.basename(base).lower()
+        shared = directory == LEVELSHOT_DIR
+        # A metadata directory is named after its map, so the picture in it is
+        # the one whose stem matches the directory's own name; anything else
+        # under `meta/` belongs to something other than the level's portrait.
+        metadata = os.path.basename(os.path.dirname(base)).lower() == METADATA_DIR
+        if not shared and not metadata:
             continue
         for name in files:
             stem, extension = os.path.splitext(name)
-            if extension.lower() in LEVELSHOT_EXTENSIONS:
-                # First wins, matching the pack precedence the texture
-                # resolver uses: an earlier pak overrides a later one.
-                found.setdefault(stem.lower(), os.path.join(base, name))
+            if extension.lower() not in LEVELSHOT_EXTENSIONS:
+                continue
+            if metadata and stem.lower() != directory:
+                continue
+            # First wins, matching the pack precedence the texture
+            # resolver uses: an earlier pak overrides a later one.
+            found.setdefault(stem.lower(), os.path.join(base, name))
     return found
 
 

@@ -712,9 +712,11 @@ carries a `libopus` for Linux, macOS and Windows rather than relying on the
 system having one. Without that extra the sound resolves to a file that will not
 decode, which is the same silence as a sound nobody fetched.
 
-One thing here does not read: their level pictures sit in `meta/<map>/` as
-Crunch rather than in a `levelshots/` directory, so the level list shows these
-maps without a thumbnail.
+Their level pictures sit in `meta/<map>/` rather than in a shared
+`levelshots/` directory, and are Crunch or WebP rather than JPEG. Both places
+are searched and both formats are read, so these levels have portraits in the
+chooser like any other. Crunch needs the `crn` extra; without it the picture
+falls back to a plain plate.
 
 Player starts are named after the team structure — `team_human_spawn`,
 `team_alien_spawn` — rather than `info_player_deathmatch`, so a level that would

@@ -2045,6 +2045,10 @@ def main(argv: Optional[List[str]] = None) -> None:
     logging.basicConfig(level=logging.DEBUG if options.verbose else logging.INFO)
     logging.getLogger('OpenGLContext.scenegraph.text').setLevel(logging.WARNING)
     apply_render_env(options)
+    # Before any screen asks for a level's picture: the chooser is the first
+    # thing drawn, and its portraits are in formats the imaging library does
+    # not read on its own.
+    match.register_picture_decoders()
     TwigContext.config = options
     TwigContext._target = options.target
     TwigContext.ContextMainLoop(
