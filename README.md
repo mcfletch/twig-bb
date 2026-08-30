@@ -87,7 +87,7 @@ The on-screen credit is **wrapped, never shortened**: a truncated licence would
 state weaker terms than the content carries. `twig_bb.mapnotice` is where all of
 this lives.
 
-## Controls
+## Default Controls
 
 | Key | Action |
 |---|---|
@@ -206,7 +206,7 @@ defines (so their animation is gone), speakers that found no sound, liquid
 volumes, where the floor of the world is, how many pickups were placed, and how
 many pickups are of kinds nothing here has anything to give for.
 
-**The developer overlay** (alt + `f`) is everything a player should never see:
+**The developer overlay** (alt + `f`) is everything a player doesn't need:
 frame rate and frame time, the renderer's features and what the last frame cost
 in shapes and draw calls, the camera's position in scene metres *and* in map units, which movement mode is in force, whether you are submerged, and the
 physics world's body and contact counts. It is fed by *registered providers* —
@@ -957,7 +957,7 @@ The game that plan describes is **Twitchy GLitchy Bang Bang**. `twig_bb` is both
 halves: the map-loading and rendering library, usable on its own as a component,
 and the game built on it.
 
-The game's own content — characters, weapons and their sounds — is **ours**,
+The game's own content — characters, weapons and their sounds — is *ours*,
 authored in glTF and shipped with the code; the figures' bodies are CC0 base
 characters, credited in
 [twig_bb/assets/characters/CREDITS.md](twig_bb/assets/characters/CREDITS.md),
