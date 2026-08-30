@@ -25,7 +25,7 @@ from . import bspfile, externallightmaps, jumppads, q3bsp, q3geometry, q3shader
 from .entities import Entity
 from .lightmapatlas import LightmapAtlas
 from .materials import (DEFAULT_LIGHTMAP_STRENGTH, TEXTURE_EXTENSIONS,
-                        MaterialLibrary)
+                        MaterialLibrary, auto_lightmap_strength)
 from .scene import build_scene
 from .surfaces import SurfaceStyle
 from .worldgeometry import SCENE_SCALE, WorldGeometry, to_scene_points
@@ -248,8 +248,9 @@ def load(path: str, lightmap_strength: Optional[float] = None,
     _magic, version = sniffed
     roots = _content_roots(path, extra_roots)
     name = os.path.splitext(os.path.basename(path))[0]
-    strength = (DEFAULT_LIGHTMAP_STRENGTH if lightmap_strength is None
-                else lightmap_strength)
+    # None is not "use the default" but "work it out from the map", which
+    # _load_quake3 can only do once it has the atlas.
+    strength = lightmap_strength
     if version == q3bsp.BSP_VERSION:
         return _load_quake3(path, name, roots, strength, subdivisions)
     raise bspfile.MalformedBSP(
@@ -269,12 +270,14 @@ def _content_roots(path: str, extra: Sequence[str]) -> List[str]:
     return roots
 
 
-def _load_quake3(path: str, name: str, roots: List[str], strength: float,
+def _load_quake3(path: str, name: str, roots: List[str],
+                 strength: Optional[float],
                  subdivisions: Optional[int]) -> LoadedMap:
     """Read a version 46 map and the material scripts that describe it."""
     bsp = q3bsp.load(path)
     _attach_external_lightmaps(path, bsp)
-    library = MaterialLibrary(roots, family='quake3', lightmap_strength=strength)
+    library = MaterialLibrary(roots, family='quake3',
+                              lightmap_strength=DEFAULT_LIGHTMAP_STRENGTH)
     materials = q3shader.load_scripts(roots)
 
     def style_for(texture_name: str) -> SurfaceStyle:
@@ -284,6 +287,12 @@ def _load_quake3(path: str, name: str, roots: List[str], strength: float,
     if subdivisions is not None:
         kwargs['subdivisions'] = subdivisions
     world, atlas = q3geometry.build(bsp, style_for=style_for, **kwargs)
+    # After the atlas, because the exposure is measured from the pages it
+    # packed, and before any material is built, because a material carries the
+    # exposure it was built with.
+    library.lightmap_strength = (
+        auto_lightmap_strength(atlas.median_luxel()) if strength is None
+        else float(strength))
     return LoadedMap(path=path, name=name, family='quake3',
                      version=q3bsp.BSP_VERSION, bsp=bsp, world=world,
                      atlas=atlas, library=library, roots=roots,

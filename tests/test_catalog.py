@@ -148,3 +148,56 @@ class TestWhatTheRestOfTheViewerSees:
     def test_the_short_name_still_reaches_the_maps_pack(self):
         found = download.parse_pack_target('openarena:oa_dm1')
         assert found is not None and found[0].key == 'openarena-maps'
+
+
+# -- the Unvanquished family -------------------------------------------------
+
+def _unvanquished():
+    return [pack for pack in catalog.load() if pack.family == 'unvanquished']
+
+
+def test_the_unvanquished_packs_are_registered():
+    """SPEC-UNVDIST §3.1: the packages whose terms are stated in the archive."""
+    keys = {pack.key for pack in _unvanquished()}
+    assert 'unvanquished-plat23' in keys
+    assert 'unvanquished-tex-pk02' in keys
+
+
+def test_no_unvanquished_pack_lacks_stated_terms():
+    """SPEC-UNVDIST §1.5, §3.4: nine packages state no licence anywhere.
+
+    They hold the player, buildable and weapon models, the voices and the
+    soundtrack, and they are deliberately absent. A pack that cannot state its
+    terms would be offered for download and left out of the acknowledgements,
+    which is the one thing `copyright` exists to prevent.
+    """
+    unlicensed = ('res-players', 'res-buildables', 'res-weapons', 'res-voices',
+                  'res-soundtrack', 'res-ambient', 'res-legacy', 'tex-all')
+    urls = ' '.join(pack.url for pack in catalog.load())
+    for name in unlicensed:
+        assert name not in urls, '%s states no licence and must not be offered' % (name,)
+
+
+def test_the_base_package_is_not_offered():
+    """SPEC-UNVDIST §1.4: a mixed tree carrying GPLv3 game-logic binaries."""
+    assert 'unvanquished_0.56' not in ' '.join(pack.url for pack in catalog.load())
+
+
+def test_every_unvanquished_map_names_the_art_it_needs():
+    """SPEC-DPK §4: a map package carries no art, so it is nothing on its own."""
+    packs = {pack.key: pack for pack in catalog.load()}
+    for pack in _unvanquished():
+        if pack.marker != 'maps':
+            continue
+        assert pack.companions, '%s would render in grey' % (pack.key,)
+        for key in pack.companions:
+            assert key in packs, '%s names %s, which is not registered' % (pack.key, key)
+
+
+def test_the_smallest_playable_set_is_the_measured_size():
+    """SPEC-UNVDIST §4.5: Platform 23 and its closure, 43890648 bytes."""
+    packs = {pack.key: pack for pack in catalog.load()}
+    plat23 = packs['unvanquished-plat23']
+    total = plat23.approximate_bytes + sum(
+        packs[key].approximate_bytes for key in plat23.companions)
+    assert total == 43890648

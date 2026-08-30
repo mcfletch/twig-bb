@@ -221,3 +221,44 @@ class TestTheCostOfAskingTwice:
     def test_it_still_answers_the_same_thing(self, quake3_map):
         loaded = maploader.load(quake3_map)
         assert loaded.missing_textures() == loaded.missing_textures()
+
+
+# -- exposure chosen from the map -------------------------------------------
+
+def test_an_explicit_exposure_is_honoured_over_the_measured_one(write_map):
+    """`--lightmap` is the user overriding a decision, not a hint."""
+    import bspbuilder
+    from twig_bb import maploader
+    lumps = bspbuilder.v46_quad(
+        lm_index=0, lightmaps=bytes(bytearray([200]) * (128 * 128 * 3)))
+    path = write_map(46, lumps)
+    assert maploader.load(path, lightmap_strength=3.5).library.lightmap_strength == 3.5
+
+
+def test_a_brightly_baked_map_is_exposed_down_by_default(write_map):
+    """No `--lightmap` means "work it out from the map", not "use 2.0"."""
+    import bspbuilder
+    from twig_bb import maploader
+    from twig_bb.materials import DEFAULT_LIGHTMAP_STRENGTH
+    lumps = bspbuilder.v46_quad(
+        lm_index=0, lightmaps=bytes(bytearray([200]) * (128 * 128 * 3)))
+    loaded = maploader.load(write_map(46, lumps))
+    assert loaded.library.lightmap_strength < DEFAULT_LIGHTMAP_STRENGTH
+
+
+def test_a_darkly_baked_map_keeps_the_default(write_map):
+    import bspbuilder
+    from twig_bb import maploader
+    from twig_bb.materials import DEFAULT_LIGHTMAP_STRENGTH
+    lumps = bspbuilder.v46_quad(
+        lm_index=0, lightmaps=bytes(bytearray([8]) * (128 * 128 * 3)))
+    loaded = maploader.load(write_map(46, lumps))
+    assert loaded.library.lightmap_strength == DEFAULT_LIGHTMAP_STRENGTH
+
+
+def test_a_map_with_no_lightmap_keeps_the_default(write_map):
+    import bspbuilder
+    from twig_bb import maploader
+    from twig_bb.materials import DEFAULT_LIGHTMAP_STRENGTH
+    loaded = maploader.load(write_map(46, bspbuilder.v46_quad(lm_index=-1)))
+    assert loaded.library.lightmap_strength == DEFAULT_LIGHTMAP_STRENGTH

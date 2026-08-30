@@ -66,9 +66,40 @@ TEXCOORD_MASK_LIGHTMAP = 32
 #: is the viewer's own default and ``--lightmap`` overrides it.
 DEFAULT_LIGHTMAP_STRENGTH = 2.0
 
+#: The middle brightness :data:`DEFAULT_LIGHTMAP_STRENGTH` was chosen against,
+#: as :meth:`~twig_bb.lightmapatlas.LightmapAtlas.median_luxel` measures it.
+#: The median of the per-map medians of twelve Quake 3 levels; the same twelve
+#: run from 0.049 to 0.72, so this is a centre and not a bound.
+REFERENCE_MEDIAN_LUXEL = 0.0986
+
 #: A trailing light value on a shader name: `light1_5000`, `baslt4_1_2k`,
 #: `gothic_light2_4K`.  See :meth:`MaterialLibrary._light_variant`.
 LIGHT_VARIANT = re.compile(r'^(.+)_\d+k?$', re.IGNORECASE)
+
+
+def auto_lightmap_strength(median: Optional[float]) -> float:
+    """The exposure for a map whose baked light sits at ``median``.
+
+    **A ceiling, never a brightener.** A map baked brighter than
+    :data:`REFERENCE_MEDIAN_LUXEL` is pulled back until its middle brightness
+    lands there; a map baked at or below it is left at
+    :data:`DEFAULT_LIGHTMAP_STRENGTH` and keeps whatever darkness its author
+    baked in.
+
+    Both halves of that matter. Normalising in *both* directions would give
+    every level the same mid-tone and flatten the difference between a dim
+    corridor and a floodlit hangar, which is a decision the map's author
+    already made. Not normalising at all leaves content baked on a brighter
+    absolute scale washed out — pale surfaces with their shadows lifted —
+    which is what this exists to fix, since the exposure was picked against one
+    body of content and the scale is not shared between projects.
+
+    ``median`` of None, which is a map with no baked light, takes the default:
+    there is nothing to be over-exposed.
+    """
+    if not median or median <= REFERENCE_MEDIAN_LUXEL:
+        return DEFAULT_LIGHTMAP_STRENGTH
+    return DEFAULT_LIGHTMAP_STRENGTH * REFERENCE_MEDIAN_LUXEL / median
 
 
 class MaterialLibrary:

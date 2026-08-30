@@ -533,3 +533,29 @@ def test_a_file_named_like_an_archive_that_is_not_one_is_skipped(tmp_path):
     (tmp_path / 'maps' / 'ok.bsp').write_bytes(b'IBSP')
     assert download.find_map(str(tmp_path), 'ok') is not None
     assert download.list_maps(str(tmp_path)) == ['ok']
+
+
+def test_a_family_and_map_shorthand_reaches_a_per_map_pack():
+    """Unvanquished publishes one package per map, so `<family>:<map>` has no
+    single pack to name and falls through to `<family>-<map>`."""
+    found = download.parse_pack_target('unvanquished:plat23')
+    assert found is not None
+    assert found[0].key == 'unvanquished-plat23'
+    assert found[1] == 'plat23'
+
+
+def test_the_shorthand_ignores_an_extension_on_the_map_name():
+    found = download.parse_pack_target('unvanquished:yocto.bsp')
+    assert found is not None and found[0].key == 'unvanquished-yocto'
+
+
+def test_a_direct_pack_key_still_wins_over_the_per_map_form():
+    """The existing aliases must not be shadowed by the fallback."""
+    found = download.parse_pack_target('openarena:oa_dm1')
+    assert found is not None and found[0].key == 'openarena-maps'
+
+
+@pytest.mark.parametrize('target', ['https://example.com/map.pk3', 'C:/maps/x.bsp',
+                                    'nosuch:whatever'])
+def test_the_shorthand_still_refuses_what_is_not_one(target):
+    assert download.parse_pack_target(target) is None

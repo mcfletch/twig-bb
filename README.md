@@ -706,6 +706,13 @@ container — the maps themselves are `IBSP` v46 byte for byte:
   scripts never mention `$lightmap` anywhere is lit implicitly, and a surface
   can still refuse it the ways it always could.
 
+Two things in these packages this viewer does not read. Their sounds are
+`.opus`, and the sound lookup takes `.wav` and `.ogg`, so a level's ambience and
+its machinery are silent — no audio library here decodes Opus, and adding one is
+a dependency decision rather than an oversight. Their level pictures sit in
+`meta/<map>/` as Crunch rather than in a `levelshots/` directory, so the level
+list shows these maps without a thumbnail.
+
 Player starts are named after the team structure — `team_human_spawn`,
 `team_alien_spawn` — rather than `info_player_deathmatch`, so a level that would
 otherwise have nowhere to stand has spawn points.
@@ -766,6 +773,21 @@ compiled and it carries the answer in two forms, and the game uses both.
 **Lightmaps** are that light painted onto the map's own surfaces, packed into
 atlas pages and wired into each batch's material. `--lightmap SCALE` sets the
 exposure they are read at.
+
+Left alone, the exposure is **measured from the map**. A map bakes absolute
+radiosity, and the absolute scale is not shared between projects: content baked
+brighter than the exposure was chosen for comes out pale, with its shadows
+lifted off the floor. So the middle brightness of a map's lit luxels is measured
+once, and a map baked brighter than the reference is pulled back until it lands
+there.
+
+It is a ceiling and never a brightener. A map baked *darker* than the reference
+keeps every bit of its darkness, because that is a decision its author made and
+normalising in both directions would give a dim corridor and a floodlit hangar
+the same mid-tone. Across fifty Quake 3 levels most are already at or below the
+reference and are untouched; the ones that move are the few baked far brighter,
+which were the ones washing out. `--lightmap` overrides the measurement
+outright.
 
 **The light grid** (`SPEC-BSP46 §4.14`) is the same solve sampled on a coarse
 grid across the level, and it is what lights everything that is *not* the map:

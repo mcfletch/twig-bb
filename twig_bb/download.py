@@ -86,8 +86,17 @@ def parse_pack_target(target: str) -> Optional[Tuple[AssetPack, str]]:
     prefix, _, name = target.partition(':')
     if not name or '/' in prefix or '\\' in prefix:
         return None
+    if name.startswith(('/', '\\')):
+        return None
     pack = pack_for_key(PACK_ALIASES.get(prefix.lower(), prefix.lower()))
-    if pack is None or name.startswith(('/', '\\')):
+    if pack is None:
+        # Content published one package per map has no single pack to name, so
+        # `<family>:<map>` also reaches a pack keyed `<family>-<map>`.  Without
+        # this the only way to ask for such a level is to know which package
+        # holds it, which is the thing the shorthand exists to save.
+        stem = os.path.splitext(name)[0].lower()
+        pack = pack_for_key('%s-%s' % (prefix.lower(), stem))
+    if pack is None:
         return None
     return (pack, name)
 
