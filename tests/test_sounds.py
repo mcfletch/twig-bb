@@ -66,8 +66,14 @@ def test_wav_is_preferred_over_ogg(content):
 
 
 def test_the_supported_extensions_are_the_ones_the_content_ships(content):
-    """SPEC-Q3ENTITIES §2.1: 255 .wav and 98 .ogg, and nothing else."""
-    assert SOUND_EXTENSIONS == ('.wav', '.ogg')
+    """The encodings the content this viewer reads actually carries.
+
+    ``SPEC-Q3ENTITIES §2.1``: Quake 3 content is 255 `.wav` and 98 `.ogg` and
+    nothing else, which is why those two lead and in that order.
+    ``SPEC-UNVASSETS §3.1.8``: Unvanquished content is `.opus` and nothing
+    else, so the list is not a Quake 3 fact any more.
+    """
+    assert SOUND_EXTENSIONS == ('.wav', '.ogg', '.opus')
 
 
 def test_a_star_prefixed_name_is_not_looked_up_at_all(content):
@@ -123,3 +129,27 @@ def test_a_name_may_not_escape_the_content_root(content, tmp_path):
 
 def _never(*args, **named):
     return False
+
+
+def test_opus_is_searched_for_as_well(tmp_path):
+    """SPEC-UNVASSETS §3.1.8: Unvanquished carries all of its audio as `.opus`.
+
+    A map there names `sound/x/y.wav` and ships `y.opus`, so the extension
+    being advisory (``SPEC-Q3ENTITIES §1.2.2``) is what finds it at all.
+    """
+    from twig_bb.sounds import SoundLibrary
+    directory = tmp_path / 'sound' / 'yocto'
+    directory.mkdir(parents=True)
+    (directory / 'motor1.opus').write_bytes(b'OggS-not-real-audio')
+    library = SoundLibrary([str(tmp_path)])
+    assert library.resolve('sound/yocto/motor1.wav').endswith('motor1.opus')
+
+
+def test_a_wav_still_wins_over_an_opus_beside_it(tmp_path):
+    """The order is most-likely-first, and `.opus` is the newcomer."""
+    from twig_bb.sounds import SoundLibrary
+    directory = tmp_path / 'sound'
+    directory.mkdir(parents=True)
+    (directory / 'x.opus').write_bytes(b'OggS')
+    (directory / 'x.wav').write_bytes(b'RIFF')
+    assert SoundLibrary([str(tmp_path)]).resolve('sound/x').endswith('x.wav')

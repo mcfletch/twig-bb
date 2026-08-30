@@ -706,12 +706,15 @@ container — the maps themselves are `IBSP` v46 byte for byte:
   scripts never mention `$lightmap` anywhere is lit implicitly, and a surface
   can still refuse it the ways it always could.
 
-Two things in these packages this viewer does not read. Their sounds are
-`.opus`, and the sound lookup takes `.wav` and `.ogg`, so a level's ambience and
-its machinery are silent — no audio library here decodes Opus, and adding one is
-a dependency decision rather than an oversight. Their level pictures sit in
-`meta/<map>/` as Crunch rather than in a `levelshots/` directory, so the level
-list shows these maps without a thumbnail.
+Their sounds are `.opus`, which is the only encoding they carry any audio in,
+and it plays: `omi_audio` decodes Ogg Opus through the `audio` extra, which
+carries a `libopus` for Linux, macOS and Windows rather than relying on the
+system having one. Without that extra the sound resolves to a file that will not
+decode, which is the same silence as a sound nobody fetched.
+
+One thing here does not read: their level pictures sit in `meta/<map>/` as
+Crunch rather than in a `levelshots/` directory, so the level list shows these
+maps without a thumbnail.
 
 Player starts are named after the team structure — `team_human_spawn`,
 `team_alien_spawn` — rather than `info_player_deathmatch`, so a level that would
@@ -881,6 +884,7 @@ To install it:
 pip install twig-bb            # from PyPI
 pip install twig-bb[audio]     # with the sound-card backend, see Sound
 pip install twig-bb[crn]       # to read Crunch textures, see Unvanquished packages
+pip install twig-bb[audio]     # also decodes Ogg Opus, see Sound
 pip install -e .               # from a checkout, for working on it
 ```
 

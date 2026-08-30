@@ -32,6 +32,7 @@ catalogue is credited without anyone having to remember. Run
 | pillow | MIT-CMU | <https://python-pillow.org/> | required |
 | miniaudio | MIT | <https://github.com/irmen/pyminiaudio> | **optional** (`pip install twig-bb[audio]`) |
 | texture2ddecoder | MIT | <https://github.com/K0lb3/texture2ddecoder> | **optional** (`pip install twig-bb[crn]`) |
+| opuslib-next-bundled | BSD-3-Clause | <https://pypi.org/project/opuslib-next-bundled/> | **optional** (`pip install twig-bb[audio]`) |
 
 **miniaudio is optional and the distinction matters here**, because a notice has
 to be accurate about what a given install actually contains. It is not a
@@ -59,6 +60,19 @@ a BSD library.
 
 zlib is a permissive, BSD-style licence, so this chain passes the same test the
 audio one does.
+
+**opuslib-next-bundled** is what reads Ogg Opus, which is the only encoding
+Unvanquished's packages carry any audio in. It bundles a `libopus` built from
+the Xiph sources so the codec is present on Linux, macOS and Windows rather than
+only where the system happens to have one:
+
+| Bundled in opuslib-next-bundled | Licence | Author |
+|---|---|---|
+| libopus | BSD-3-Clause | Xiph.Org Foundation and contributors |
+| opuslib / opuslib-next | BSD-3-Clause | Никита Кузнецов and others; fork by Kalicyh |
+
+The container around the codec is not from a package: `omi_audio._opus`
+demultiplexes Ogg itself from RFC 3533 and RFC 7845.
 
 ## Art shipped with this program
 

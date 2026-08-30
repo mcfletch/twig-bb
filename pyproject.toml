@@ -53,7 +53,7 @@ dev = ["pytest", "pytest-cov", "ruff", "mypy"]
 # only audio package this project takes: the convenient wrappers (libsndfile,
 # PyAV, pydub via ffmpeg) are LGPL or worse and cannot be a dependency of a BSD
 # library.
-audio = ["omi_audio[playback]"]
+audio = ["omi_audio[playback]", "omi_audio[opus]"]
 # Crunch (`.crn`) textures, which Unvanquished's packages use for most of their
 # art (SPEC-CRN).  Optional because it is needed only for that content and
 # because its absence is the ordinary "this build cannot decode that format"

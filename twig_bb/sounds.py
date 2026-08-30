@@ -30,7 +30,13 @@ log = logging.getLogger(__name__)
 
 #: The audio extensions the content ships and the engine decodes, most likely
 #: first (``SPEC-Q3ENTITIES §2.1``: 255 `.wav` against 98 `.ogg`).
-SOUND_EXTENSIONS = ('.wav', '.ogg')
+#:
+#: `.opus` is last and is what Unvanquished's packages ship
+#: (``SPEC-UNVASSETS §3.1.8``), where it is the *only* audio format: a level's
+#: ambience and its machinery are in no other encoding.  It decodes through
+#: ``omi_audio``'s `opus` extra; without that the name resolves to a file that
+#: will not decode, which is the same silence as a sound nobody fetched.
+SOUND_EXTENSIONS = ('.wav', '.ogg', '.opus')
 
 #: ``SPEC-Q3ENTITIES §1.2.5``: a `noise` beginning with this names an entity
 #: model's own sound and is not a path into the content tree.
