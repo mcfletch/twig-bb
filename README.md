@@ -10,6 +10,9 @@ onto the underlying file, so load times are generally pretty fast.
 Rendering uses the built-in lightmaps in the OpenGLContext PBR render 
 passes but we don't currently implement the PK3 sky rendering.
 
+The game opens full-screen; `--no-fullscreen` gives a window, and the settings
+screen has the same toggle for changing your mind mid-game.
+
 ```bash
 twig-bb                                 # the start screen: pick a level
 twig-bb maps/oa_dm1.bsp                  # a map you already have
@@ -556,6 +559,7 @@ holding one, which is how the offsets above are dialled in.
 | `--hud` / `--no-hud` | draw the game HUD (off during a `--capture`) |
 | `--effects full\|reduced\|off` | how much impact and blood to draw (default `full`); presentation only, it cannot change play |
 | `--headlight` | a lamp at the camera, for maps with no baked lighting |
+| `--fullscreen` / `--no-fullscreen` | fill the screen (on by default; a `--capture` always renders at its window size) |
 
 Set `OPENGLCONTEXT_DEBUG_WHEEL=1` to have every scroll report the offset it was
 given and how many notches it made of it. Platforms disagree about what one

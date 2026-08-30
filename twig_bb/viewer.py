@@ -215,6 +215,10 @@ def build_parser(prog: str = 'twig-bb') -> argparse.ArgumentParser:
                         help='how much impact and blood to draw (default full).  '
                              'Presentation only: it cannot change what a shot '
                              'does, so two players may set it differently')
+    parser.add_argument('--fullscreen', action=argparse.BooleanOptionalAction,
+                        default=True,
+                        help='fill the screen (default on; a capture always '
+                             'renders at the window size it asked for)')
     parser.add_argument('--headlight', action='store_true',
                         help='add a lamp at the camera, for maps with no lightmaps')
     parser.add_argument('--shadows', action=argparse.BooleanOptionalAction,
@@ -460,9 +464,26 @@ def _print_line(line: str) -> None:   # pragma: no cover - console output
     sys.stdout.flush()
 
 
-def context_definition() -> ContextDefinition:
-    """A context definition carrying this viewer's declared modes."""
-    return ContextDefinition(movementModes=movement_modes())
+def wants_fullscreen(options: argparse.Namespace) -> bool:
+    """Whether this run should fill the screen.
+
+    A capture is a picture of the scene at a stated size, so it keeps the
+    window whatever the rest of the command line says: a frame read back at
+    whatever the display happens to be is not comparable with one read back
+    anywhere else.
+    """
+    return bool(options.fullscreen) and not options.capture
+
+
+def context_definition(fullscreen: bool = True) -> ContextDefinition:
+    """A context definition carrying this viewer's declared modes.
+
+    Full-screen by default, because that is how the game is played; the
+    settings screen offers the same field, so a player who wants a window can
+    have one without restarting.
+    """
+    return ContextDefinition(movementModes=movement_modes(),
+                             fullscreen=fullscreen)
 
 
 def character_capabilities() -> CharacterCapabilities:
@@ -2016,7 +2037,8 @@ def main(argv: Optional[List[str]] = None) -> None:
     apply_render_env(options)
     TwigContext.config = options
     TwigContext._target = options.target
-    TwigContext.ContextMainLoop(definition=context_definition())
+    TwigContext.ContextMainLoop(
+        definition=context_definition(fullscreen=wants_fullscreen(options)))
 
 
 if __name__ == '__main__':

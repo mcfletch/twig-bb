@@ -389,6 +389,39 @@ def test_a_swim_mode_is_declared_for_when_liquid_volumes_arrive():
     assert swim
 
 
+class TestHowBigTheWindowOpens:
+    """A game is played full-screen, so that is what starting it does.
+
+    Two things want it back in a window and neither is the player: a capture
+    is a picture of a scene at a stated size, and somebody working on the game
+    wants it beside an editor.
+    """
+
+    def test_the_game_starts_full_screen(self):
+        assert viewer.build_parser().parse_args([]).fullscreen
+
+    def test_a_window_can_be_asked_for(self):
+        assert not viewer.build_parser().parse_args(
+            ['--no-fullscreen']).fullscreen
+
+    def test_the_definition_carries_the_choice(self):
+        assert viewer.context_definition().fullscreen
+        assert not viewer.context_definition(fullscreen=False).fullscreen
+
+    def test_a_capture_stays_in_its_window(self):
+        """The frame is read back at the size that was asked for."""
+        options = viewer.build_parser().parse_args(['--capture', 'shot.png'])
+        assert not viewer.wants_fullscreen(options)
+
+    def test_playing_fills_the_screen(self):
+        options = viewer.build_parser().parse_args([])
+        assert viewer.wants_fullscreen(options)
+
+    def test_asking_for_a_window_is_honoured(self):
+        options = viewer.build_parser().parse_args(['--no-fullscreen'])
+        assert not viewer.wants_fullscreen(options)
+
+
 def test_the_modes_reach_the_context_definition():
     definition = viewer.context_definition()
     assert list(definition.movementModes)
