@@ -35,6 +35,9 @@ DEFAULT_PAGE_SIZE = 2048
 #: floating-point drift at a block's edge.
 DEFAULT_PADDING = 1
 
+#: Rec. 709 luminance weights, for reducing a luxel to one brightness.
+LUMINANCE = np.array([0.2126, 0.7152, 0.0722], dtype='f')
+
 
 @dataclass(frozen=True)
 class Placement:
@@ -60,6 +63,33 @@ class LightmapAtlas:
         """The page a block landed on, or -1 if it has none."""
         place = self.placements[index]
         return -1 if place is None else place.page
+
+    def median_luxel(self) -> Optional[float]:
+        """The middle brightness of this map's baked light, from 0 to 1.
+
+        How bright the map was *baked*, which is not a constant across content:
+        a map records absolute radiosity and different compilers and different
+        projects settle on wildly different absolute scales.  A viewer applying
+        one fixed exposure to all of them over-exposes whichever content was
+        baked brighter than the exposure was chosen for, and the surfaces come
+        out pale with their shadows lifted off the floor.
+
+        Unlit luxels are left out: a page is mostly the black between blocks,
+        and counting it would report every map as dark whatever its lit
+        surfaces look like.  The median rather than the mean, because a few
+        bright light fixtures should not decide the exposure of a whole level.
+
+        None when the map has no baked light at all.
+        """
+        if not self.pages:
+            return None
+        luminance = np.concatenate([
+            np.asarray(page, dtype='f').reshape((-1, 3)) @ LUMINANCE
+            for page in self.pages])
+        lit = luminance[luminance > 0]
+        if not len(lit):
+            return None
+        return float(np.median(lit)) / 255.0
 
     def uv_from_luxels(self, index: int, luxels: Any) -> np.ndarray:
         """Atlas UVs for coordinates given in luxels within the block.

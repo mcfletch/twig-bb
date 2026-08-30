@@ -31,7 +31,10 @@ from .assetpack import AssetPack
 log = logging.getLogger(__name__)
 
 #: Archive extensions that hold a map and its content (``SPEC-BSP46 §7.1``).
-ARCHIVE_EXTENSIONS = ('.pk3', '.zip')
+#: `.dpk` is the same ZIP container under a different name and laid out the
+#: same way (``SPEC-DPK §1.1``, ``§1.19``), so it unpacks through this module
+#: unchanged; what it adds is the dependency list :mod:`twig_bb.dpk` reads.
+ARCHIVE_EXTENSIONS = ('.pk3', '.zip', '.dpk')
 MAP_EXTENSION = '.bsp'
 
 #: Where an unpacked archive lands when the caller names no directory.  A map
@@ -83,8 +86,17 @@ def parse_pack_target(target: str) -> Optional[Tuple[AssetPack, str]]:
     prefix, _, name = target.partition(':')
     if not name or '/' in prefix or '\\' in prefix:
         return None
+    if name.startswith(('/', '\\')):
+        return None
     pack = pack_for_key(PACK_ALIASES.get(prefix.lower(), prefix.lower()))
-    if pack is None or name.startswith(('/', '\\')):
+    if pack is None:
+        # Content published one package per map has no single pack to name, so
+        # `<family>:<map>` also reaches a pack keyed `<family>-<map>`.  Without
+        # this the only way to ask for such a level is to know which package
+        # holds it, which is the thing the shorthand exists to save.
+        stem = os.path.splitext(name)[0].lower()
+        pack = pack_for_key('%s-%s' % (prefix.lower(), stem))
+    if pack is None:
         return None
     return (pack, name)
 

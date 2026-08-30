@@ -457,3 +457,108 @@ textures/sfx/flame
 """
     style = q3shader.parse(text)['textures/sfx/flame'].style()
     assert style.animation.animmap is not None
+
+
+# -- the implicit-lightmap convention ----------------------------------------
+
+def test_content_that_never_names_a_lightmap_stage_is_lit_implicitly():
+    """A script set with no `$lightmap` anywhere takes the baked light anyway.
+
+    Read under the Quake 3 convention alone every surface of such a set comes
+    out unlit, and the map draws correctly textured and completely flat.
+    """
+    materials = parse('a { { diffuseMap x } }\nb { { map y.tga } }')
+    assert not any(m.lightmap_stage for m in materials.values())
+    assert q3shader.apply_implicit_lightmaps(materials)
+    assert materials['a'].lightmapped
+    assert materials['b'].lightmapped
+
+
+def test_a_set_that_uses_the_lightmap_stage_even_once_keeps_quake_3_rules():
+    """One `$lightmap` anywhere means the set was authored the Quake 3 way.
+
+    The surface *without* one must then stay unlit, which is what stops a
+    fullbright or additive surface being handed baked light it never asked for.
+    """
+    materials = parse('lit { { map $lightmap } }\nflat { { map y.tga } }')
+    assert not q3shader.apply_implicit_lightmaps(materials)
+    assert materials['lit'].lightmapped
+    assert not materials['flat'].lightmapped
+
+
+def test_the_implicit_rule_still_honours_a_surface_that_refuses_light():
+    """`nolightmap`, transparency, sky and undrawn all still refuse it."""
+    materials = parse(
+        'no { surfaceparm nolightmap { { diffuseMap x } } }\n'
+        'clear { surfaceparm trans { { diffuseMap x } } }\n'
+        'sky { surfaceparm sky { { diffuseMap x } } }\n'
+        'hidden { surfaceparm nodraw { { diffuseMap x } } }\n'
+        'wall { { diffuseMap x } }')
+    assert q3shader.apply_implicit_lightmaps(materials)
+    assert materials['wall'].lightmapped
+    for name in ('no', 'clear', 'sky', 'hidden'):
+        assert not materials[name].lightmapped, name
+
+
+def test_an_empty_script_set_claims_no_convention():
+    """Nothing loaded is not evidence of the implicit convention."""
+    assert not q3shader.apply_implicit_lightmaps({})
+
+
+# -- the physically-based stage dialect --------------------------------------
+
+def test_a_diffuse_map_names_the_surfaces_image():
+    """SPEC-UNVASSETS §4.5.1, §4.5.3: 169 materials name their image only so."""
+    material = parse('n { { diffuseMap textures/a/b_d normalMap x } }')['n']
+    assert material.image == 'textures/a/b_d'
+
+
+def test_a_diffuse_map_outranks_a_later_glow_mask():
+    """SPEC-UNVASSETS §4.5.5, §4.5.6: taking the first `map` takes the mask.
+
+    The 46 materials carrying both put the PBR stage first and an additive
+    mask after it, and 14 surfaces across the sample maps draw as a glow
+    pattern on black when the mask wins.
+    """
+    material = parse('n {\n'
+                     ' { diffuseMap textures/a/panel_d }\n'
+                     ' { map textures/a/panel_a\n blend add }\n'
+                     '}')['n']
+    assert material.image == 'textures/a/panel_d'
+
+
+def test_a_plain_map_still_wins_where_there_is_no_diffuse_map():
+    """SPEC-Q3SHADER §2.3.1 is untouched for content that never uses the new
+    keyword."""
+    assert parse('n { { map a.tga } { map b.tga } }')['n'].image == 'a.tga'
+
+
+def test_the_editor_image_is_still_the_fallback():
+    """SPEC-UNVASSETS §4.5.4: what rescues a diffuse-only material today."""
+    material = parse('n { qer_editorImage textures/a/b_d\n surfaceparm trans }')['n']
+    assert material.image == 'textures/a/b_d'
+
+
+@pytest.mark.parametrize('directive', ['blendFunc add', 'blend add'])
+def test_blend_is_an_alternative_spelling_of_blendfunc(directive):
+    """SPEC-UNVASSETS §4.5.7: 73 stages spell it the second way.
+
+    Unrecognised, an additive glow draws as an opaque rectangle.
+    """
+    material = parse('n { { map a.tga\n %s } }' % (directive,))['n']
+    assert material.transparent
+
+
+@pytest.mark.parametrize('directive', ['blendFunc blend', 'blend blend'])
+def test_both_spellings_of_the_translucent_shorthand_blend(directive):
+    material = parse('n { { map a.tga\n %s } }' % (directive,))['n']
+    assert material.transparent
+
+
+def test_an_opaque_first_stage_is_not_made_transparent_by_a_later_glow():
+    """The glow is painted on top of an opaque surface, not through it."""
+    material = parse('n {\n'
+                     ' { diffuseMap textures/a/panel_d }\n'
+                     ' { map textures/a/panel_a\n blend add }\n'
+                     '}')['n']
+    assert not material.transparent

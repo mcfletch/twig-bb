@@ -22,7 +22,25 @@
     "There is deliberately no entry for Alien Arena's base art.  The only",
     "source of it is its own game data, licensed for use solely within its own",
     "engine, so this viewer may neither download it nor read an installed copy.",
-    "The symmetry with the Quake 3 entry is inviting and false."
+    "The symmetry with the Quake 3 entry is inviting and false.",
+    "",
+    "The Unvanquished entries are one package per file, because that is how",
+    "that content is published: a map package carries no art and names the",
+    "texture packages it draws from in its own DEPS file, which is where each",
+    "map's 'companions' list below comes from (SPEC-DPK section 4,",
+    "SPEC-UNVDIST section 5).  A map fetched without them renders in grey.",
+    "",
+    "There is deliberately no entry for Unvanquished's player, buildable or",
+    "weapon models, nor for its voices, soundtrack or ambient sound.  Those",
+    "nine packages state no licence anywhere in the archive (SPEC-UNVDIST",
+    "section 1.5): the only terms that reach them are a project-wide statement",
+    "in a different package, which is an inference and not a fact, and",
+    "SPEC-UNVDIST section E.1 escalates it.  A pack that cannot state its terms",
+    "is refused by twig_bb.catalog and left out of the acknowledgements, which",
+    "is the outcome that rule exists for.  Two things would have to change",
+    "before they could be offered: the licensing question answered by a human,",
+    "and a reader for Inter-Quake Model, since the meshes are .iqm and nothing",
+    "here loads one yet."
   ],
   "packs": [
     {
@@ -50,7 +68,10 @@
       "notes": "The levels themselves. Without the two companions they render untextured.",
       "url_page": "https://openarena.ws/",
       "marker": "",
-      "companions": ["openarena-textures", "openarena-data"]
+      "companions": [
+        "openarena-textures",
+        "openarena-data"
+      ]
     },
     {
       "key": "openarena-textures",
@@ -90,7 +111,202 @@
       "notes": "Community-made levels, each with its own author. Wants the OpenArena art packs, which is what its maps are built against.",
       "url_page": "https://openarena.ws/",
       "marker": "",
-      "companions": ["openarena-textures", "openarena-data"]
+      "companions": [
+        "openarena-textures",
+        "openarena-data"
+      ]
+    },
+    {
+      "key": "unvanquished-plat23",
+      "title": "Unvanquished: Platform 23",
+      "url": "https://dl.unvanquished.net/pkg/map-plat23_1.14.dpk",
+      "family": "unvanquished",
+      "directory": "unv-map-plat23",
+      "archive": "zip",
+      "approximate_bytes": 3808627,
+      "copyright": "Jack \"EmperorJack\" Purvis, CC BY-SA 3.0; Unvanquished project packages",
+      "notes": "A ship platform, and the smallest complete set here: the map and its three texture packs come to 44 MB.",
+      "url_page": "https://unvanquished.net/",
+      "marker": "maps",
+      "companions": [
+        "unvanquished-tex-common",
+        "unvanquished-tex-pk02",
+        "unvanquished-tex-space"
+      ]
+    },
+    {
+      "key": "unvanquished-usstremor",
+      "title": "Unvanquished: USS Tremor",
+      "url": "https://dl.unvanquished.net/pkg/map-usstremor_1.1.dpk",
+      "family": "unvanquished",
+      "directory": "unv-map-usstremor",
+      "archive": "zip",
+      "approximate_bytes": 10573034,
+      "copyright": "Matthias \"Masmblr\" Peters and others, CC BY 4.0; Unvanquished project packages",
+      "notes": "Textures by Philip Klevestav (CC BY 3.0) and Stijn Buys; sounds by newlocknew (CC BY 4.0); Librestile font by ocelothe2k1 (OFL 1.1). Per-file detail is in the package's own LICENSE and README.",
+      "url_page": "https://unvanquished.net/",
+      "marker": "maps",
+      "companions": [
+        "unvanquished-tex-common",
+        "unvanquished-tex-pk01",
+        "unvanquished-tex-pk02",
+        "unvanquished-tex-space"
+      ]
+    },
+    {
+      "key": "unvanquished-yocto",
+      "title": "Unvanquished: Yocto: underwater habitat",
+      "url": "https://dl.unvanquished.net/pkg/map-yocto_1.1.dpk",
+      "family": "unvanquished",
+      "directory": "unv-map-yocto",
+      "archive": "zip",
+      "approximate_bytes": 19103961,
+      "copyright": "Pawel \"Pevel\" Micek, CC BY-SA 3.0; Unvanquished project packages",
+      "notes": "Declares the whole texture set rather than naming packs individually, so its companions are all ten.",
+      "url_page": "https://unvanquished.net/",
+      "marker": "maps",
+      "companions": [
+        "unvanquished-tex-common",
+        "unvanquished-tex-ej01",
+        "unvanquished-tex-ex",
+        "unvanquished-tex-exm",
+        "unvanquished-tex-pk01",
+        "unvanquished-tex-pk02",
+        "unvanquished-tex-space",
+        "unvanquished-tex-tech",
+        "unvanquished-tex-trak5",
+        "unvanquished-tex-vega"
+      ]
+    },
+    {
+      "key": "unvanquished-tex-common",
+      "title": "Unvanquished textures: common",
+      "url": "https://dl.unvanquished.net/pkg/tex-common_2.5.dpk",
+      "family": "unvanquished",
+      "directory": "unv-tex-common",
+      "archive": "zip",
+      "approximate_bytes": 75195,
+      "copyright": "Stijn \"Ingar\" Buys and the Unvanquished team, CC0 1.0; Unvanquished project packages",
+      "notes": "Shared surface parameters and the common editor textures. Tiny, and wanted by every other package.",
+      "url_page": "https://unvanquished.net/",
+      "marker": ""
+    },
+    {
+      "key": "unvanquished-tex-ej01",
+      "title": "Unvanquished textures: ej01",
+      "url": "https://dl.unvanquished.net/pkg/tex-ej01_1.3.1.dpk",
+      "family": "unvanquished",
+      "directory": "unv-tex-ej01",
+      "archive": "zip",
+      "approximate_bytes": 5481526,
+      "copyright": "Jack \"EmperorJack\" Purvis, CC BY-SA 3.0; Unvanquished project packages",
+      "notes": "Surface art the maps draw from. Crunch textures, which need the \"crn\" extra to decode.",
+      "url_page": "https://unvanquished.net/",
+      "marker": ""
+    },
+    {
+      "key": "unvanquished-tex-ex",
+      "title": "Unvanquished textures: ex",
+      "url": "https://dl.unvanquished.net/pkg/tex-ex_1.3.1.dpk",
+      "family": "unvanquished",
+      "directory": "unv-tex-ex",
+      "archive": "zip",
+      "approximate_bytes": 10928333,
+      "copyright": "Yves \"evillair\" Allaire, CC BY-SA 4.0; Unvanquished project packages",
+      "notes": "Surface art the maps draw from. Crunch textures, which need the \"crn\" extra to decode.",
+      "url_page": "https://unvanquished.net/",
+      "marker": ""
+    },
+    {
+      "key": "unvanquished-tex-exm",
+      "title": "Unvanquished textures: exm",
+      "url": "https://dl.unvanquished.net/pkg/tex-exm_1.3.3.dpk",
+      "family": "unvanquished",
+      "directory": "unv-tex-exm",
+      "archive": "zip",
+      "approximate_bytes": 1964231,
+      "copyright": "Yves \"evillair\" Allaire, CC BY-SA 4.0; Unvanquished project packages",
+      "notes": "Surface art the maps draw from. Crunch textures, which need the \"crn\" extra to decode.",
+      "url_page": "https://unvanquished.net/",
+      "marker": ""
+    },
+    {
+      "key": "unvanquished-tex-pk01",
+      "title": "Unvanquished textures: pk01",
+      "url": "https://dl.unvanquished.net/pkg/tex-pk01_1.3.1.dpk",
+      "family": "unvanquished",
+      "directory": "unv-tex-pk01",
+      "archive": "zip",
+      "approximate_bytes": 4785909,
+      "copyright": "Philip Klevestav, CC BY 3.0; Unvanquished project packages",
+      "notes": "Surface art the maps draw from. Crunch textures, which need the \"crn\" extra to decode.",
+      "url_page": "https://unvanquished.net/",
+      "marker": ""
+    },
+    {
+      "key": "unvanquished-tex-pk02",
+      "title": "Unvanquished textures: pk02",
+      "url": "https://dl.unvanquished.net/pkg/tex-pk02_1.3.2.dpk",
+      "family": "unvanquished",
+      "directory": "unv-tex-pk02",
+      "archive": "zip",
+      "approximate_bytes": 23618489,
+      "copyright": "Philip Klevestav, CC BY 3.0; Unvanquished project packages",
+      "notes": "Surface art the maps draw from. Crunch textures, which need the \"crn\" extra to decode.",
+      "url_page": "https://unvanquished.net/",
+      "marker": ""
+    },
+    {
+      "key": "unvanquished-tex-space",
+      "title": "Unvanquished textures: space",
+      "url": "https://dl.unvanquished.net/pkg/tex-space_1.3.dpk",
+      "family": "unvanquished",
+      "directory": "unv-tex-space",
+      "archive": "zip",
+      "approximate_bytes": 16388337,
+      "copyright": "Stijn \"Ingar\" Buys, CC BY-SA 3.0; Unvanquished project packages",
+      "notes": "Space skyboxes. The author offers this pack under CC BY-SA 3.0 or GPLv2; the first is taken, which keeps it free of a copyleft-code obligation.",
+      "url_page": "https://unvanquished.net/",
+      "marker": ""
+    },
+    {
+      "key": "unvanquished-tex-tech",
+      "title": "Unvanquished textures: tech",
+      "url": "https://dl.unvanquished.net/pkg/tex-tech_1.3.1.dpk",
+      "family": "unvanquished",
+      "directory": "unv-tex-tech",
+      "archive": "zip",
+      "approximate_bytes": 18895689,
+      "copyright": "Scott \"Cr4zy\" Coxhead, CC BY-SA 3.0; Unvanquished project packages",
+      "notes": "Surface art the maps draw from. Crunch textures, which need the \"crn\" extra to decode.",
+      "url_page": "https://unvanquished.net/",
+      "marker": ""
+    },
+    {
+      "key": "unvanquished-tex-trak5",
+      "title": "Unvanquished textures: trak5",
+      "url": "https://dl.unvanquished.net/pkg/tex-trak5_1.3.2.dpk",
+      "family": "unvanquished",
+      "directory": "unv-tex-trak5",
+      "archive": "zip",
+      "approximate_bytes": 10311721,
+      "copyright": "Georges \"TRaK\" Grondin, MIT; Unvanquished project packages",
+      "notes": "Surface art the maps draw from. Crunch textures, which need the \"crn\" extra to decode.",
+      "url_page": "https://unvanquished.net/",
+      "marker": ""
+    },
+    {
+      "key": "unvanquished-tex-vega",
+      "title": "Unvanquished textures: vega",
+      "url": "https://dl.unvanquished.net/pkg/tex-vega_1.5.dpk",
+      "family": "unvanquished",
+      "directory": "unv-tex-vega",
+      "archive": "zip",
+      "approximate_bytes": 17669738,
+      "copyright": "Stijn \"Ingar\" Buys, CC BY-SA 3.0; Unvanquished project packages",
+      "notes": "The author offers this pack under CC BY-SA 3.0 or GPLv2; the first is taken.",
+      "url_page": "https://unvanquished.net/",
+      "marker": ""
     }
   ]
 }

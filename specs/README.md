@@ -1,9 +1,10 @@
 # Format specifications
 
 Every format constant, layout and behaviour in this viewer cites a numbered fact
-in one of these documents. **No Quake, ioquake3 or Alien Arena engine source was
-read while writing the viewer**; these files are the only channel the format
-knowledge came through, and each one records where its own facts came from.
+in one of these documents. **No Quake, ioquake3, Alien Arena, Dæmon or
+Unvanquished engine source was read while writing the viewer**; these files are
+the only channel the format knowledge came through, and each one records where
+its own facts came from.
 
 | Spec | Covers |
 |---|---|
@@ -12,6 +13,11 @@ knowledge came through, and each one records where its own facts came from.
 | [SPEC-Q3SHADER.md](SPEC-Q3SHADER.md) | Quake 3 `.shader` material scripts, including the animation family (§2.4, added 2026-07-27 from the same published manual) |
 | [SPEC-Q3PUSH.md](SPEC-Q3PUSH.md) | v46 jump pads, which are aimed at a destination rather than pointed |
 | [SPEC-Q3ENTITIES.md](SPEC-Q3ENTITIES.md) | v46 game entities — `target_speaker` (§1) and the pickups a map places (§3); the rest as they are built |
+| [SPEC-EXTLM.md](SPEC-EXTLM.md) | baked lightmap pages written beside a map instead of into its lightmap lump, and the deluxemap pages that interleave with them |
+| [SPEC-CRN.md](SPEC-CRN.md) | the Crunch (`.crn`) block-compressed texture container |
+| [SPEC-DPK.md](SPEC-DPK.md) | the `.dpk` package: its ZIP container, its name and version grammar, its `DEPS` dependency list, and its virtual filesystem |
+| [SPEC-UNVASSETS.md](SPEC-UNVASSETS.md) | what Unvanquished packages hold, written as the delta from Quake 3: the map container, the content formats, the material-script keywords, the entity vocabulary |
+| [SPEC-UNVDIST.md](SPEC-UNVDIST.md) | where those packages come from and on what terms, per package |
 
 `SPEC-TRIGGER-PUSH` was written under the clean-room procedure in
 [CLEAN-ROOM.md](CLEAN-ROOM.md): a Reader who wrote no project code read the GPL
@@ -19,6 +25,22 @@ source and produced a specification, and the implementer read only the
 specification. The others needed no wall at all, because their facts came from
 published documentation, this project's own earlier BSD code, and the bytes of
 sample files.
+
+The five documents covering Unvanquished content — `SPEC-DPK`, `SPEC-UNVASSETS`,
+`SPEC-UNVDIST`, `SPEC-CRN` and `SPEC-EXTLM` — needed **no wall either**, and
+that is the point of them. Rule 0 of `CLEAN-ROOM.md` puts copyleft source last,
+and here the earlier alternatives carried the whole job: a corpus of fifteen
+published packages, the population of package filenames on the download server,
+the packages' own licence statements, and published format specifications. The
+engine is GPLv3 and was never opened. Between them the three larger documents
+record 270 numbered facts, and where the data did not settle a question they say
+so and mark the implementation's answer a choice — `SPEC-DPK` §8 collects those
+choices in one table.
+
+Deriving from bytes is not the weaker route it might sound. A statement that a
+lump length divides exactly by a record size, over 42 lumps and three maps, is
+checkable by anyone holding the same files, and it does not go stale when the
+engine is refactored.
 
 `SPEC-Q3PUSH` goes one step further and is worth reading as an example: where a
 fact could not be established from a permitted source, it says so and marks the

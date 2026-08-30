@@ -54,6 +54,13 @@ dev = ["pytest", "pytest-cov", "ruff", "mypy"]
 # PyAV, pydub via ffmpeg) are LGPL or worse and cannot be a dependency of a BSD
 # library.
 audio = ["omi_audio[playback]"]
+# Crunch (`.crn`) textures, which Unvanquished's packages use for most of their
+# art (SPEC-CRN).  Optional because it is needed only for that content and
+# because its absence is the ordinary "this build cannot decode that format"
+# outcome the texture lookup already handles, not an error.  MIT, over a
+# zlib-licensed reference decoder, so neither places any obligation on a BSD
+# package -- the same test every dependency here has to pass.
+crn = ["texture2ddecoder"]
 
 [project.scripts]
 twig-bb = "twig_bb.viewer:main"

@@ -23,6 +23,7 @@ import numpy as np
 
 from OpenGLContext.scenegraph.pbrmaterial import PBRMaterial, PBRTexture
 
+from . import crnfile
 from .contentsearch import ContentSearch
 from .surfaces import SurfaceStyle
 
@@ -30,7 +31,15 @@ log = logging.getLogger(__name__)
 
 #: Extension search order, first hit wins (``SPEC-Q3SHADER §1.6``,
 #: ``SPEC-BSP46 §7.3``).
-TEXTURE_EXTENSIONS = ('.tga', '.jpg', '.png', '.jpeg')
+#:
+#: `.webp` and `.crn` come last, after every format the older content uses, so
+#: a tree holding both spellings of a texture is read in whichever the content
+#: it was authored against would have used.  `.crn` is Crunch
+#: (:mod:`twig_bb.crnfile`, ``SPEC-CRN``) and needs an optional package; the
+#: extension is listed either way, since a name that resolves to a file this
+#: build cannot decode is a clearer thing to report than a name that resolves
+#: to nothing.
+TEXTURE_EXTENSIONS = ('.tga', '.jpg', '.png', '.jpeg', '.webp', '.crn')
 
 #: Size assumed for a texture whose image is absent.  ``SPEC-BSP46 §6.2``
 #: normalises UVs by the image's real dimensions, so this only affects the
@@ -57,9 +66,40 @@ TEXCOORD_MASK_LIGHTMAP = 32
 #: is the viewer's own default and ``--lightmap`` overrides it.
 DEFAULT_LIGHTMAP_STRENGTH = 2.0
 
+#: The middle brightness :data:`DEFAULT_LIGHTMAP_STRENGTH` was chosen against,
+#: as :meth:`~twig_bb.lightmapatlas.LightmapAtlas.median_luxel` measures it.
+#: The median of the per-map medians of twelve Quake 3 levels; the same twelve
+#: run from 0.049 to 0.72, so this is a centre and not a bound.
+REFERENCE_MEDIAN_LUXEL = 0.0986
+
 #: A trailing light value on a shader name: `light1_5000`, `baslt4_1_2k`,
 #: `gothic_light2_4K`.  See :meth:`MaterialLibrary._light_variant`.
 LIGHT_VARIANT = re.compile(r'^(.+)_\d+k?$', re.IGNORECASE)
+
+
+def auto_lightmap_strength(median: Optional[float]) -> float:
+    """The exposure for a map whose baked light sits at ``median``.
+
+    **A ceiling, never a brightener.** A map baked brighter than
+    :data:`REFERENCE_MEDIAN_LUXEL` is pulled back until its middle brightness
+    lands there; a map baked at or below it is left at
+    :data:`DEFAULT_LIGHTMAP_STRENGTH` and keeps whatever darkness its author
+    baked in.
+
+    Both halves of that matter. Normalising in *both* directions would give
+    every level the same mid-tone and flatten the difference between a dim
+    corridor and a floodlit hangar, which is a decision the map's author
+    already made. Not normalising at all leaves content baked on a brighter
+    absolute scale washed out — pale surfaces with their shadows lifted —
+    which is what this exists to fix, since the exposure was picked against one
+    body of content and the scale is not shared between projects.
+
+    ``median`` of None, which is a map with no baked light, takes the default:
+    there is nothing to be over-exposed.
+    """
+    if not median or median <= REFERENCE_MEDIAN_LUXEL:
+        return DEFAULT_LIGHTMAP_STRENGTH
+    return DEFAULT_LIGHTMAP_STRENGTH * REFERENCE_MEDIAN_LUXEL / median
 
 
 class MaterialLibrary:
@@ -133,7 +173,7 @@ class MaterialLibrary:
         """The decoded image for a texture name, or None; loaded once."""
         if name not in self._images:
             path = self.resolve(name)
-            self._images[name] = _open_image(path) if path else None
+            self._images[name] = open_image(path) if path else None
         return self._images[name]
 
     def texture_size(self, name: str) -> Tuple[int, int]:
@@ -148,7 +188,7 @@ class MaterialLibrary:
         key = (path, srgb)
         texture = self._textures.get(key)
         if texture is None:
-            image = _open_image(path)
+            image = open_image(path)
             if image is None:
                 return None
             texture = self._textures[key] = PBRTexture(image, srgb=srgb)
@@ -238,10 +278,17 @@ def _alpha_mode(style: SurfaceStyle) -> str:
     return 'OPAQUE'
 
 
-def _open_image(path: Optional[str]) -> Any:
-    """Decode an image file, or None if it cannot be read."""
+def open_image(path: Optional[str]) -> Any:
+    """Decode an image file, or None if it cannot be read.
+
+    Crunch textures (``SPEC-CRN``) are block-compressed and go to
+    :mod:`twig_bb.crnfile`; everything else is a format the imaging library
+    reads for itself.
+    """
     if not path:
         return None
+    if os.path.splitext(path)[1].lower() == crnfile.EXTENSION:
+        return crnfile.load(path)
     try:
         from PIL import Image
         image = Image.open(path)

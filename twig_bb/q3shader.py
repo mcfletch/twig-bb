@@ -58,6 +58,20 @@ OPAQUE_BLEND = ('gl_one', 'gl_zero')
 #: Stage keywords whose first argument is a texture path (``§2.3``).
 TEXTURE_KEYWORDS = ('map', 'clampmap')
 
+#: The stage keyword that names a surface's base-colour image directly, rather
+#: than naming one pass over it (``SPEC-UNVASSETS §4.5.1``).  Content using it
+#: describes a surface as the channels of one material -- colour, normal,
+#: specular, height -- so this stage *is* the surface, and it wins over any
+#: `map` the definition also carries (``§4.5.6``).  The other channels are
+#: recorded nowhere yet: this viewer draws base colour and its baked light.
+DIFFUSE_KEYWORD = 'diffusemap'
+
+#: Spellings of the blend directive.  `blend` is the same shorthand under a
+#: different name (``SPEC-UNVASSETS §4.5.7``), and the two coexist even within
+#: one package, so both are read.  Unrecognised, an additive glow or a
+#: translucent decal draws as an opaque rectangle.
+BLEND_KEYWORDS = ('blendfunc', 'blend')
+
 #: Opacity given to a surface the scripts call translucent.  The language says
 #: *that* a surface blends, not by how much (``SPEC-Q3SHADER §2.2``, ``§2.3``),
 #: so the fraction is the viewer's own choice.
@@ -80,6 +94,12 @@ class Material:
     liquid: bool = False
     #: Which liquid this material's surfaces bound (``SPEC-Q3SHADER §2.2``).
     liquidKind: str = ''
+    #: Whether the definition named `$lightmap` as a stage's image
+    #: (``SPEC-Q3SHADER §2.3.2``).  Kept because it is not only a fact about
+    #: this material: read across a whole script set it says which of the two
+    #: lightmapping conventions the content was authored under, which is what
+    #: :func:`apply_implicit_lightmaps` decides.
+    lightmap_stage: bool = False
     surfaceparms: Set[str] = field(default_factory=set)
     #: What this material does over time (``SPEC-Q3SHADER §2.4``).
     animation: surfaceanim.SurfaceAnimation = field(
@@ -162,7 +182,42 @@ def load_scripts(roots: Sequence[str]) -> Dict[str, Material]:
                 log.warning('cannot read %s: %s', path, error)
                 continue
             materials.update(parse(text))
+    apply_implicit_lightmaps(materials)
     return materials
+
+
+def apply_implicit_lightmaps(materials: Dict[str, Material]) -> bool:
+    """Light the surfaces of content that never names a lightmap stage.
+
+    ``SPEC-Q3SHADER §2.3.2`` has a shader ask for the baked lightmap by naming
+    `$lightmap` as a stage's image, and a definition that never does is a
+    surface drawn at full brightness.  Content exists that instead leaves the
+    lightmap implicit: the material describes only its own images and the
+    renderer applies the baked light to any surface that has not refused it.
+    Read under the first convention, every one of its surfaces comes out
+    unlit — the map draws, correctly textured, and completely flat.
+
+    The two are told apart by the script set as a whole rather than by any one
+    material, because that is the level the convention belongs to: a set in
+    which **no** definition anywhere names `$lightmap` is one written under the
+    second, and a set that uses it even once is written under the first.  The
+    question is only asked once per load and the answer applies to the set.
+
+    A surface still refuses the lightmap the ways it always could — a
+    `surfaceparm` that says so, transparency, sky, or not being drawn at all —
+    so this grants baked light rather than forcing it.  Returns whether the
+    implicit convention was recognised.
+    """
+    if not materials or any(material.lightmap_stage
+                            for material in materials.values()):
+        return False
+    for material in materials.values():
+        material.lightmapped = (material.draw and not material.sky
+                                and not material.transparent
+                                and PARM_NOLIGHTMAP not in material.surfaceparms)
+    log.info('no material names %s, so the baked lightmap is applied to every '
+             'surface that has not refused it', LIGHTMAP_TOKEN)
+    return True
 
 
 def parse(text: str) -> Dict[str, Material]:
@@ -206,6 +261,9 @@ class _Body:
     def __init__(self, name: str) -> None:
         self.material = Material(name=name.lower())
         self.stage_images: List[str] = []
+        #: Base-colour images named by ``DIFFUSE_KEYWORD``, kept apart from
+        #: ``stage_images`` because they outrank them (``§4.5.6``).
+        self.diffuse_images: List[str] = []
         self.editor_image = ''
         #: Each stage's blend, by stage index.  **By index and not as a
         #: list**, because which stage blends is the whole question: a
@@ -348,6 +406,13 @@ def _stage_directive(body: _Body, keyword: str, arguments: List[str]) -> None:
     if keyword in ANIMATION_KEYWORDS:
         _animation_directive(body, keyword, arguments)
         return
+    if keyword == DIFFUSE_KEYWORD and arguments:
+        # SPEC-UNVASSETS §4.5.5: the definition may also carry a later stage
+        # whose `map` is an additive glow mask.  Taking the first `map` takes
+        # the mask, and the surface draws as a glow pattern on black.
+        _claim_image(body)
+        body.diffuse_images.append(arguments[0])
+        return
     if keyword in TEXTURE_KEYWORDS and arguments:
         token = arguments[0]
         lowered = token.lower()
@@ -364,7 +429,7 @@ def _stage_directive(body: _Body, keyword: str, arguments: List[str]) -> None:
         _claim_stage(body)
         if body.animmap is None:
             body.animmap = surfaceanim.parse_animmap(arguments)
-    elif keyword == 'blendfunc' and arguments:
+    elif keyword in BLEND_KEYWORDS and arguments:
         body.blends[body.stage_index] = _blend(arguments)
     elif keyword == 'alphafunc':
         body.material.masked = True
@@ -438,7 +503,11 @@ def _finish(body: _Body) -> Material:
     material = body.material
     # §2.3.1: the first drawable stage map, then the editor image, then the
     # material's own name.
-    material.image = (body.stage_images[0] if body.stage_images
+    # §2.3.1, and SPEC-UNVASSETS §4.5.6: a base-colour image named outright
+    # outranks a stage `map`, then the first stage map, then the editor image,
+    # then the material's own name.
+    material.image = (body.diffuse_images[0] if body.diffuse_images
+                      else body.stage_images[0] if body.stage_images
                       else body.editor_image or material.name)
     # §2.3: the stages are drawn in order, each over the one before, so the
     # **first** decides whether the surface is see-through.  A first stage with
@@ -452,6 +521,7 @@ def _finish(body: _Body) -> Material:
             material.transparent = True
     if material.masked:
         material.transparent = False            # a cut-out is not blending
+    material.lightmap_stage = body.samples_lightmap
     material.lightmapped = (material.lightmapped and body.samples_lightmap
                             and not material.transparent)   # §2.3.2
     material.animation = surfaceanim.SurfaceAnimation(
