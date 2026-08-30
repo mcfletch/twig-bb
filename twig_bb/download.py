@@ -31,7 +31,10 @@ from .assetpack import AssetPack
 log = logging.getLogger(__name__)
 
 #: Archive extensions that hold a map and its content (``SPEC-BSP46 §7.1``).
-ARCHIVE_EXTENSIONS = ('.pk3', '.zip')
+#: `.dpk` is the same ZIP container under a different name and laid out the
+#: same way (``SPEC-DPK §1.1``, ``§1.19``), so it unpacks through this module
+#: unchanged; what it adds is the dependency list :mod:`twig_bb.dpk` reads.
+ARCHIVE_EXTENSIONS = ('.pk3', '.zip', '.dpk')
 MAP_EXTENSION = '.bsp'
 
 #: Where an unpacked archive lands when the caller names no directory.  A map

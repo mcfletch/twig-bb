@@ -21,10 +21,11 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from . import bspfile, jumppads, q3bsp, q3geometry, q3shader
+from . import bspfile, externallightmaps, jumppads, q3bsp, q3geometry, q3shader
 from .entities import Entity
 from .lightmapatlas import LightmapAtlas
-from .materials import DEFAULT_LIGHTMAP_STRENGTH, MaterialLibrary
+from .materials import (DEFAULT_LIGHTMAP_STRENGTH, TEXTURE_EXTENSIONS,
+                        MaterialLibrary)
 from .scene import build_scene
 from .surfaces import SurfaceStyle
 from .worldgeometry import SCENE_SCALE, WorldGeometry, to_scene_points
@@ -38,6 +39,10 @@ SPAWN_CLASSNAMES = (
     'info_player_start', 'info_player_deathmatch', 'info_player_team1',
     'info_player_team2', 'team_ctf_redplayer', 'team_ctf_blueplayer',
     'team_ctf_redspawn', 'team_ctf_bluespawn', 'info_player_coop',
+    # A team-versus-team level names its starts after the team's structure
+    # instead, and places none of the names above at all -- so a level built
+    # for one reads as having nowhere to stand.  ``SPEC-UNVASSETS §4``.
+    'team_human_spawn', 'team_alien_spawn',
 )
 
 #: A map lives at ``maps/<name>.bsp`` inside its content tree, so its content
@@ -268,6 +273,7 @@ def _load_quake3(path: str, name: str, roots: List[str], strength: float,
                  subdivisions: Optional[int]) -> LoadedMap:
     """Read a version 46 map and the material scripts that describe it."""
     bsp = q3bsp.load(path)
+    _attach_external_lightmaps(path, bsp)
     library = MaterialLibrary(roots, family='quake3', lightmap_strength=strength)
     materials = q3shader.load_scripts(roots)
 
@@ -282,6 +288,24 @@ def _load_quake3(path: str, name: str, roots: List[str], strength: float,
                      version=q3bsp.BSP_VERSION, bsp=bsp, world=world,
                      atlas=atlas, library=library, roots=roots,
                      style_for=style_for)
+
+
+def _attach_external_lightmaps(path: str, bsp: Any) -> None:
+    """Give the map its lightmap pages when they live beside it, not in it.
+
+    ``SPEC-EXTLM``: a compiler may write the pages of ``SPEC-BSP46 §4.13`` as
+    image files next to the `.bsp` and leave the lump empty.  The pages stand
+    in for the lump and are addressed identically (``SPEC-EXTLM §3.1``), so
+    this is the whole of the difference and nothing downstream knows which
+    kind of map it is drawing.
+
+    The pages are resolved against the map's own directory rather than the
+    content roots: they belong to this map, and a second map with the same
+    name in another root must not lend it its lighting.
+    """
+    pages = externallightmaps.for_map(path, bsp, TEXTURE_EXTENSIONS)
+    if pages is not None:
+        bsp.lightmaps = pages
 
 
 def main() -> None:

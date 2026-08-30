@@ -30,6 +30,13 @@ the map is read, and everything after that — surface styles, batched geometry,
 the lightmap atlas, PBR materials, the scene, the collision mesh, push volumes —
 is built from it.
 
+Unvanquished's `.dpk` packages are read too, and the same v46 reader does it:
+their maps are the same container, byte for byte. What differs is the content
+around the map — Crunch and WebP textures, lightmap pages written beside the
+`.bsp`, a material dialect that names a surface's channels instead of its
+passes, and a `DEPS` file naming the other packages a map needs. See
+[Unvanquished packages](#unvanquished-packages).
+
 ## Content Licensing Note
 
 twig-bb is mostly targetted at allowing you to use existing
@@ -659,6 +666,55 @@ unwrap.
 `openarena-oacmp1`, a community map pack, is also in Debian main and is not
 registered here yet.
 
+## Unvanquished packages
+
+Unvanquished ships its content as `.dpk` packages, and this viewer reads them.
+A `.dpk` is a ZIP archive laid out the way a `.pk3` is, so it unpacks and
+resolves through the same code; give one to `twig-bb` as you would any archive.
+
+```bash
+twig-bb map-plat23_1.14.dpk       # a package you already have
+```
+
+**A map package is not enough on its own.** Every package carries a `DEPS` file
+naming the other packages it needs, and a map's textures live in those rather
+than beside it — Platform 23 draws from `tex-common`, `tex-pk02` and
+`tex-space`, which come to about 44 MB on top of the 4 MB map. Put the packages
+in one directory and `twig_bb.dpk.resolve` follows the list transitively, in the
+order `DEPS` gives, with the map's own package first so its content shadows the
+shared art. A dependency you do not have is reported, not fatal: the map draws
+with whatever art it can find.
+
+Four things differ from Quake 3 content, and all four are content rather than
+container — the maps themselves are `IBSP` v46 byte for byte:
+
+- **Textures are Crunch (`.crn`) and WebP.** WebP needs nothing extra. Crunch is
+  block-compressed and needs the optional `crn` extra (see
+  [Installing](#installing)); without it those textures resolve to a file that
+  will not decode and the surface draws in the missing-texture colour.
+- **The baked light is in image files beside the map**, at
+  `maps/<name>/lm_NNNN.webp`, rather than in the map's lightmap lump. They are
+  found and used automatically. A map compiled with deluxemaps interleaves
+  light-direction pages with them; nothing references those, so they are never
+  read.
+- **Material scripts name a surface's channels**, `diffuseMap` and friends,
+  rather than one `map` per pass, and spell the blend directive `blend` as well
+  as `blendFunc`. Both spellings are read.
+- **The baked lightmap is implicit.** Quake 3 content asks for it with a
+  `$lightmap` stage; this content never does, and a reader that requires the
+  stage draws the level correctly textured and completely flat. Content whose
+  scripts never mention `$lightmap` anywhere is lit implicitly, and a surface
+  can still refuse it the ways it always could.
+
+Player starts are named after the team structure — `team_human_spawn`,
+`team_alien_spawn` — rather than `info_player_deathmatch`, so a level that would
+otherwise have nowhere to stand has spawn points.
+
+The packages' licensing varies per package and is recorded in
+[`specs/SPEC-UNVDIST.md`](specs/SPEC-UNVDIST.md), which also lists what each one
+requires by way of credit. Several packages state no terms at all; those are not
+offered for download here, for the reason the acknowledgements screen exists.
+
 ## Missing textures
 
 Almost every map ships only the textures its author added and names the rest out
@@ -759,8 +815,9 @@ set rather than a search per rectangle.
 
 ## Where the format knowledge comes from
 
-This viewer is BSD licensed and the Quake engines are GPL, so **no engine source
-was read while writing it**. Every format constant, layout and behaviour cites a
+This viewer is BSD licensed and the Quake engines — and Dæmon, which
+Unvanquished runs on — are GPL, so **no engine source was read while writing
+it**. Every format constant, layout and behaviour cites a
 numbered fact in one of the specifications under [`specs/`](specs/):
 
 | Spec | Covers | Provenance |
@@ -770,6 +827,11 @@ numbered fact in one of the specifications under [`specs/`](specs/):
 | `SPEC-Q3SHADER` | Quake 3 `.shader` material scripts | no copyleft source: the published shader manual and shipped map content |
 | `SPEC-Q3PUSH` | version 46 aimed jump pads | no copyleft source: entity data observed in the 50 shipped OpenArena maps, plus projectile physics |
 | `SPEC-Q3ENTITIES` | version 46 game entities: placed sounds (§1) and the pickups a map places (§3) | no copyleft source: every classname and key read out of the entity lumps of 67 shipped maps, with the counts recorded |
+| `SPEC-EXTLM` | lightmap pages beside a map, and deluxemaps | no copyleft source: the bytes of two shipped maps and the images beside them |
+| `SPEC-CRN` | the Crunch texture container | no copyleft source: the bytes of 303 shipped textures |
+| `SPEC-DPK` | the `.dpk` package, its versions and its `DEPS` list | no copyleft source: 15 shipped packages, 360 published filenames, and the PKZIP application note |
+| `SPEC-UNVASSETS` | Unvanquished content as the delta from Quake 3 | no copyleft source: the bytes of 15 shipped packages, measured against this project's own specs |
+| `SPEC-UNVDIST` | per-package licensing and where packages come from | no copyleft source: the packages' own licence statements and the download server |
 
 Three further specifications are retired. `SPEC-BSP38` (the `IBSP` v38 container —
 Quake 2) is kept for provenance: the v38 reader has been removed, but many shared
@@ -796,6 +858,7 @@ To install it:
 ```bash
 pip install twig-bb            # from PyPI
 pip install twig-bb[audio]     # with the sound-card backend, see Sound
+pip install twig-bb[crn]       # to read Crunch textures, see Unvanquished packages
 pip install -e .               # from a checkout, for working on it
 ```
 

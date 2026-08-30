@@ -23,6 +23,7 @@ import numpy as np
 
 from OpenGLContext.scenegraph.pbrmaterial import PBRMaterial, PBRTexture
 
+from . import crnfile
 from .contentsearch import ContentSearch
 from .surfaces import SurfaceStyle
 
@@ -30,7 +31,15 @@ log = logging.getLogger(__name__)
 
 #: Extension search order, first hit wins (``SPEC-Q3SHADER §1.6``,
 #: ``SPEC-BSP46 §7.3``).
-TEXTURE_EXTENSIONS = ('.tga', '.jpg', '.png', '.jpeg')
+#:
+#: `.webp` and `.crn` come last, after every format the older content uses, so
+#: a tree holding both spellings of a texture is read in whichever the content
+#: it was authored against would have used.  `.crn` is Crunch
+#: (:mod:`twig_bb.crnfile`, ``SPEC-CRN``) and needs an optional package; the
+#: extension is listed either way, since a name that resolves to a file this
+#: build cannot decode is a clearer thing to report than a name that resolves
+#: to nothing.
+TEXTURE_EXTENSIONS = ('.tga', '.jpg', '.png', '.jpeg', '.webp', '.crn')
 
 #: Size assumed for a texture whose image is absent.  ``SPEC-BSP46 §6.2``
 #: normalises UVs by the image's real dimensions, so this only affects the
@@ -133,7 +142,7 @@ class MaterialLibrary:
         """The decoded image for a texture name, or None; loaded once."""
         if name not in self._images:
             path = self.resolve(name)
-            self._images[name] = _open_image(path) if path else None
+            self._images[name] = open_image(path) if path else None
         return self._images[name]
 
     def texture_size(self, name: str) -> Tuple[int, int]:
@@ -148,7 +157,7 @@ class MaterialLibrary:
         key = (path, srgb)
         texture = self._textures.get(key)
         if texture is None:
-            image = _open_image(path)
+            image = open_image(path)
             if image is None:
                 return None
             texture = self._textures[key] = PBRTexture(image, srgb=srgb)
@@ -238,10 +247,17 @@ def _alpha_mode(style: SurfaceStyle) -> str:
     return 'OPAQUE'
 
 
-def _open_image(path: Optional[str]) -> Any:
-    """Decode an image file, or None if it cannot be read."""
+def open_image(path: Optional[str]) -> Any:
+    """Decode an image file, or None if it cannot be read.
+
+    Crunch textures (``SPEC-CRN``) are block-compressed and go to
+    :mod:`twig_bb.crnfile`; everything else is a format the imaging library
+    reads for itself.
+    """
     if not path:
         return None
+    if os.path.splitext(path)[1].lower() == crnfile.EXTENSION:
+        return crnfile.load(path)
     try:
         from PIL import Image
         image = Image.open(path)

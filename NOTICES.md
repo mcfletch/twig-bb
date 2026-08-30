@@ -31,6 +31,7 @@ catalogue is credited without anyone having to remember. Run
 | numpy | BSD-3-Clause | <https://numpy.org/> | required |
 | pillow | MIT-CMU | <https://python-pillow.org/> | required |
 | miniaudio | MIT | <https://github.com/irmen/pyminiaudio> | **optional** (`pip install twig-bb[audio]`) |
+| texture2ddecoder | MIT | <https://github.com/K0lb3/texture2ddecoder> | **optional** (`pip install twig-bb[crn]`) |
 
 **miniaudio is optional and the distinction matters here**, because a notice has
 to be accurate about what a given install actually contains. It is not a
@@ -48,6 +49,16 @@ Nothing in that chain is copyleft, which is the reason it is the only audio
 package this project takes: the convenient wrappers — `libsndfile`, PyAV,
 `pydub` via ffmpeg — are LGPL or worse, and none of them may be a dependency of
 a BSD library.
+
+**texture2ddecoder is optional on the same terms**, and is what reads Crunch
+(`.crn`) textures (``SPEC-CRN``). It carries a bundled decoder of its own:
+
+| Bundled in texture2ddecoder | Licence | Author |
+|---|---|---|
+| crunch / crnlib | zlib | Rich Geldreich |
+
+zlib is a permissive, BSD-style licence, so this chain passes the same test the
+audio one does.
 
 ## Art shipped with this program
 
