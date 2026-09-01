@@ -198,33 +198,76 @@ def _level_chooser(draft: match.MatchSetup,
 
 
 def download_screen(packs: Sequence[AssetPack],
-                    on_start: Optional[Callable[[], None]] = None,
+                    on_start: Optional[Callable[[Sequence[AssetPack]], None]] = None,
                     on_cancel: Optional[Callable[[], None]] = None) -> Panel:
-    """What a download costs and on what terms, before any of it happens.
+    """What one download costs and on what terms, before any of it happens.
 
     The size and the licence are **on the screen that asks**, not only in
     ``--list-packs``: a user consenting to hundreds of megabytes of CC BY-SA
     content should be able to see that is what they are agreeing to at the
     moment they agree to it.
+
+    **One set at a time**, chosen with the arrows.  Laying every set out at
+    once made the screen as tall as the catalogue -- and a catalogue grows,
+    while a screen does not, so the buttons went off the bottom and nothing
+    could be downloaded at all.  A fixed shape also matches how the content is
+    actually taken: a map and its art now, the rest another day.
+
+    ``on_start`` is handed the packs the user settled on, which is the chosen
+    one and whichever of its companions are not on disk yet -- a map fetched
+    without its art renders in grey, so the two travel together and the screen
+    says so before the button is pressed.
     """
-    total = sum(pack.approximate_bytes for pack in packs)
-    body: List[Any] = [
-        Label(text='Download %s?  About %d MB in total.'
-                   % (_listed(packs), round(total / 1e6)),
-              wrap=True, name='question'),
-    ]
-    for pack in packs:
-        body.append(Label(text='%s — %d MB\n%s'
-                               % (pack.title, round(pack.approximate_bytes / 1e6),
-                                  pack.copyright),
-                          wrap=True, top=4, name='pack-%s' % (pack.key,)))
-        if pack.notes:
-            body.append(Label(text=pack.notes, wrap=True, name='notes-%s'
-                                                            % (pack.key,)))
+    packs = list(packs)
+    catalogue = sum(pack.approximate_bytes for pack in packs)
+    chooser = Select(name='pack',
+                     options=[pack.key for pack in packs] or [''],
+                     optionLabels=[_offer_label(pack) for pack in packs] or ['nothing'],
+                     value=packs[0].key if packs else '')
+    summary = Label(text='', wrap=True, top=4, name='detail')
+    notes = Label(text='', wrap=True, name='notes')
+    needs = Label(text='', wrap=True, top=2, name='companions')
+
+    def selected() -> List[AssetPack]:
+        """The chosen pack and the companions it cannot do without."""
+        for pack in packs:
+            if pack.key == chooser.value:
+                return [pack] + [other for other in packs
+                                 if other.key in pack.companions]
+        return packs[:1]
+
+    def describe(_widget: Any = None) -> None:
+        chosen = selected()
+        if not chosen:
+            return
+        pack, companions = chosen[0], chosen[1:]
+        summary.text = '%s — %d MB\n%s' % (pack.title,
+                                           round(pack.approximate_bytes / 1e6),
+                                           pack.copyright)
+        notes.text = pack.notes
+        if companions:
+            needs.text = ('Needs %s as well, which this fetches too.  '
+                          '%d MB together.'
+                          % (_listed(companions),
+                             round(sum(one.approximate_bytes
+                                       for one in chosen) / 1e6)))
+        else:
+            needs.text = ''
+
+    chooser.on_change = describe
+    describe()
+
     start = Button(text='Download', name='download', role='primary')
     cancel = Button(text='Not now', name='cancel')
-    body.append(Row(children=[Spacer(), cancel, start], spacing=8, top=8,
-                    name='buttons'))
+    body: List[Any] = [
+        Label(text='%d %s to choose from, %d MB in all.  One at a time:'
+                   % (len(packs), 'set' if len(packs) == 1 else 'sets',
+                      round(catalogue / 1e6)),
+              wrap=True, name='question'),
+        chooser, summary, notes, needs,
+        Row(children=[Spacer(), cancel, start], spacing=8, top=8,
+            name='buttons'),
+    ]
     panel = Panel(title='Content', scrim=True, modal=True,
                   preferredColumns=MENU_COLUMNS + 12,
                   children=[Column(children=body, spacing=4)])
@@ -236,7 +279,7 @@ def download_screen(packs: Sequence[AssetPack],
         answered.append(yes)
         panel.close(yes)
         if yes and on_start is not None:
-            on_start()
+            on_start(selected())
         elif not yes and on_cancel is not None:
             on_cancel()
 
@@ -244,6 +287,11 @@ def download_screen(packs: Sequence[AssetPack],
     cancel.on_activate = lambda _widget: answer(False)
     panel.on_close = lambda _closing: answer(False)
     return panel
+
+
+def _offer_label(pack: AssetPack) -> str:
+    """One line for the chooser: what it is and what it costs."""
+    return '%s — %d MB' % (pack.title, round(pack.approximate_bytes / 1e6))
 
 
 def progress_screen(job: Any,

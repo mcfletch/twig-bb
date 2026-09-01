@@ -657,11 +657,18 @@ user under `<cache>/twig-bb-content/<pack>` and every later run finds it there.
 
 The OpenArena release is split, so what one map needs spans several packs:
 fetching only the maps gets you geometry and baked lighting rendered in grey.
-The viewer says so, names the packs that would fix it, and asks about all of
-them at once — a question that has to be answered again next launch to get the
-rest is a worse question. The Debian *source* tarballs are used rather than the
-`.deb` packages: the upstream archive as published, with no packaging layer to
-unwrap.
+The viewer says so and names the packs that would fix it. The Debian *source*
+tarballs are used rather than the `.deb` packages: the upstream archive as
+published, with no packaging layer to unwrap.
+
+**The content screen offers one set at a time.** The arrows step through what is
+not yet on disk, and the screen shows that set's size, its terms and what it is
+for, with a button that fetches that one. A set that another cannot do without
+brings it along and says so first, since a map fetched without its art renders
+in grey. It is one at a time because the screen is a fixed shape and the
+catalogue is not: laying every set out at once made the panel as tall as the
+catalogue and pushed the buttons off the bottom of the display, where a
+catalogue of any size eventually puts them.
 
 `openarena-oacmp1`, a community map pack, is also in Debian main and is not
 registered here yet.

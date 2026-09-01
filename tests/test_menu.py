@@ -25,6 +25,21 @@ def widget(panel, name):
     return walk(panel)
 
 
+def _shape(panel):
+    """How many widgets a panel is made of, by kind.
+
+    A screen whose shape depends on how much is in the catalogue is a screen
+    that eventually runs off the bottom of the display.
+    """
+    counts = {}
+    def walk(node):
+        counts[type(node).__name__] = counts.get(type(node).__name__, 0) + 1
+        for child in getattr(node, 'children', ()) or ():
+            walk(child)
+    walk(panel)
+    return counts
+
+
 def names(panel):
     found = []
 
@@ -228,28 +243,70 @@ class TestTheDownloadConsent:
 
     def test_the_licence_is_on_the_screen_that_asks(self):
         panel = menu.download_screen([pack()])
-        assert 'CC BY-SA' in widget(panel, 'pack-sample').text
+        assert 'CC BY-SA' in widget(panel, 'detail').text
 
-    def test_several_packs_are_asked_about_at_once(self):
-        """A question that must be answered again next launch is a worse one."""
+    def test_the_sets_are_offered_one_at_a_time(self):
+        """The screen is a fixed shape and the catalogue is not.
+
+        Laying all of them out made it as tall as the catalogue, and the
+        buttons went off the bottom where nothing could reach them.
+        """
         panel = menu.download_screen([pack(key='a'), pack(key='b')])
-        assert widget(panel, 'pack-a') is not None
-        assert widget(panel, 'pack-b') is not None
+        chooser = widget(panel, 'pack')
+        assert list(chooser.options) == ['a', 'b']
+        assert widget(panel, 'buttons') is not None
 
-    def test_the_total_is_the_sum(self):
+    def test_the_screen_does_not_grow_with_the_catalogue(self):
+        """What the bug was: eighteen sets, and no button on the screen."""
+        small = menu.download_screen([pack(key='a')])
+        large = menu.download_screen([pack(key='k%d' % n) for n in range(18)])
+        assert _shape(small) == _shape(large)
+
+    def test_the_catalogue_total_is_still_shown(self):
+        """One at a time is not the same as not saying what it all comes to."""
         panel = menu.download_screen([pack(key='a', approximate_bytes=1_000_000),
                                       pack(key='b', approximate_bytes=3_000_000)])
         assert '4 MB' in widget(panel, 'question').text
+        assert '2 sets' in widget(panel, 'question').text
 
-    def test_accepting_starts_it(self):
+    def test_choosing_changes_what_is_described(self):
+        panel = menu.download_screen([pack(key='a', title='Alpha'),
+                                      pack(key='b', title='Beta')])
+        chooser = widget(panel, 'pack')
+        assert 'Alpha' in widget(panel, 'detail').text
+        chooser.write('b')
+        assert 'Beta' in widget(panel, 'detail').text
+
+    def test_accepting_starts_the_chosen_set(self):
         started = []
-        panel = menu.download_screen([pack()], on_start=lambda: started.append(1))
+        panel = menu.download_screen([pack(key='a'), pack(key='b')],
+                                     on_start=started.append)
+        widget(panel, 'pack').write('b')
         widget(panel, 'download').on_activate(None)
-        assert started == [1]
+        assert [one.key for one in started[0]] == ['b']
+
+    def test_a_set_brings_the_companions_it_cannot_do_without(self):
+        """A map fetched without its art renders in grey."""
+        packs = [pack(key='maps', companions=('art',)), pack(key='art')]
+        started = []
+        panel = menu.download_screen(packs, on_start=started.append)
+        assert 'art' in widget(panel, 'companions').text.lower() or \
+               'sample' in widget(panel, 'companions').text.lower()
+        widget(panel, 'download').on_activate(None)
+        assert [one.key for one in started[0]] == ['maps', 'art']
+
+    def test_a_companion_already_on_disk_is_not_fetched_again(self):
+        """The caller passes only what is missing, so absence means present."""
+        started = []
+        panel = menu.download_screen([pack(key='maps', companions=('art',))],
+                                     on_start=started.append)
+        widget(panel, 'download').on_activate(None)
+        assert [one.key for one in started[0]] == ['maps']
+        assert widget(panel, 'companions').text == ''
 
     def test_declining_does_not(self):
         started, declined = [], []
-        panel = menu.download_screen([pack()], on_start=lambda: started.append(1),
+        panel = menu.download_screen([pack()], on_start=started.append,
                                      on_cancel=lambda: declined.append(1))
         widget(panel, 'cancel').on_activate(None)
         assert (started, declined) == ([], [1])

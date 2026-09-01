@@ -938,8 +938,10 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
                 'Everything in the catalogue is already downloaded.',
                 title='Content', on_close=lambda panel: self.showMenu()))
             return
+        # The screen decides which of them, so it is the screen that says: one
+        # set and its companions, not the whole catalogue.
         self.pushOverlay(menu.download_screen(
-            wanted, on_start=lambda: self._startDownload(wanted),
+            wanted, on_start=self._startDownload,
             on_cancel=self.showMenu))
 
     def _startDownload(self, packs: Any) -> None:   # pragma: no cover - GL
