@@ -195,7 +195,12 @@ class TestWhereALevelsPictureLives:
         assert match._levelshots(str(tmp_path)) == {}
 
     def test_the_shared_directory_wins_where_a_map_has_both(self, tmp_path):
-        """First wins, and `os.walk` reaches `levelshots/` first by name."""
+        """The pack's own gallery beats whatever the map was shipped with.
+
+        Decided by which directory the picture is in, not by which the walk
+        reached first: os.walk yields what the filesystem hands back, and on
+        this one `meta/` comes first.
+        """
         self._picture(tmp_path / 'levelshots' / 'plat23.jpg')
         self._picture(tmp_path / 'meta' / 'plat23' / 'plat23.webp')
         assert match._levelshots(str(tmp_path))['plat23'].endswith('.jpg')

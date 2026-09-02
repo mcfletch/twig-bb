@@ -250,9 +250,18 @@ def _levelshots(root: str) -> Dict[str, str]:
     release splits its content across several pak directories, so the picture
     for a map is rarely beside the map, and fifty separate searches over the
     same tree is fifty times the work for the same answer.
+
+    A map with a picture in both places gets the shared one: ``levelshots/`` is
+    the pack's own gallery, while a ``meta/`` picture is whatever the map was
+    shipped with.  That is decided here rather than left to which the walk
+    reached first, because ``os.walk`` yields entries in the order the
+    filesystem hands back -- so "first" is a different picture on a different
+    machine.
     """
-    found: Dict[str, str] = {}
-    for base, _dirs, files in os.walk(root):
+    shared_pictures: Dict[str, str] = {}
+    metadata_pictures: Dict[str, str] = {}
+    for base, dirs, files in os.walk(root):
+        dirs.sort()             # so two paks are read in the same order anywhere
         directory = os.path.basename(base).lower()
         shared = directory == LEVELSHOT_DIR
         # A metadata directory is named after its map, so the picture in it is
@@ -261,16 +270,17 @@ def _levelshots(root: str) -> Dict[str, str]:
         metadata = os.path.basename(os.path.dirname(base)).lower() == METADATA_DIR
         if not shared and not metadata:
             continue
-        for name in files:
+        found = shared_pictures if shared else metadata_pictures
+        for name in sorted(files):
             stem, extension = os.path.splitext(name)
             if extension.lower() not in LEVELSHOT_EXTENSIONS:
                 continue
             if metadata and stem.lower() != directory:
                 continue
-            # First wins, matching the pack precedence the texture
-            # resolver uses: an earlier pak overrides a later one.
+            # First wins within a kind, matching the pack precedence the
+            # texture resolver uses: an earlier pak overrides a later one.
             found.setdefault(stem.lower(), os.path.join(base, name))
-    return found
+    return {**metadata_pictures, **shared_pictures}
 
 
 def describe(setup: MatchSetup) -> Dict[str, Any]:

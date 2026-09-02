@@ -101,9 +101,10 @@ def render():
         context = made.get('context')
         if context is None:
             context = build(children or [], camera)
-        for _frame in range(frames):
+        for _frame in range(max(0, frames - 1)):
             glfw.poll_events()
             context.OnDraw(force=1)
+        glfw.poll_events()
         return _pixels(context)
 
     yield run
@@ -124,12 +125,18 @@ def render():
 
 
 def _pixels(context):
-    """The framebuffer as (h, w, 3) ints."""
-    from OpenGL.GL import GL_RGB, GL_UNSIGNED_BYTE, glReadPixels
-    width, height = context.getViewPort()
-    raw = glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE)
-    return np.frombuffer(bytes(raw), dtype=np.uint8).reshape(
-        height, width, 3).astype(int)
+    """The framebuffer as (h, w, 3) ints.
+
+    Drawn and read through the engine, which reads between the render and the
+    swap: presenting a frame leaves the back buffer holding whatever the driver
+    last put there, so reading after the draw reads black on some drivers and
+    the frame before last on others.  ``read_back_buffer`` also binds the
+    default framebuffer first, which a post-process pass would otherwise have
+    left pointing at its own.
+    """
+    from OpenGLContext.capture import read_back_buffer
+
+    return context.drawAndReadFrame(read_back_buffer)[0].astype(int)
 
 
 def _lit(pixels, threshold=12):
