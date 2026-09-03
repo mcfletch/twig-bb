@@ -76,15 +76,30 @@ def test_a_name_that_exists_nowhere_resolves_to_nothing(roots):
     assert ContentSearch(roots).find('sound/world/absent', ('.wav',)) is None
 
 
+def found_is(path, wanted):
+    """``path`` names the same file as ``wanted``.
+
+    Compared as files rather than as strings, because on a case-insensitive
+    filesystem the two spellings *are* one file: the cheap lookup opens it
+    without ever listing the directory, and comes back with the spelling it was
+    asked for rather than the one on disk. What matters either way is which
+    file was found, and making the search normalise a case the filesystem
+    itself disregards would cost a directory listing on every content lookup.
+    """
+    return path is not None and os.path.samefile(path, wanted)
+
+
 def test_a_differently_cased_file_is_still_found(roots):
     """Quake content is authored as though the filesystem ignored case."""
     wanted = write(roots[0], 'sound/world/Wind1.WAV')
-    assert ContentSearch(roots).find('sound/world/wind1', ('.wav',)) == wanted
+    assert found_is(ContentSearch(roots).find('sound/world/wind1', ('.wav',)),
+                    wanted)
 
 
 def test_a_differently_cased_directory_is_still_found(roots):
     wanted = write(roots[0], 'Sound/World/wind1.wav')
-    assert ContentSearch(roots).find('sound/world/wind1', ('.wav',)) == wanted
+    assert found_is(ContentSearch(roots).find('sound/world/wind1', ('.wav',)),
+                    wanted)
 
 
 def test_an_exact_match_beats_a_case_insensitive_one(roots):
