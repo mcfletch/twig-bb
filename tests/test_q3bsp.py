@@ -153,13 +153,23 @@ def test_a_truncated_directory_is_refused(tmp_path):
 # -- against a real sample map ------------------------------------------------
 
 def test_the_sample_map_reads_with_the_counts_its_bytes_imply(quake3_map):
-    """Record sizes from SPEC-BSP46 §2.1 divided into the real lump lengths."""
+    """Record sizes from SPEC-BSP46 §2.1 divided into the real lump lengths.
+
+    Read off the map's own directory rather than written out for one map: what
+    is claimed is that a lump holds a whole number of its records and that we
+    read every one of them, which is true of any v46 map and is what a second
+    map would otherwise quietly stop checking.
+    """
     bsp = q3bsp.load(quake3_map)
     assert bsp.version == 46
-    assert len(bsp.textures) == 7056 // 72
-    assert len(bsp.faces) == 320424 // 104
-    assert len(bsp.vertexes) == 774576 // 44
-    assert len(bsp.lightmaps) == 540672 // 49152
+    for name, index, dtype in q3bsp._RECORD_LUMPS:
+        length = int(bsp.directory[index][1])
+        assert length % dtype.itemsize == 0, (
+            '%s: %d bytes is not a whole number of %d-byte records'
+            % (name, length, dtype.itemsize))
+        assert len(getattr(bsp, name)) == length // dtype.itemsize, name
+    lightmaps = int(bsp.directory[q3bsp.LUMP_LIGHTMAPS][1])
+    assert len(bsp.lightmaps) == lightmaps // q3bsp.LIGHTMAP_BYTES
 
 
 def test_the_sample_map_has_patches_and_polygons(quake3_map):

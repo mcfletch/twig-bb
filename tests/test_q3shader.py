@@ -229,14 +229,12 @@ def test_a_tree_with_no_scripts_loads_nothing(tmp_path):
 
 # -- against real shipped scripts --------------------------------------------
 
-def test_a_real_maps_scripts_parse(quake3_map):
-    """The `.shader` files shipped inside the sample map's archive."""
-    import os
-    root = os.path.dirname(os.path.dirname(quake3_map))
-    materials = q3shader.load_scripts([root])
+def test_a_real_maps_scripts_parse(quake3_scripts_roots):
+    """The `.shader` files a real map is built against."""
+    materials = q3shader.load_scripts(quake3_scripts_roots)
     assert materials
     sky = [m for m in materials.values() if m.sky]
-    assert sky, 'the sample map defines a sky material'
+    assert sky, 'the shipped scripts define a sky material'
     for material in materials.values():
         assert material.image, 'every material resolves to some image'
 
