@@ -154,7 +154,7 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
         # compositor frame callback that a window nobody is watching never
         # gets, so a capture would draw one frame and then wait forever.
         from .viewer import disable_vsync
-        disable_vsync()
+        disable_vsync(self)
         self.weapons = weapontable.default_table()
         # Carrying everything: this demo is *for* looking at the weapons, and
         # a number key that refuses because nothing has handed you the weapon

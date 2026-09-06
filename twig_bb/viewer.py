@@ -651,7 +651,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         start screen; everything below that a map is needed for is deferred to
         :meth:`_loadLevel`, which the menu calls when a level is chosen.
         """
-        disable_vsync()
+        disable_vsync(self)
         if self.config is None:
             self.config = build_parser().parse_args([self._target or ''])
         # The handover for loading a level off the render thread (see
@@ -2015,19 +2015,18 @@ def _backdrop() -> Background:
     )
 
 
-def disable_vsync() -> None:                    # pragma: no cover - needs GLFW
-    """Uncap the frame rate.
+def disable_vsync(context: Any) -> bool:
+    """Uncap ``context``'s frame rate; answers whether the backend could.
 
     A forced redraw every frame blocks on the buffer swap when no compositor is
     presenting frames, which is exactly the headless capture case: without this
     a probe renders one frame and then hangs.  Public because every one of this
     project's windows redraws that way and needs it.
+
+    Through the engine (``Context.setVSync``) rather than through a toolkit's
+    own swap-interval call, so it works whichever backend the window came from.
     """
-    try:
-        import glfw
-        glfw.swap_interval(0)
-    except Exception:
-        pass
+    return bool(context.setVSync(False))
 
 
 def main(argv: Optional[List[str]] = None) -> None:

@@ -346,20 +346,19 @@ class ReviewContext:
         except Exception as error:                      # pragma: no cover - GL
             raise SystemExit('no usable GL context: %r' % (error,)) from error
         self.context.deferRedraw = True
-        try:
-            import glfw
-            glfw.swap_interval(0)
-        except Exception:                               # pragma: no cover
-            pass
+        # A forced redraw blocks on a swap nobody is presenting, so a headless
+        # probe would draw one frame and then wait for ever.  Through the
+        # engine, so it works whichever backend the window came from.
+        self.context.setVSync(False)
 
     def frame(self) -> Any:
         """Draw once and hand back what landed in the framebuffer."""
         from OpenGLContext.capture import read_back_buffer
-        try:
-            import glfw
-            glfw.poll_events()
-        except Exception:                               # pragma: no cover
-            pass
+        # Let the window system deliver whatever it has queued; a window that
+        # is never pumped is one some platforms decide has stopped responding.
+        pump = getattr(self.context, 'pumpWindowEvents', None)
+        if pump is not None:
+            pump()
         # Twice: `OnDraw` swaps, so a single draw leaves the frame just made
         # in the *front* buffer and the one before it in the back, and every
         # capture would be one tick behind what it is labelled.
