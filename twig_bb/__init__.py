@@ -10,4 +10,4 @@ cites a numbered fact in one of the specifications under ``specs/``; none was
 derived from an engine implementation.
 """
 
-__version__ = '3.0.0'
+__version__ = '1.0.0a1'
