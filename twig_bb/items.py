@@ -503,7 +503,7 @@ class Pickups:
         for index, item in enumerate(self.items):
             if not item.available:
                 continue
-            for at, (id, feet) in enumerate(standing):
+            for at, (id, _feet) in enumerate(standing):
                 if not touching[index, at]:
                     continue
                 one = arena.combatant(id)

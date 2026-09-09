@@ -19,12 +19,11 @@ GL is involved -- these run headless with the rest of the suite.
 
 from __future__ import annotations
 
-import pytest
 
 from OpenGLContext import visitor
 from vrml.vrml97 import nodetypes
 
-from twig_bb import game, maploader, projectiles, rules, viewer, weapons
+from twig_bb import game, projectiles, viewer, weapons
 
 #: What one frame at sixty a second affords, in node-paths.  The pass spends on
 #: the order of six microseconds of Python per path per frame gathering and

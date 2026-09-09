@@ -18,7 +18,6 @@ import struct
 import numpy as np
 import pytest
 
-from twig_bb import visibility
 from twig_bb.visibility import NO_CLUSTER, Visibility
 
 
