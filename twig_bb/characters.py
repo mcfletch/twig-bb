@@ -408,6 +408,11 @@ class Character:
         #: whole cast is posed by one run of arithmetic -- see
         #: :class:`OpenGLContext.character.crowd.Crowd`.
         self.crowd: Any = None
+        #: This figure's place in that crowd --
+        #: :class:`OpenGLContext.character.crowd.Member` -- kept beside the
+        #: crowd itself so a caller can reach the figure's own playback rate.
+        #: `Crowd.remove` finds it by mixer and does not need this.
+        self.member: Any = None
         self.locomotion = Locomotion()
         #: Which way the body is drawn facing, which lags where its owner is
         #: looking by however long the turn takes.

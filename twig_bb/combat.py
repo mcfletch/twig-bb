@@ -252,7 +252,7 @@ def aim_at(arena: Any, shooter: str, target: str) -> Optional[np.ndarray]:
 
 def visible_targets(world: Any, arena: Any, looker: str,
                     within: Optional[float] = None,
-                    facing: Optional[Sequence[float]] = None,
+                    facing: Optional[ArrayLike] = None,
                     cone: Optional[float] = None,
                     seen: Optional[dict] = None,
                     rooms: Any = None) -> List[str]:
