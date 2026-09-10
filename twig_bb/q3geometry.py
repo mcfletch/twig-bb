@@ -171,7 +171,9 @@ def _add_face(builder: GeometryBuilder, bsp: Q3BSP, face: np.ndarray,
                         orient_triangles(indices, positions, normals))
 
 
-def _indexed_face(bsp: Q3BSP, face: np.ndarray):
+def _indexed_face(
+    bsp: Q3BSP, face: np.ndarray
+) -> Tuple[Optional[Tuple[np.ndarray, ...]], np.ndarray]:
     """A polygon or mesh face's vertices and triangles (``SPEC-BSP46 §4.12.1``)."""
     first, count = int(face['vertex']), int(face['num_vertexes'])
     mesh_first, mesh_count = int(face['meshvert']), int(face['num_meshverts'])
@@ -193,7 +195,9 @@ def _indexed_face(bsp: Q3BSP, face: np.ndarray):
             indices.astype(np.uint32))
 
 
-def _patch_face(bsp: Q3BSP, face: np.ndarray, subdivisions: int):
+def _patch_face(
+    bsp: Q3BSP, face: np.ndarray, subdivisions: int
+) -> Tuple[Optional[Tuple[np.ndarray, ...]], np.ndarray]:
     """A Bezier patch face's tessellated vertices (``SPEC-BSP46 §6.3``–``§6.5``)."""
     first = int(face['vertex'])
     width, height = (int(v) for v in face['size'])

@@ -290,7 +290,8 @@ class _Body:
         self.first_stage = 0
 
 
-def _parse_body(name: str, tokens: List[Tuple[str, int]], index: int):
+def _parse_body(name: str, tokens: List[Tuple[str, int]],
+                index: int) -> Tuple[Material, int]:
     """Parse a material body from ``index`` until its closing brace."""
     body = _Body(name)
     depth = 1

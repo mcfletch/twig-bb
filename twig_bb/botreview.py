@@ -27,7 +27,9 @@ import argparse
 import math
 import os
 import sys
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import (
+    Any, Callable, Dict, List, Optional, Sequence, Tuple,
+)
 
 os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
@@ -86,38 +88,51 @@ class Take:
                 np.asarray(facing, dtype='d'), dict(state))
 
 
-def _still(velocity=(0, 0, 0), facing=(0, 0, 1), **state):
+#: What a take's ``motion`` answers for a moment of itself: where the body is
+#: going, where it is looking, and what the rules would be reporting. The two
+#: vectors are whatever holds three numbers -- a tuple written here, a numpy
+#: row worked out from a heading -- since `Take.at` puts both through
+#: `np.asarray`.
+Moment = Tuple[Any, Any, Dict[str, Any]]
+Motion = Callable[[float], Moment]
+
+
+def _still(velocity: Any = (0, 0, 0), facing: Any = (0, 0, 1),
+           **state: Any) -> Motion:
     """A take that says the same thing at every moment of itself."""
-    def motion(_when, velocity=velocity, facing=facing, state=state):
+    def motion(_when: float, velocity: Any = velocity,
+               facing: Any = facing,
+               state: Dict[str, Any] = state) -> Moment:
         return (velocity, facing, state)
     return motion
 
 
-def _walking(speed, heading=(0, 0, -1), facing=(0, 0, 1), **state):
+def _walking(speed: float, heading: Sequence[float] = (0, 0, -1),
+             facing: Any = (0, 0, 1), **state: Any) -> Motion:
     """Moving along ``heading`` at ``speed`` while looking at ``facing``."""
     unit = np.asarray(heading, dtype='d')
     unit = unit / max(float(np.linalg.norm(unit)), 1e-9)
     return _still(velocity=unit * float(speed), facing=facing, **state)
 
 
-def _jump(when):
+def _jump(when: float) -> Moment:
     """Up, over and down: the arc a jump pad or a hop puts a body through."""
     rising = when < 0.45
     return ((0.0, 3.0 if rising else -3.0, 2.0), (0, 0, 1),
             {'grounded': when > 0.9, 'rising': rising})
 
 
-def _dying(when):
+def _dying(when: float) -> Moment:
     return ((0.0, 0.0, 0.0), (0, 0, 1), {'dead': when > 0.12})
 
 
-def _firing(when):
+def _firing(when: float) -> Moment:
     """Standing and shooting: the trigger comes down twice."""
     return ((0.0, 0.0, 0.0), (0, 0, 1),
             {'firing': (when % 0.7) < 0.18, 'aiming': True})
 
 
-def _turning_to_shoot(when):
+def _turning_to_shoot(when: float) -> Moment:
     """Somebody walks past and the bot turns to face them and fires."""
     angle = math.radians(-90.0 + 150.0 * min(1.0, when / 1.1))
     return ((0.0, 0.0, 0.0), (math.sin(angle), 0.0, math.cos(angle)),

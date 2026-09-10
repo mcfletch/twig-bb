@@ -85,7 +85,7 @@ ROCKET_PICKUP = dict(model='items/javelin-rocket-pickup.glb',
 #: a bubble colour, so a player learns one colour per weapon rather than one
 #: per pickup: green is the shotgun, cyan the grenade launcher, lime the
 #: sniper, orange the handgun, red the rocket launcher.
-def _pickup(name):
+def _pickup(name: str) -> Dict[str, Any]:
     return dict(model='items/%s.glb' % (name,), modelScale=0.5, tinted=False)
 
 
