@@ -120,8 +120,15 @@ def test_shapes_are_named_after_their_texture_for_debugging(tmp_path):
 
 def test_the_scene_can_be_restricted_to_the_shadow_casters(tmp_path):
     """SPEC-BSP38 §8.3.3: a NOSHADOW surface is drawn but never written into a
-    shadow map."""
+    shadow map.
+
+    Read off the Shape, which is where OpenGLContext's shadow pass reads it
+    (`passes.shadowmixin._shadowCasterRecords` walks the rendering paths and
+    the node it finds at the end of one is the Shape). Set on the geometry the
+    flag says nothing at all, and a sky goes into every cascade.
+    """
     world = _world(SurfaceStyle(name='a'), SurfaceStyle(name='b', casts_shadow=False))
     group = build_scene(world, build_atlas([]), _library(tmp_path))
-    casters = [child for child in group.children if getattr(child.geometry, "castsShadow", True)]
+    casters = [child for child in group.children if child.castsShadow]
     assert len(casters) == 1
+    assert all(child.castsShadow for child in casters)

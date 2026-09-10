@@ -77,13 +77,13 @@ def build_shape(batch: Batch, index: int, atlas: LightmapAtlas,
         # PBRMesh.solid is the backface-culling flag, so a two-sided material
         # must clear it (SPEC-Q3SHADER §2.1's `cull none`).
         solid=not style.double_sided)
-    # Sky is drawn by the backdrop rather than as geometry, so it must not be
-    # written into a shadow map either; the shadow pass reads this opt-out off
-    # the geometry node.
-    mesh.castsShadow = style.casts_shadow
     if animator is not None:
         animator.add(style, material, mesh=mesh, resolve=library.texture_for)
+    # Sky is drawn by the backdrop rather than as geometry, so it must not be
+    # written into a shadow map either. On the Shape: a shadow caster is a
+    # renderable, and that is the node the shadow pass reads the flag from.
     return Shape(geometry=mesh, appearance=Appearance(material=material),
+                 castsShadow=style.casts_shadow,
                  DEF=_shape_name(style.name, index))
 
 

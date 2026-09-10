@@ -33,7 +33,9 @@ from OpenGLContext.ui.gallery import Carousel
 from OpenGLContext.ui.layout import Column, Row
 from OpenGLContext.ui.panel import Panel
 from OpenGLContext.ui.session import SettingsSession
-from OpenGLContext.ui.widgets import Button, Label, Select, Separator, Spacer
+from OpenGLContext.ui.widgets import (
+    BoundWidget, Button, Label, Select, Separator, Spacer,
+)
 
 from . import match
 from .assetpack import AssetPack
@@ -168,7 +170,7 @@ def play_screen(setup: match.MatchSetup, levels: Sequence[match.Level],
 
 
 def _level_chooser(draft: match.MatchSetup,
-                   levels: Sequence[match.Level]) -> Any:
+                   levels: Sequence[match.Level]) -> BoundWidget:
     """A band of the levels on disk, shown by their own art.
 
     A drop-down is the wrong control here.  What tells one arena from another
@@ -179,9 +181,9 @@ def _level_chooser(draft: match.MatchSetup,
     and the name under each.
     """
     if not levels:
-        chooser = Select(name='level', options=[''], optionLabels=[NO_LEVELS])
-        chooser.enabled = False
-        return chooser
+        empty = Select(name='level', options=[''], optionLabels=[NO_LEVELS])
+        empty.enabled = False
+        return empty
     chooser = Carousel(
         name='level', visibleCount=LEVELS_SHOWN,
         options=[level.target for level in levels],
@@ -311,7 +313,6 @@ def progress_screen(job: Any,
                       Row(children=[Spacer(), stop], spacing=8, top=8,
                           name='buttons'),
                   ])])
-    panel.progressLabel = line
 
     def stopped(_widget: Any) -> None:
         job.cancel()
@@ -322,8 +323,13 @@ def progress_screen(job: Any,
 
 
 def refresh_progress(panel: Any, job: Any) -> bool:
-    """Put the job's latest state on its screen; returns whether it changed."""
-    label = getattr(panel, 'progressLabel', None)
+    """Put the job's latest state on its screen; returns whether it changed.
+
+    The label is found by the name it was built with, which is what a panel's
+    parts are named for -- there is nothing to keep in step, and a screen read
+    back from a file works the same way as one built here.
+    """
+    label = panel.find('progress') if panel is not None else None
     if label is None:
         return False
     line = progress_line(job)

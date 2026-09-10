@@ -59,7 +59,7 @@ class MatchSetup(node.Node):
     #: Minutes that end the match; 0 for no time limit.
     timeLimit = field.newField('timeLimit', 'SFFloat', 1, 10.0)
 
-    UI_HINTS = {
+    UI_HINTS: Dict[str, Dict[str, Any]] = {
         'level': {'skip': True},        # chosen from a list, not typed
         'bots': {'label': 'Opponents', 'minimum': 0, 'maximum': 15, 'step': 1},
         'difficulty': {'label': 'Difficulty', 'options': DIFFICULTIES,

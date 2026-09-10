@@ -28,9 +28,10 @@ import os
 import re
 import sys
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Set
+from typing import Callable, List, Optional, Sequence, Set
 
 from OpenGLContext.ui.dialogs import notice
+from OpenGLContext.ui.panel import Panel
 
 from . import catalog
 from .assetpack import AssetPack
@@ -239,8 +240,8 @@ def full_text(current: Optional[MapNotice] = None) -> str:
     return '\n'.join(parts)
 
 
-def screen(on_close: Optional[object] = None,
-           current: Optional[MapNotice] = None) -> object:
+def screen(on_close: Optional[Callable[[Panel], None]] = None,
+           current: Optional[MapNotice] = None) -> Panel:
     """The acknowledgements, as a scrolling panel over whatever is running."""
     return notice('Acknowledgements', full_text(current), on_close=on_close)
 
