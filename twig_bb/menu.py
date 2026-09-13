@@ -216,7 +216,7 @@ def download_screen(packs: Sequence[AssetPack],
     actually taken: a map and its art now, the rest another day.
 
     ``on_start`` is handed the packs the user settled on, which is the chosen
-    one and whichever of its companions are not on disk yet -- a map fetched
+    one and whichever of the packs it needs are not on disk yet -- a map fetched
     without its art renders in grey, so the two travel together and the screen
     says so before the button is pressed.
     """
@@ -228,29 +228,29 @@ def download_screen(packs: Sequence[AssetPack],
                      value=packs[0].key if packs else '')
     summary = Label(text='', wrap=True, top=4, name='detail')
     notes = Label(text='', wrap=True, name='notes')
-    needs = Label(text='', wrap=True, top=2, name='companions')
+    needs = Label(text='', wrap=True, top=2, name='needs')
 
     def selected() -> List[AssetPack]:
-        """The chosen pack and the companions it cannot do without."""
+        """The chosen pack and the packs it cannot do without."""
         for pack in packs:
             if pack.key == chooser.value:
                 return [pack] + [other for other in packs
-                                 if other.key in pack.companions]
+                                 if other.key in pack.needs]
         return packs[:1]
 
     def describe(_widget: Any = None) -> None:
         chosen = selected()
         if not chosen:
             return
-        pack, companions = chosen[0], chosen[1:]
+        pack, needed = chosen[0], chosen[1:]
         summary.text = '%s — %d MB\n%s' % (pack.title,
                                            round(pack.approximate_bytes / 1e6),
                                            pack.copyright)
         notes.text = pack.notes
-        if companions:
+        if needed:
             needs.text = ('Needs %s as well, which this fetches too.  '
                           '%d MB together.'
-                          % (_listed(companions),
+                          % (_listed(needed),
                              round(sum(one.approximate_bytes
                                        for one in chosen) / 1e6)))
         else:

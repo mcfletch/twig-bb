@@ -19,10 +19,15 @@ import hashlib
 import logging
 import os
 import shutil
-import tarfile
 import zipfile
 from typing import List, Optional, Sequence, Tuple
 
+from OpenGLContext.contentpacks import ContentStore, archive as engine_archive
+from OpenGLContext.contentpacks import catalog as engine_catalog
+from OpenGLContext.contentpacks.archive import UnsafeArchive as UnsafeArchive
+# Re-exported: what a pack of a declared size is fetched under is the
+# engine's answer, and callers here have always asked this module.
+from OpenGLContext.contentpacks.fetch import fetch_limit as fetch_limit
 from OpenGLContext.loaders import resolver
 
 from . import catalog
@@ -51,13 +56,70 @@ CONTENT_SUBDIR = 'twig-bb-content'
 #: Every pack this build offers, read from :mod:`twig_bb.catalog` at import.
 #: A list rather than a literal here so a pack can be added or corrected in
 #: `packs.json` without touching Python.
-ASSET_PACKS = tuple(catalog.load())
+ASSET_PACKS = tuple(engine_catalog.merge(catalog.load()))
+
+#: Where a previous version unpacked shared content: one flat directory per
+#: pack. The engine's store partitions by namespace instead, so content already
+#: on a player's disk is moved into place rather than downloaded again.
+LEGACY_CONTENT = 'twig-bb-content'
+
+_adopted: set = set()
+
+
+def store(cache_dir: Optional[str] = None) -> ContentStore:
+    """This game's content store, with anything a previous version left adopted.
+
+    ``cache_dir`` names the root to use instead of the per-user one, which is
+    what a test and the ``--cache-dir`` option pass.
+    """
+    made = ContentStore('twig-bb', root=cache_dir or os.path.join(
+        _default_cache(), 'content'))
+    if made.root not in _adopted:
+        _adopted.add(made.root)
+        adopt_legacy_content(made)
+    return made
+
+
+def adopt_legacy_content(store: ContentStore) -> List[str]:
+    """Move content a previous version unpacked into the store; what moved.
+
+    A player who has fetched 450 MB of textures should not fetch them twice
+    because the layout beneath them changed. Each pack's directory is moved
+    across, which on one filesystem is a rename and costs nothing; a pack whose
+    place in the store is already taken is left where it is rather than
+    overwriting what is there.
+    """
+    legacy = os.path.join(_default_cache(), LEGACY_CONTENT)
+    if not os.path.isdir(legacy):
+        return []
+    moved = []
+    for pack in ASSET_PACKS:
+        was = os.path.join(legacy, pack.directory)
+        now = store.directory_for(pack)
+        if not os.path.isdir(was) or os.path.exists(now):
+            continue
+        os.makedirs(os.path.dirname(now), exist_ok=True)
+        try:
+            shutil.move(was, now)
+        except OSError as error:                # pragma: no cover - needs a
+            log.warning('cannot adopt %s: %s', was, error)   # read-only tree
+            continue
+        log.info('adopted %s from %s', pack.key, was)
+        moved.append(now)
+    return moved
 
 
 def pack_for_key(key: str) -> Optional[AssetPack]:
-    """The registered pack with this key, or None."""
+    """The registered pack with this key, or None.
+
+    A bare name reaches this game's own pack of that name: keys are namespaced
+    (``twig-bb/quake3-core``) so that a registry added to a build cannot answer
+    for one shipped here, but inside this game the namespace is implied and a
+    player typing ``--texture-packs quake3-core`` means the obvious thing.
+    """
+    wanted = key if '/' in key else '%s/%s' % (catalog.NAMESPACE, key)
     for pack in ASSET_PACKS:
-        if pack.key == key:
+        if pack.key == wanted:
             return pack
     return None
 
@@ -207,10 +269,6 @@ class AmbiguousMap(IOError):
     """An archive holding several maps, with no way to tell which was meant."""
 
 
-class UnsafeArchive(IOError):
-    """An archive whose entry names would write outside the unpack directory."""
-
-
 def resolve_target(target: str, cache_dir: Optional[str] = None,
                    map_name: Optional[str] = None, force: bool = False) -> str:
     """Turn what a user typed into the path of a map file on disk.
@@ -228,23 +286,6 @@ def resolve_target(target: str, cache_dir: Optional[str] = None,
         return unpack(target, _unpack_dir(target, cache_dir),
                       map_name=map_name, force=force)
     return target
-
-
-#: How much larger than its published size a pack is allowed to be.  A size
-#: drifts between releases, and a fetch that fails on the last megabyte is
-#: worse than one that never started.
-SIZE_HEADROOM = 1.5
-
-
-def fetch_limit(approximate_bytes: int) -> int:
-    """The byte cap to fetch a pack of this size under.
-
-    The resolver's own default is the floor: it is the right limit for an asset
-    of unknown size, and a pack whose size is known in advance is the one case
-    where raising it is warranted.
-    """
-    return max(int(approximate_bytes * SIZE_HEADROOM),
-               resolver.DEFAULT_MAX_RESOURCE_BYTES)
 
 
 def fetch(url: str, cache_dir: Optional[str] = None,
@@ -327,8 +368,7 @@ def _already_unpacked(directory: str, chosen: Optional[str]) -> bool:
 
 def pack_directory(pack: AssetPack, cache_dir: Optional[str] = None) -> str:
     """Where a pack unpacks, whether or not it is there yet."""
-    base = cache_dir or _default_cache()
-    return os.path.join(base, CONTENT_SUBDIR, pack.directory)
+    return store(cache_dir).directory_for(pack)
 
 
 def pack_root(pack: AssetPack, cache_dir: Optional[str] = None) -> Optional[str]:
@@ -342,50 +382,27 @@ def pack_root(pack: AssetPack, cache_dir: Optional[str] = None) -> Optional[str]
     archive would need a filesystem shim to support, and every read from an
     unpacked tree skips a decompression.
     """
-    directory = pack_directory(pack, cache_dir)
-    marker = os.path.join(directory, pack.marker) if pack.marker else directory
-    return directory if os.path.isdir(marker) and os.listdir(directory) else None
+    return store(cache_dir).root_for(pack)
 
 
 def fetch_pack(pack: AssetPack, cache_dir: Optional[str] = None) -> str:
     """Fetch and unpack ``pack``; return its content root.
 
     A no-op when it is already unpacked, so a caller may use it as "make sure
-    this is available".  A pack carries no map of its own in the `.bsp`-in-an-
-    archive sense the map loader expects, so the no-map rule is relaxed.
+    this is available".
     """
-    existing = pack_root(pack, cache_dir)
-    if existing is not None:
-        return existing
-    archive = fetch(pack.url, cache_dir=cache_dir,
-                    max_bytes=fetch_limit(pack.approximate_bytes))
-    directory = pack_directory(pack, cache_dir)
-    if pack.archive == 'zip':
-        unpack(archive, directory, require_map=False)
-    else:
-        _extract_tar(archive, directory)
-    return directory
+    from OpenGLContext.contentpacks import fetch as engine_fetch
+    return engine_fetch.fetch_pack(pack, store(cache_dir))
 
 
 def _extract_tar(archive: str, directory: str) -> None:
     """Extract a source tarball, refusing any entry that escapes ``directory``.
 
-    Archive content is untrusted whatever its format, so the same rule the zip
-    path applies is applied here — ``filter='data'`` additionally refuses
-    absolute paths, links out of the tree, and device nodes.
+    Archive content is untrusted whatever its format, and what bounds it -- the
+    escape check, the refusal of links and device nodes, and the cap on what it
+    unpacks to -- is :mod:`OpenGLContext.contentpacks.archive`.
     """
-    os.makedirs(directory, exist_ok=True)
-    root = os.path.abspath(directory)
-    with tarfile.open(archive) as tar:
-        for member in tar.getmembers():
-            target = os.path.abspath(os.path.join(root, member.name))
-            if os.path.isabs(member.name) or not target.startswith(root + os.sep):
-                raise UnsafeArchive(
-                    'archive entry %r would be written outside %s'
-                    % (member.name, directory))
-        tar.extractall(directory, filter='data')
-
-
+    engine_archive.extract(archive, directory, 'tar')
 
 
 def _unpack_dir(target: str, cache_dir: Optional[str]) -> str:

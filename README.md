@@ -653,7 +653,23 @@ naming a map inside a pack (`twig-bb openarena:oa_dm1`) or naming the pack
 (`twig-bb --fetch openarena-textures`) is itself the answer, since a pack
 must be on disk before there is a window to ask in; anything else is asked in
 the window, over the map it is about, with two buttons. A pack unpacks once per
-user under `<cache>/twig-bb-content/<pack>` and every later run finds it there.
+user under `<content>/packs/twig-bb/<pack>` and every later run finds it there.
+
+**Content already on the machine, and content that must not be fetched.**
+`OPENGLCONTEXT_CONTENT` names directories searched before the store, separated
+by the platform's path separator, laid out as the store lays packs out
+(`<namespace>/<pack>`). A packaged build, a machine with no network, or a CI job
+points it at a local copy and downloads nothing:
+
+```bash
+OPENGLCONTEXT_CONTENT=/opt/twig-bb/content twig-bb maps/plat23.bsp
+```
+
+The catalogue itself is `twig_bb/packs.json`, read and validated by the engine's
+content facility — see
+[OpenGLContext's content packs](https://github.com/mcfletch/openglcontext/blob/main/docs/contentpacks.html)
+for the registry format, every field, and how a set of packs from elsewhere is
+offered alongside these.
 
 The OpenArena release is split, so what one map needs spans several packs:
 fetching only the maps gets you geometry and baked lighting rendered in grey.
@@ -765,9 +781,12 @@ Quake 3 replacement set. Offering the wrong one would download hundreds of
 megabytes that cannot name a single one of the map's textures.
 
 A pack is unpacked into a named directory of its own —
-`<cache>/twig-bb-content/<pack>` — rather than into one more hash-named
+`<content>/packs/twig-bb/<pack>` — rather than into one more hash-named
 per-archive tree, which makes it something you can find, point another tool at,
-or delete on purpose. It is unpacked rather than read straight from the archive
+or delete on purpose. Packs sit under the namespace that declares them, so a
+registry added to a build writes into its own tree and cannot land on one of
+these. Content a previous version unpacked is moved into place the first time
+this one looks, rather than downloaded again. It is unpacked rather than read straight from the archive
 because texture lookup lists directories to match names whose case differs from
 the map's. A release that wraps its content in a version directory and a pak
 directory is resolved to the level texture names are actually relative to.

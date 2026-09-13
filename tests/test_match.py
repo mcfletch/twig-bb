@@ -138,7 +138,7 @@ class TestWhatCanBePlayedNow:
     def test_a_fetched_pack_offers_its_maps(self, tmp_path, monkeypatch):
         from twig_bb import download
         pack = download.pack_for_key('openarena-maps')
-        root = tmp_path / 'twig-bb-content' / pack.directory / 'maps'
+        root = tmp_path / 'packs' / 'twig-bb' / pack.directory / 'maps'
         root.mkdir(parents=True)
         for name in ('oa_dm1.bsp', 'oa_dm4.bsp'):
             (root / name).write_bytes(b'IBSP')
@@ -149,7 +149,7 @@ class TestWhatCanBePlayedNow:
     def test_a_level_knows_which_pack_it_came_from(self, tmp_path):
         from twig_bb import download
         pack = download.pack_for_key('openarena-maps')
-        root = tmp_path / 'twig-bb-content' / pack.directory / 'maps'
+        root = tmp_path / 'packs' / 'twig-bb' / pack.directory / 'maps'
         root.mkdir(parents=True)
         (root / 'oa_dm1.bsp').write_bytes(b'IBSP')
         assert match.levels_available(cache_dir=str(tmp_path))[0].pack == pack.key

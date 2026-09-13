@@ -46,7 +46,7 @@ class TestTheShippedCatalogue:
         """A dangling companion key is a download that silently does half a job."""
         keys = {pack.key for pack in catalog.load()}
         for pack in catalog.load():
-            assert set(pack.companions) <= keys, pack.key
+            assert set(pack.needs) <= keys, pack.key
 
     def test_every_url_is_https(self):
         """Content is untrusted either way, but plain http is a free downgrade."""
@@ -66,12 +66,12 @@ class TestLoadingAFile:
 
     def write(self, tmp_path, packs):
         path = tmp_path / 'packs.json'
-        path.write_text(json.dumps({'packs': packs}))
+        path.write_text(json.dumps({'namespace': 'sample', 'packs': packs}))
         return str(path)
 
     def minimal(self, **named):
         entry = {
-            'key': 'sample', 'title': 'A sample pack',
+            'key': 'sample/sample', 'title': 'A sample pack',
             'url': 'https://example.com/sample.zip', 'directory': 'sample',
             'archive': 'zip', 'approximate_bytes': 1000,
             'copyright': 'Nobody, public domain', 'marker': '',
@@ -81,18 +81,18 @@ class TestLoadingAFile:
 
     def test_a_pack_reads_back_with_its_fields(self, tmp_path):
         packs = catalog.load(self.write(tmp_path, [self.minimal()]))
-        assert packs[0].key == 'sample'
+        assert packs[0].key == 'sample/sample'
         assert packs[0].approximate_bytes == 1000
 
     def test_the_optional_fields_have_defaults(self, tmp_path):
         pack = catalog.load(self.write(tmp_path, [self.minimal()]))[0]
-        assert pack.companions == ()
+        assert pack.needs == ()
         assert pack.family is None
 
-    def test_companions_read_back_as_a_tuple(self, tmp_path):
+    def test_needs_read_back_as_a_tuple(self, tmp_path):
         """Frozen, because a pack is hashable and lives in sets."""
-        entry = self.minimal(companions=['other'])
-        assert catalog.load(self.write(tmp_path, [entry]))[0].companions == ('other',)
+        entry = self.minimal(needs=['sample/other'])
+        assert catalog.load(self.write(tmp_path, [entry]))[0].needs == ('sample/other',)
 
     def test_a_pack_with_no_copyright_is_refused(self, tmp_path):
         path = self.write(tmp_path, [self.minimal(copyright='')])
@@ -123,7 +123,7 @@ class TestLoadingAFile:
     def test_the_comment_key_is_not_a_pack(self, tmp_path):
         """The file documents itself; that must not become an entry."""
         path = tmp_path / 'packs.json'
-        path.write_text(json.dumps({'_comment': ['notes'],
+        path.write_text(json.dumps({'_comment': ['notes'], 'namespace': 'sample',
                                     'packs': [self.minimal()]}))
         assert len(catalog.load(str(path))) == 1
 
@@ -147,7 +147,7 @@ class TestWhatTheRestOfTheViewerSees:
 
     def test_the_short_name_still_reaches_the_maps_pack(self):
         found = download.parse_pack_target('openarena:oa_dm1')
-        assert found is not None and found[0].key == 'openarena-maps'
+        assert found is not None and found[0].key == 'twig-bb/openarena-maps'
 
 
 # -- the Unvanquished family -------------------------------------------------
@@ -159,8 +159,8 @@ def _unvanquished():
 def test_the_unvanquished_packs_are_registered():
     """SPEC-UNVDIST §3.1: the packages whose terms are stated in the archive."""
     keys = {pack.key for pack in _unvanquished()}
-    assert 'unvanquished-plat23' in keys
-    assert 'unvanquished-tex-pk02' in keys
+    assert 'twig-bb/unvanquished-plat23' in keys
+    assert 'twig-bb/unvanquished-tex-pk02' in keys
 
 
 def test_no_unvanquished_pack_lacks_stated_terms():
@@ -189,15 +189,15 @@ def test_every_unvanquished_map_names_the_art_it_needs():
     for pack in _unvanquished():
         if pack.marker != 'maps':
             continue
-        assert pack.companions, '%s would render in grey' % (pack.key,)
-        for key in pack.companions:
+        assert pack.needs, '%s would render in grey' % (pack.key,)
+        for key in pack.needs:
             assert key in packs, '%s names %s, which is not registered' % (pack.key, key)
 
 
 def test_the_smallest_playable_set_is_the_measured_size():
     """SPEC-UNVDIST §4.5: Platform 23 and its closure, 43890648 bytes."""
     packs = {pack.key: pack for pack in catalog.load()}
-    plat23 = packs['unvanquished-plat23']
+    plat23 = packs['twig-bb/unvanquished-plat23']
     total = plat23.approximate_bytes + sum(
-        packs[key].approximate_bytes for key in plat23.companions)
+        packs[key].approximate_bytes for key in plat23.needs)
     assert total == 43890648

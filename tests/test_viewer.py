@@ -244,7 +244,7 @@ def test_always_fetches_the_pack_the_map_named(monkeypatch, tmp_path):
                         or str(tmp_path))
     viewer.available_textures(_Loaded(['a']),
                               _texture_options('always', ['openarena-textures']))
-    assert fetched == ['openarena-textures']
+    assert fetched == ['twig-bb/openarena-textures']
 
 
 def test_a_failed_download_does_not_stop_the_map_loading(monkeypatch):
@@ -488,7 +488,7 @@ def test_naming_a_map_inside_a_pack_fetches_the_pack(tmp_path, monkeypatch):
     monkeypatch.setattr(viewer.download, 'fetch_pack', _fetch)
     options = viewer.build_parser().parse_args(['openarena:oa_dm1'])
     path = viewer.resolve_map_target(options)
-    assert fetched == ['openarena-maps']
+    assert fetched == ['twig-bb/openarena-maps']
     assert path.endswith('oa_dm1.bsp')
 
 
@@ -535,7 +535,7 @@ def test_a_companion_pack_already_on_disk_is_used_as_a_content_root(tmp_path, mo
     monkeypatch.setattr(
         viewer.download, 'pack_root',
         lambda pack, cache_dir=None: (str(textures_root)
-                                      if pack.key == 'openarena-textures' else None))
+                                      if pack.key == 'twig-bb/openarena-textures' else None))
     options = viewer.build_parser().parse_args(['openarena:oa_dm1'])
     viewer.resolve_map_target(options)
     assert str(textures_root) in options.content
@@ -553,13 +553,13 @@ def test_a_map_from_a_pack_offers_that_familys_textures_not_quake3s(tmp_path, mo
                         lambda pack, cache_dir=None: None)
     options = viewer.build_parser().parse_args(['openarena:oa_dm1'])
     viewer.resolve_map_target(options)
-    assert options.texture_packs == ['openarena-textures', 'openarena-data']
+    assert options.texture_packs == ['twig-bb/openarena-textures', 'twig-bb/openarena-data']
 
 
 def test_an_ordinary_map_offers_the_quake3_replacement_pack(tmp_path):
     options = viewer.build_parser().parse_args([synthetic_map(tmp_path)])
     viewer.resolve_map_target(options)
-    assert options.texture_packs == ['quake3-core']
+    assert options.texture_packs == ['twig-bb/quake3-core']
 
 
 def test_a_pack_can_be_fetched_deliberately_from_the_command_line(monkeypatch, capsys):
@@ -570,7 +570,7 @@ def test_a_pack_can_be_fetched_deliberately_from_the_command_line(monkeypatch, c
     with pytest.raises(SystemExit) as exit_info:
         viewer.main(['--fetch', 'openarena-textures'])
     assert exit_info.value.code == 0
-    assert fetched == ['openarena-textures']
+    assert fetched == ['twig-bb/openarena-textures']
     assert '/x' in capsys.readouterr().out
 
 
@@ -598,7 +598,7 @@ def test_the_pack_named_by_the_map_is_the_one_offered(tmp_path, monkeypatch):
     options = viewer.build_parser().parse_args([synthetic_map(tmp_path)])
     options.texture_packs = ['openarena-textures', 'openarena-data']
     offer = viewer.texture_pack_offer(_Loaded(['a']), options)
-    assert [pack.key for pack in offer] == ['openarena-textures', 'openarena-data']
+    assert [pack.key for pack in offer] == ['twig-bb/openarena-textures', 'twig-bb/openarena-data']
 
 
 def test_a_pack_already_on_disk_is_not_offered_again(tmp_path, monkeypatch):
@@ -1124,7 +1124,7 @@ def test_a_companion_key_naming_no_registered_pack_is_ignored(tmp_path, monkeypa
     (maps_root / 'maps' / 'oa_dm1.bsp').write_bytes(b'IBSP')
     import dataclasses
     pack = dataclasses.replace(viewer.download.pack_for_key('openarena-maps'),
-                               companions=('nonsense',))
+                               needs=('nonsense',))
     monkeypatch.setattr(viewer.download, 'parse_pack_target',
                         lambda target: (pack, target.split(':')[1]))
     monkeypatch.setattr(viewer.download, 'fetch_pack',

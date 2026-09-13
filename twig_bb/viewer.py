@@ -146,7 +146,7 @@ FAR_PLANE = 4000.0
 #: missing.  Named here rather than looked up by role because it *is* a choice:
 #: it is the community's freely-licensed replacement set, and offering it is
 #: this viewer's decision rather than a fact about the map.
-CORE_TEXTURE_PACK = 'quake3-core'
+CORE_TEXTURE_PACK = 'twig-bb/quake3-core'
 
 #: Scene time a capture pins the surface animation to, in seconds.  Not zero:
 #: at zero every wave is at a zero crossing and a reference image would show a
@@ -277,7 +277,7 @@ def resolve_map_target(options: argparse.Namespace,
             % (pack.key, name, ', '.join(download.list_maps(root)) or 'nothing'))
     roots = list(download.content_roots(root))
     missing: List[str] = []
-    for key in pack.companions:
+    for key in pack.needs:
         companion = download.pack_for_key(key)
         if companion is None:
             continue
@@ -939,7 +939,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
                 title='Content', on_close=lambda panel: self.showMenu()))
             return
         # The screen decides which of them, so it is the screen that says: one
-        # set and its companions, not the whole catalogue.
+        # set and the packs it needs, not the whole catalogue.
         self.pushOverlay(menu.download_screen(
             wanted, on_start=self._startDownload,
             on_cancel=self.showMenu))

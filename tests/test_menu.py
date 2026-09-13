@@ -285,24 +285,24 @@ class TestTheDownloadConsent:
         widget(panel, 'download').on_activate(None)
         assert [one.key for one in started[0]] == ['b']
 
-    def test_a_set_brings_the_companions_it_cannot_do_without(self):
+    def test_a_set_brings_the_needs_it_cannot_do_without(self):
         """A map fetched without its art renders in grey."""
-        packs = [pack(key='maps', companions=('art',)), pack(key='art')]
+        packs = [pack(key='maps', needs=('art',)), pack(key='art')]
         started = []
         panel = menu.download_screen(packs, on_start=started.append)
-        assert 'art' in widget(panel, 'companions').text.lower() or \
-               'sample' in widget(panel, 'companions').text.lower()
+        assert 'art' in widget(panel, 'needs').text.lower() or \
+               'sample' in widget(panel, 'needs').text.lower()
         widget(panel, 'download').on_activate(None)
         assert [one.key for one in started[0]] == ['maps', 'art']
 
     def test_a_companion_already_on_disk_is_not_fetched_again(self):
         """The caller passes only what is missing, so absence means present."""
         started = []
-        panel = menu.download_screen([pack(key='maps', companions=('art',))],
+        panel = menu.download_screen([pack(key='maps', needs=('art',))],
                                      on_start=started.append)
         widget(panel, 'download').on_activate(None)
         assert [one.key for one in started[0]] == ['maps']
-        assert widget(panel, 'companions').text == ''
+        assert widget(panel, 'needs').text == ''
 
     def test_declining_does_not(self):
         started, declined = [], []

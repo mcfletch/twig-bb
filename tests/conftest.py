@@ -116,7 +116,7 @@ def quake3_scripts_roots(quake3_map) -> list:
 
     A self-contained ``.pk3`` carries its own, so the map's own tree is looked
     at first.  A split distribution puts the levels in one package and the
-    scripts in another -- which is what a pack's ``companions`` are -- so those
+    scripts in another -- which is what a pack's ``needs`` are -- so those
     are searched next.
     """
     from twig_bb import download
@@ -125,7 +125,7 @@ def quake3_scripts_roots(quake3_map) -> list:
     if roots:
         return roots
     pack = download.pack_for_key(PACK_MAP[0])
-    for key in (pack.companions if pack is not None else ()):
+    for key in (pack.needs if pack is not None else ()):
         companion = download.pack_for_key(key)
         roots = _script_roots(
             download.pack_root(companion) if companion is not None else None)

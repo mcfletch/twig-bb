@@ -210,6 +210,11 @@ class TestCancelling:
     def test_cancelling_a_job_that_never_started_is_harmless(self):
         job = fetcher.FetchJob([pack()], fetch=lambda p, prog, can: '/c')
         job.cancel()
+        # Asking is the caller's own act; whether it stopped the job is
+        # something the job says, and like everything else a caller reads it is
+        # published by poll().
+        job.poll()
+        settle(job)
         assert job.cancelled
 
 

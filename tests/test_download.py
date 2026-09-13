@@ -150,7 +150,7 @@ def test_a_url_is_fetched_through_the_resolver(tmp_path, monkeypatch):
     archive.write_bytes(_map_archive())
     calls = []
 
-    def fake_fetch(url, cache_dir=None, max_bytes=None):
+    def fake_fetch(url, cache_dir=None, max_bytes=None, **named):
         calls.append(url)
         return str(archive)
 
@@ -165,7 +165,7 @@ def test_a_url_unpacks_beneath_the_cache_directory(tmp_path, monkeypatch):
     archive = tmp_path / 'cached.pk3'
     archive.write_bytes(_map_archive())
     monkeypatch.setattr(download.resolver, 'fetch_to_cache',
-                        lambda url, cache_dir=None, max_bytes=None: str(archive))
+                        lambda url, cache_dir=None, max_bytes=None, **named: str(archive))
     cache = tmp_path / 'cache'
     path = download.resolve_target('https://example.invalid/m.pk3',
                                    cache_dir=str(cache))
@@ -216,10 +216,11 @@ def test_the_pack_lives_in_its_own_named_shared_directory(tmp_path, monkeypatch)
     archive = tmp_path / 'pack.zip'
     archive.write_bytes(_archive({'textures/base_wall/a.tga': b'x'}))
     monkeypatch.setattr(download.resolver, 'fetch_to_cache',
-                        lambda url, cache_dir=None, max_bytes=None: str(archive))
-    root = download.fetch_pack(download.pack_for_key('quake3-core'), str(tmp_path))
+                        lambda url, cache_dir=None, max_bytes=None, **named: str(archive))
+    pack = download.pack_for_key('quake3-core')
+    root = download.fetch_pack(pack, str(tmp_path))
     assert os.path.basename(root) == 'xcsv_hires'
-    assert download.CONTENT_SUBDIR in root
+    assert os.path.join('twig-bb', pack.directory) in root
     assert download.CACHE_SUBDIR not in root         # not among the map trees
 
 
@@ -237,7 +238,7 @@ def test_the_pack_is_not_downloaded_when_it_is_already_unpacked(tmp_path, monkey
     archive = tmp_path / 'pack.zip'
     archive.write_bytes(_archive({'textures/base_wall/a.tga': b'x'}))
     monkeypatch.setattr(download.resolver, 'fetch_to_cache',
-                        lambda url, cache_dir=None, max_bytes=None: str(archive))
+                        lambda url, cache_dir=None, max_bytes=None, **named: str(archive))
     first = download.fetch_pack(download.pack_for_key('quake3-core'), str(tmp_path))
     assert os.path.isfile(os.path.join(first, 'textures', 'base_wall', 'a.tga'))
     assert download.pack_root(download.pack_for_key('quake3-core'), str(tmp_path)) == first
@@ -250,7 +251,7 @@ def test_the_pack_unpacks_even_though_it_holds_no_map(tmp_path, monkeypatch):
     archive = tmp_path / 'pack.zip'
     archive.write_bytes(_archive({'textures/gothic_block/blocks10.jpg': b'x'}))
     monkeypatch.setattr(download.resolver, 'fetch_to_cache',
-                        lambda url, cache_dir=None, max_bytes=None: str(archive))
+                        lambda url, cache_dir=None, max_bytes=None, **named: str(archive))
     root = download.fetch_pack(download.pack_for_key('quake3-core'), str(tmp_path))
     assert os.path.isfile(os.path.join(root, 'textures', 'gothic_block',
                                        'blocks10.jpg'))
@@ -272,7 +273,7 @@ def test_both_packs_are_registered_with_size_and_copyright():
 def test_the_quake3_pack_is_offered_to_quake3_maps_only():
     """A version 38 map is not helped by Quake 3 replacement art."""
     families = {p.key: p.family for p in download.ASSET_PACKS}
-    assert families['quake3-core'] == 'quake3'
+    assert families['twig-bb/quake3-core'] == 'quake3'
 
 
 def test_the_openarena_maps_pack_is_registered():
@@ -313,10 +314,10 @@ def test_a_bz2_pack_unpacks_into_its_own_named_directory(tmp_path, monkeypatch):
     archive_path = tmp_path / 'maps.tar.bz2'
     archive_path.write_bytes(blob)
     monkeypatch.setattr(download.resolver, 'fetch_to_cache',
-                        lambda url, cache_dir=None, max_bytes=None: str(archive_path))
+                        lambda url, cache_dir=None, max_bytes=None, **named: str(archive_path))
     pack = download.pack_for_key('openarena-maps')
     root = download.fetch_pack(pack, str(tmp_path / 'cache'))
-    assert download.CONTENT_SUBDIR in root
+    assert os.path.join('twig-bb', pack.directory) in root
     assert os.path.isfile(os.path.join(
         root, 'openarena-maps-1.orig', 'pak1-maps', 'maps', 'oa.bsp'))
 
@@ -331,7 +332,7 @@ def test_a_tar_entry_that_would_escape_is_refused(tmp_path, monkeypatch):
     archive_path = tmp_path / 'evil.tar.bz2'
     archive_path.write_bytes(payload.getvalue())
     monkeypatch.setattr(download.resolver, 'fetch_to_cache',
-                        lambda url, cache_dir=None, max_bytes=None: str(archive_path))
+                        lambda url, cache_dir=None, max_bytes=None, **named: str(archive_path))
     with pytest.raises(download.UnsafeArchive):
         download.fetch_pack(download.pack_for_key('openarena-maps'),
                             str(tmp_path / 'cache'))
@@ -341,7 +342,7 @@ def test_a_tar_entry_that_would_escape_is_refused(tmp_path, monkeypatch):
 def test_a_pack_already_unpacked_is_not_fetched_again(tmp_path, monkeypatch):
     pack = download.pack_for_key('quake3-core')
     monkeypatch.setattr(download.resolver, 'fetch_to_cache',
-                        lambda url, cache_dir=None, max_bytes=None: str(
+                        lambda url, cache_dir=None, max_bytes=None, **named: str(
                             _write(tmp_path / 'p.zip',
                                    _archive({'textures/base/a.tga': b'x'}))))
     cache = str(tmp_path / 'cache')
@@ -416,7 +417,7 @@ def test_listing_the_maps_a_pack_holds(tmp_path):
 def test_the_openarena_maps_pack_names_the_texture_pack_it_needs():
     """The maps ship geometry and lightmaps only; the art is a separate,
     much larger download, so a maps-only fetch renders untextured."""
-    assert 'openarena-textures' in download.pack_for_key('openarena-maps').companions
+    assert 'twig-bb/openarena-textures' in download.pack_for_key('twig-bb/openarena-maps').needs
 
 
 def test_the_openarena_texture_pack_is_registered_and_honest_about_its_size():
@@ -427,12 +428,12 @@ def test_the_openarena_texture_pack_is_registered_and_honest_about_its_size():
 
 
 def test_the_quake3_pack_needs_nothing_else():
-    assert download.pack_for_key('quake3-core').companions == ()
+    assert download.pack_for_key('twig-bb/quake3-core').needs == ()
 
 
-def test_a_packs_companions_resolve_to_registered_packs():
+def test_a_packs_needs_resolve_to_registered_packs():
     for pack in download.ASSET_PACKS:
-        for key in pack.companions:
+        for key in pack.needs:
             assert download.pack_for_key(key) is not None
 
 
@@ -486,7 +487,7 @@ def test_a_pack_larger_than_the_resolvers_default_cap_is_still_fetched(tmp_path,
     in advance."""
     seen = {}
 
-    def _fetch(url, cache_dir=None, max_bytes=None):
+    def _fetch(url, cache_dir=None, max_bytes=None, **named):
         seen['max_bytes'] = max_bytes
         path = tmp_path / 'p.tar.bz2'
         with tarfile.open(path, 'w:bz2') as archive:
@@ -522,8 +523,8 @@ def test_the_openarena_base_data_pack_is_registered():
 
 
 def test_the_maps_pack_needs_both_the_art_and_the_scripts():
-    assert set(download.pack_for_key('openarena-maps').companions) == {
-        'openarena-textures', 'openarena-data'}
+    assert set(download.pack_for_key('twig-bb/openarena-maps').needs) == {
+        'twig-bb/openarena-textures', 'twig-bb/openarena-data'}
 
 
 def test_a_file_named_like_an_archive_that_is_not_one_is_skipped(tmp_path):
@@ -540,22 +541,92 @@ def test_a_family_and_map_shorthand_reaches_a_per_map_pack():
     single pack to name and falls through to `<family>-<map>`."""
     found = download.parse_pack_target('unvanquished:plat23')
     assert found is not None
-    assert found[0].key == 'unvanquished-plat23'
+    assert found[0].key == 'twig-bb/unvanquished-plat23'
     assert found[1] == 'plat23'
 
 
 def test_the_shorthand_ignores_an_extension_on_the_map_name():
     found = download.parse_pack_target('unvanquished:yocto.bsp')
-    assert found is not None and found[0].key == 'unvanquished-yocto'
+    assert found is not None and found[0].key == 'twig-bb/unvanquished-yocto'
 
 
 def test_a_direct_pack_key_still_wins_over_the_per_map_form():
     """The existing aliases must not be shadowed by the fallback."""
     found = download.parse_pack_target('openarena:oa_dm1')
-    assert found is not None and found[0].key == 'openarena-maps'
+    assert found is not None and found[0].key == 'twig-bb/openarena-maps'
 
 
 @pytest.mark.parametrize('target', ['https://example.com/map.pk3', 'C:/maps/x.bsp',
                                     'nosuch:whatever'])
 def test_the_shorthand_still_refuses_what_is_not_one(target):
     assert download.parse_pack_target(target) is None
+
+
+class TestContentAPreviousVersionUnpacked:
+    """A player who has fetched 450 MB of textures must not fetch them again.
+
+    Content used to be unpacked into one flat directory per pack; the engine's
+    store partitions by namespace, so what is already on disk is moved into
+    place rather than downloaded a second time. A move on one filesystem is a
+    rename and costs nothing.
+    """
+
+    def legacy(self, base, pack, *, files=('textures/x.tga',)):
+        where = os.path.join(base, download.LEGACY_CONTENT, pack.directory)
+        for name in files:
+            path = os.path.join(where, name)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w') as handle:
+                handle.write('x')
+        return where
+
+    def store(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(download, '_default_cache', lambda: str(tmp_path))
+        monkeypatch.setattr(download, '_adopted', set())
+        return download.store()
+
+    def test_it_is_found_where_the_store_now_looks(self, tmp_path, monkeypatch):
+        pack = download.pack_for_key('quake3-core')
+        self.legacy(str(tmp_path), pack, files=('textures/x.tga',))
+        store = self.store(tmp_path, monkeypatch)
+        root = store.root_for(pack)
+        assert root is not None and root == store.directory_for(pack)
+        assert os.path.isfile(os.path.join(root, 'textures', 'x.tga'))
+
+    def test_the_old_directory_is_left_empty_rather_than_copied(
+            self, tmp_path, monkeypatch):
+        pack = download.pack_for_key('quake3-core')
+        was = self.legacy(str(tmp_path), pack)
+        self.store(tmp_path, monkeypatch)
+        assert not os.path.exists(was), 'moved, not copied'
+
+    def test_content_already_in_the_store_is_not_overwritten(
+            self, tmp_path, monkeypatch):
+        """The store is what a later version wrote; the legacy tree is older."""
+        pack = download.pack_for_key('quake3-core')
+        monkeypatch.setattr(download, '_default_cache', lambda: str(tmp_path))
+        monkeypatch.setattr(download, '_adopted', set())
+        store = download.store()
+        kept = os.path.join(store.directory_for(pack), 'textures')
+        os.makedirs(kept)
+        with open(os.path.join(kept, 'newer.tga'), 'w') as handle:
+            handle.write('newer')
+        self.legacy(str(tmp_path), pack)
+        download._adopted.clear()
+        download.store()
+        assert os.path.isfile(os.path.join(kept, 'newer.tga'))
+        assert not os.path.exists(os.path.join(kept, 'x.tga'))
+
+    def test_nothing_to_adopt_is_not_an_error(self, tmp_path, monkeypatch):
+        store = self.store(tmp_path, monkeypatch)
+        assert download.adopt_legacy_content(store) == []
+
+    def test_it_is_done_once_per_store_rather_than_per_call(
+            self, tmp_path, monkeypatch):
+        """Every `pack_root` would otherwise walk the whole catalogue."""
+        pack = download.pack_for_key('quake3-core')
+        self.legacy(str(tmp_path), pack)
+        monkeypatch.setattr(download, '_default_cache', lambda: str(tmp_path))
+        monkeypatch.setattr(download, '_adopted', set())
+        assert len(download.adopt_legacy_content(download.store())) == 0, (
+            'the first store() already adopted it')

@@ -238,7 +238,11 @@ def levels_available(cache_dir: Optional[str] = None,
             continue
         art = _levelshots(root)
         for name in download.list_maps(root):
-            found.append(Level(name=name, target='%s:%s' % (pack.key, name),
+            # The short name, since a target is typed back on a command line
+            # and `pack:map` reads anything with a slash in the prefix as a
+            # path or a URL rather than as a pack.
+            found.append(Level(name=name,
+                               target='%s:%s' % (pack.key.split('/')[-1], name),
                                pack=pack.key, art=art.get(name, '')))
     return found
 
