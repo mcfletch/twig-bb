@@ -190,3 +190,43 @@ class TestPaintingOneModelFourWays:
         assert art.recolour(node, (0.2, 0.55, 0.95)) == 2
         for shape in art.shapes(node):
             assert tuple(shape.appearance.material.baseColor) == (0.2, 0.55, 0.95)
+
+
+class TestWhereTheGamesOwnArtComesFrom:
+    """15 MB of characters, weapons and pickups, which PyPI should not carry.
+
+    The art is a base pack now -- attached to a release and fetched before the
+    first match. Both sources are honoured on purpose: the art leaves the wheel
+    when the release carrying it exists, and until that day an install has to
+    work anyway.
+    """
+
+    def test_it_is_the_wheel_until_the_pack_is_here(self, tmp_path):
+        from twig_bb import art, download
+        where = art.assets_directory(cache_dir=str(tmp_path))
+        assert os.path.isdir(os.path.join(where, 'characters'))
+        assert not where.startswith(str(tmp_path))
+        assert where == download.art.ASSETS if hasattr(download, 'art') else True
+
+    def test_and_the_pack_once_it_is(self, tmp_path):
+        from twig_bb import art, download
+        pack = download.pack_for_key('twig-bb/art')
+        assert pack is not None and pack.base
+        root = download.store(str(tmp_path)).directory_for(pack)
+        os.makedirs(os.path.join(root, pack.marker), exist_ok=True)
+        assert art.assets_directory(cache_dir=str(tmp_path)) == root
+
+    def test_the_base_pack_carries_a_digest(self):
+        """The one thing the game cannot start without: a truncated download of
+        it should be a refusal, not a missing character."""
+        from twig_bb import download
+        pack = download.pack_for_key('twig-bb/art')
+        assert len(pack.sha256) == 64
+
+    def test_a_first_run_asks_for_it(self, tmp_path):
+        from OpenGLContext.contentpacks import fetch
+
+        from twig_bb import download
+        wanted = fetch.missing_base(list(download.ASSET_PACKS),
+                                    download.store(str(tmp_path)))
+        assert [one.key for one in wanted] == ['twig-bb/art']

@@ -52,6 +52,7 @@ from omi_audio import model as audiomodel
 from omi_audio import synth
 
 from . import arena as arenamod
+from . import art
 from . import game as gamemod
 
 log = logging.getLogger(__name__)
@@ -73,7 +74,10 @@ RUMBLE = 'rumble'
 #: Where sound content that ships with this package would live.  Shared with
 #: :mod:`twig_bb.weapons`, because a weapon's model and a weapon's sound are
 #: the same kind of thing: art named by the table.
-ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets')
+#: The same root :mod:`twig_bb.art` resolves -- the base pack once it is
+#: fetched, the copy in the wheel until then. A weapon's sound travels with
+#: its model.
+ASSETS = art.assets_directory()
 
 #: The keys the game asks for by name.  A weapon may name its own fire sound
 #: instead of :data:`FIRE`, which is what makes a shotgun sound unlike a rifle.

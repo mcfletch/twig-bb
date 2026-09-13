@@ -26,10 +26,34 @@ from typing import Any, Iterator, Optional, Sequence
 
 log = logging.getLogger(__name__)
 
-__all__ = ['ASSETS', 'brighten', 'path_for', 'load', 'recolour', 'shapes']
+__all__ = ['ASSETS', 'IN_WHEEL', 'assets_directory', 'brighten', 'path_for',
+           'load', 'recolour', 'shapes']
 
-#: Where the art that ships with this package lives.
-ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets')
+#: The copy that ships inside the package, and the fallback while one does.
+IN_WHEEL = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets')
+
+
+def assets_directory(cache_dir: Optional[str] = None) -> str:
+    """Where this game's own art is read from.
+
+    The base pack once it has been fetched, and the copy inside the wheel until
+    then. Both, deliberately: 15 MB of characters and weapons is not something
+    an index should carry, so the art leaves the wheel when the release holding
+    it exists -- and until that day an install has to work anyway. When it does
+    leave, this is the only place that has to stop looking there.
+    """
+    from . import download
+    pack = download.pack_for_key('twig-bb/art')
+    if pack is not None:
+        root = download.store(cache_dir).root_for(pack)
+        if root is not None:
+            return str(root)
+    return IN_WHEEL
+
+
+#: Where the art this game is played with lives, resolved once at import the
+#: way it always was. :func:`assets_directory` is the live answer.
+ASSETS = assets_directory()
 
 
 def path_for(relative: str) -> str:

@@ -49,10 +49,27 @@
   "",
   "'needs' names the packs an entry is incomplete without.  Declared here",
   "rather than read out of a map's own DEPS after download, so the whole set",
-  "is sized, consented to and fetched as one."
+  "is sized, consented to and fetched as one.",
+  "",
+  "'twig-bb/art' is the base pack: this game's own characters, weapons and",
+  "pickups, which used to ship inside the wheel at 15 MB.  PyPI carries the",
+  "code; the art is attached to a release and fetched before the first match."
  ],
  "namespace": "twig-bb",
  "packs": [
+  {
+   "key": "twig-bb/art",
+   "title": "twig-bb art",
+   "url": "https://github.com/mcfletch/twig-bb/releases/download/content-v1/twig-bb-art.tar.gz",
+   "directory": "twig-bb-art",
+   "archive": "tar",
+   "approximate_bytes": 10226876,
+   "sha256": "3cb4172d54a130b181566e11801fb10fba6c3e8228219e249051a53720fa1738",
+   "base": true,
+   "copyright": "The twig-bb project, BSD-3-Clause; characters, weapons and pickups modelled for this game.",
+   "notes": "The characters, weapons and pickups the game is played with. Fetched before the first match, because a game with none of it has nothing to draw.",
+   "marker": "characters"
+  },
   {
    "key": "twig-bb/quake3-core",
    "title": "Quake 3 replacement textures",
