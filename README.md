@@ -671,6 +671,21 @@ content facility — see
 for the registry format, every field, and how a set of packs from elsewhere is
 offered alongside these.
 
+One entry in it is ours: `twig-bb/art`, the characters, weapons and pickups the
+game is played with, which is a base pack fetched before the first match rather
+than 15 MB inside the wheel. `./release-assets.py` builds it, writes that entry
+from the archive it built, and publishes it:
+
+```bash
+./release-assets.py                 # build the archive, write the entry
+./release-assets.py --install       # ...and install it in this machine's store
+./release-assets.py --push          # ...and attach it to the release tag
+```
+
+`--install` is how the pack is played against before there is a release to
+fetch it from. The other eighteen entries are other people's packages on other
+people's servers, and nothing here rewrites them.
+
 The OpenArena release is split, so what one map needs spans several packs:
 fetching only the maps gets you geometry and baked lighting rendered in grey.
 The viewer says so and names the packs that would fix it. The Debian *source*
