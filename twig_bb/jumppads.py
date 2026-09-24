@@ -329,11 +329,10 @@ def push_volumes(source: Any, scene_gravity: Optional[float] = None
 class PushSystem:
     """Runs push volumes as physics triggers against a player-sized box.
 
-    A sensor-only world holds one trigger body per volume and one dynamic body
-    standing in for the player, posed by hand each frame.  Two constraints
-    shape that: the broadphase skips pairs of two non-dynamic bodies, so the
-    player proxy must be dynamic; and a body posed by hand must be kept awake
-    or it stops generating events.
+    A sensor-only world holds one trigger body per volume and one kinematic
+    body standing in for the player, placed each frame where the player is.
+    A kinematic body enters triggers and is never moved by the world, so the
+    stand-in is exactly where it was put.
     """
 
     def __init__(self, volumes: Sequence[PushVolume],
@@ -357,10 +356,9 @@ class PushSystem:
         size = to_scene_directions(np.array([player_size]))[0] * SCENE_SCALE
         player_shape = self.world.add_shape(model.Shape.box(tuple(np.abs(size))))
         # §5.6: the test is box-against-box, so the proxy is a box even though
-        # the avatar itself is a capsule.  Dynamic with no gravity so it stays
-        # exactly where it is posed.
+        # the avatar itself is a capsule.
         self.player = self.world.add_body(
-            motion=model.Motion(type=model.DYNAMIC, mass=1.0, gravityFactor=0.0),
+            motion=model.Motion(type=model.KINEMATIC),
             collider=model.Collider(shape=player_shape))
         self.world.add_trigger_listener(self._on_trigger)
 
@@ -386,8 +384,7 @@ class PushSystem:
             self._events.clear()
             return None
         self._events.clear()
-        self.world.position[self.player] = np.asarray(position, dtype='d')
-        self.world.wake(self.player)
+        self.world.place_body(self.player, position=position)
         self.world.step(dt)
         return self._resolve()
 
