@@ -155,6 +155,36 @@ class TestWhatCanBePlayedNow:
         assert match.levels_available(cache_dir=str(tmp_path))[0].pack == pack.key
 
 
+    def test_a_target_names_the_pack_it_came_from_and_no_other(self,
+                                                               tmp_path):
+        """A pack from another publisher with the same short name as one of
+        ours must not be read back as ours."""
+        from dataclasses import replace
+        from twig_bb import download
+        ours = download.pack_for_key('openarena-maps')
+        theirs = replace(ours, key='others/openarena-maps')
+        root = tmp_path / 'packs' / 'others' / theirs.directory / 'maps'
+        root.mkdir(parents=True)
+        (root / 'oa_dm1.bsp').write_bytes(b'IBSP')
+        level = match.levels_available(cache_dir=str(tmp_path),
+                                       packs=[theirs])[0]
+        found = download.parse_pack_target(level.target)
+        assert found is None or found[0].key == theirs.key
+
+    def test_a_whole_key_is_a_target_too(self):
+        from twig_bb import download
+        found = download.parse_pack_target('twig-bb/openarena-maps:oa_dm1')
+        assert found is not None and found[0].key == 'twig-bb/openarena-maps'
+        assert download.parse_pack_target('maps/oa_dm1.bsp:x') is None
+
+    def test_every_target_of_ours_reads_back_as_its_pack(self):
+        from twig_bb import download
+        for pack in download.ASSET_PACKS:
+            target = match.level_target(pack, 'somewhere')
+            found = download.parse_pack_target(target)
+            assert found is not None and found[0].key == pack.key, target
+
+
 class TestWhereALevelsPictureLives:
     """Two conventions, because the content this reads uses two.
 

@@ -158,14 +158,20 @@ PACK_ALIASES = {'openarena': 'openarena-maps', 'oa': 'openarena-maps'}
 def parse_pack_target(target: str) -> Optional[Tuple[AssetPack, str]]:
     """Read ``pack:mapname`` and return the pack and the map name.
 
-    None for anything else, including URLs and Windows drive letters, both of
+    ``pack`` is one of this game's packs by its short name or an alias, or
+    any registered pack by its whole ``namespace/name`` key. None for anything
+    else, including URLs and Windows drive letters, both of
     which have the same shape and are not this.
     """
     prefix, _, name = target.partition(':')
-    if not name or '/' in prefix or '\\' in prefix:
+    if not name or '\\' in prefix or name.startswith(('/', '\\')):
         return None
-    if name.startswith(('/', '\\')):
-        return None
+    if '/' in prefix:
+        # A whole key, as a pack from another publisher is named; anything
+        # else with a slash before the colon is a path.
+        found = pack_for_key(prefix)
+        return (found, name) if found is not None and found.key == prefix \
+            else None
     pack = pack_for_key(PACK_ALIASES.get(prefix.lower(), prefix.lower()))
     if pack is None:
         # Content published one package per map has no single pack to name, so

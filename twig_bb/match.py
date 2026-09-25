@@ -238,13 +238,22 @@ def levels_available(cache_dir: Optional[str] = None,
             continue
         art = _levelshots(root)
         for name in download.list_maps(root):
-            # The short name, since a target is typed back on a command line
-            # and `pack:map` reads anything with a slash in the prefix as a
-            # path or a URL rather than as a pack.
-            found.append(Level(name=name,
-                               target='%s:%s' % (pack.key.split('/')[-1], name),
+            found.append(Level(name=name, target=level_target(pack, name),
                                pack=pack.key, art=art.get(name, '')))
     return found
+
+
+def level_target(pack: Any, name: str) -> str:
+    """What the loader is handed for map ``name`` in ``pack``: ``pack:map``.
+
+    This game's own packs by their short name, which is what a player types;
+    any other pack by its whole key, so a short name another publisher shares
+    with one of ours is not read back as ours.
+    """
+    from . import catalog
+    namespace, _, short = pack.key.partition('/')
+    return '%s:%s' % (short if namespace == catalog.NAMESPACE else pack.key,
+                      name)
 
 
 def _levelshots(root: str) -> Dict[str, str]:
