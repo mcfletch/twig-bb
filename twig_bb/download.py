@@ -322,9 +322,10 @@ def fetch(url: str, cache_dir: Optional[str] = None,
           max_bytes: Optional[int] = None) -> str:
     """Download ``url`` through the resolver and return the cached file's path."""
     log.info('fetching %s', url)
+    checked = resolver.checked_url(url)
     if max_bytes is None:
-        return resolver.fetch_to_cache(url, cache_dir=cache_dir)
-    return resolver.fetch_to_cache(url, cache_dir=cache_dir, max_bytes=max_bytes)
+        return resolver.fetch_to_cache(checked, cache_dir=cache_dir)
+    return resolver.fetch_to_cache(checked, cache_dir=cache_dir, max_bytes=max_bytes)
 
 
 def unpack(archive: str, directory: str, map_name: Optional[str] = None,
