@@ -207,7 +207,7 @@ class TestWhereTheGamesOwnArtComesFrom:
     """
 
     def test_it_is_the_wheel_until_the_pack_is_here(self, tmp_path):
-        from twig_bb import art, download
+        from twig_bb import art
         where = art.assets_directory(cache_dir=str(tmp_path))
         assert os.path.isdir(os.path.join(where, 'characters'))
         assert where == art.IN_WHEEL
