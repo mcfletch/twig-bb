@@ -112,7 +112,7 @@ class TestTheCastIsPosedTogether:
     them cost about what one of them used to.
     """
 
-    IDS = ['bot0', 'bot1', 'bot2', 'bot3']
+    IDS = ('bot0', 'bot1', 'bot2', 'bot3')
 
     def _cast(self):
         from twig_bb import characters as charactersmod

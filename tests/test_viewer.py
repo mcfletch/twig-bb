@@ -1181,7 +1181,7 @@ def test_the_settings_and_binding_screens_have_keys():
 class _KeyStub(eventhandlermixin.EventHandlerMixin):
     """The viewer's key bindings over a real event registry, with no window."""
 
-    EventManagerClasses = [('keyboard', keyboardevents.KeyboardEventManager)]
+    EventManagerClasses = (('keyboard', keyboardevents.KeyboardEventManager),)
     TimeManagerClass = None
     drawing = False
 

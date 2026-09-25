@@ -24,7 +24,7 @@ import logging
 import os
 import tempfile
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 
 from vrml import field, node
 
@@ -59,7 +59,7 @@ class MatchSetup(node.Node):
     #: Minutes that end the match; 0 for no time limit.
     timeLimit = field.newField('timeLimit', 'SFFloat', 1, 10.0)
 
-    UI_HINTS: dict[str, dict[str, Any]] = {
+    UI_HINTS: ClassVar[dict[str, dict[str, Any]]] = {
         'level': {'skip': True},        # chosen from a list, not typed
         'bots': {'label': 'Opponents', 'minimum': 0, 'maximum': 15, 'step': 1},
         'difficulty': {'label': 'Difficulty', 'options': DIFFICULTIES,

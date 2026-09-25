@@ -21,11 +21,11 @@ from twig_bb.player import PlayerState
 
 class FakeWorld:
     triangle_count = 12345
-    batches = [object(), object()]
+    batches = (object(), object())
 
 
 class FakeAtlas:
-    pages = [object()]
+    pages = (object(),)
 
 
 class FakeLoaded:
@@ -373,8 +373,8 @@ class TestPhysicsSection:
 
     def test_it_counts_bodies_once_there_is_a_world(self, viewer):
         class World:
-            bodies = [object(), object(), object()]
-            contacts = []
+            bodies = (object(), object(), object())
+            contacts = ()
 
         viewer._world = World()
         twigdebug.install(viewer)

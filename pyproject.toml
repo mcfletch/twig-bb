@@ -119,6 +119,9 @@ select = [
     "BLE001", "S110", "S112",
     # Every noqa silences something.
     "RUF100",
+    # A mutable class attribute is a ClassVar the engine reads from the class,
+    # or it is made immutable.
+    "RUF012",
 ]
 ignore = ["E501"]
 

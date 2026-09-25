@@ -28,7 +28,7 @@ import logging
 import math
 import random
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 from collections.abc import Sequence
 
 import numpy as np
@@ -127,7 +127,7 @@ class Difficulty(node.Node):
     #: itself and anything it fires at.
     blastSense = field.newField('blastSense', 'SFFloat', 1, 0.6)
 
-    UI_HINTS = {
+    UI_HINTS: ClassVar[dict[str, dict[str, Any]]] = {
         'name': {'skip': True},
         'reactionTime': {'label': 'Reaction (s)', 'minimum': 0.0,
                          'maximum': 2.0, 'step': 0.05},

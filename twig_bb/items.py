@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 from collections.abc import Iterable, Sequence
 
 import numpy as np
@@ -184,7 +184,7 @@ class ItemKind(node.Node):
     #: it is and where its middle is -- are independent.
     modelOffset = vfield.newField('modelOffset', 'SFVec3f', 1, (0.0, 0.0, 0.0))
 
-    UI_HINTS = {
+    UI_HINTS: ClassVar[dict[str, dict[str, Any]]] = {
         'key': {'skip': True},
         'classnames': {'skip': True},
         'model': {'skip': True},
