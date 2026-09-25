@@ -18,7 +18,9 @@ import struct
 import numpy as np
 import pytest
 
+from twig_bb import game, items
 from twig_bb.visibility import NO_CLUSTER, Visibility
+from twig_bb.worldgeometry import to_scene_points
 
 
 def vectors(rows):
@@ -145,33 +147,27 @@ class TestWhichPickupsAreWorthDrawing:
     """``game.ItemRooms`` over a map's pickups, from where the player stands."""
 
     def pickups(self, *positions):
-        from twig_bb import items
         kind = items.ItemKind(key='test', title='TEST', health=25)
         return items.Pickups([
             items.Pickup(kind=kind, position=np.array(at, dtype='d'))
             for at in positions])
 
     def rooms(self, seen, *positions):
-        from twig_bb import game
         return game.ItemRooms(two_rooms(seen=seen), self.pickups(*positions))
 
     def test_a_pickup_in_a_room_the_camera_sees_is_drawn(self):
-        from twig_bb.worldgeometry import to_scene_points
         here = to_scene_points([[10.0, 0.0, 0.0]])[0]
         there = to_scene_points([[20.0, 0.0, 0.0]])[0]
         found = self.rooms(((0,), (1,)), there)
         assert list(found.drawable(here)) == [True]
 
     def test_a_pickup_in_a_room_it_cannot_see_is_not(self):
-        from twig_bb.worldgeometry import to_scene_points
         here = to_scene_points([[10.0, 0.0, 0.0]])[0]
         behind = to_scene_points([[-20.0, 0.0, 0.0]])[0]
         found = self.rooms(((0,), (1,)), behind)
         assert list(found.drawable(here)) == [False]
 
     def test_a_map_with_no_visibility_draws_everything(self):
-        from twig_bb import game
-        from twig_bb.worldgeometry import to_scene_points
         found = game.ItemRooms(Visibility(), self.pickups((0.0, 0.0, 0.0)))
         assert found.drawable(to_scene_points([[0.0, 0.0, 0.0]])[0]) is None
 
@@ -179,6 +175,5 @@ class TestWhichPickupsAreWorthDrawing:
         assert self.rooms(((0,), (1,)), (0.0, 0.0, 0.0)).drawable(None) is None
 
     def test_a_level_with_no_pickups_is_no_answer(self):
-        from twig_bb.worldgeometry import to_scene_points
         assert self.rooms(((0,), (1,))).drawable(
             to_scene_points([[10.0, 0.0, 0.0]])[0]) is None

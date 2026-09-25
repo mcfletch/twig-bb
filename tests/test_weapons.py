@@ -7,11 +7,13 @@ a gap in pixels, and the selection rules the number keys and the wheel drive.
 
 from __future__ import annotations
 
+import glob
 import math
+import os
 
 import pytest
 
-from twig_bb import art, weapons
+from twig_bb import art, projectiles, weapons
 
 
 class TestTable:
@@ -49,7 +51,6 @@ class TestTable:
             assert str(weapon.model).endswith('.glb')
 
     def test_the_stand_in_model_is_actually_there(self):
-        import os
         for weapon in weapons.default_table().weapons:
             assert os.path.exists(weapons.model_path(weapon)), weapon.key
 
@@ -238,7 +239,6 @@ class TestTheWeaponModels:
         assert len(models) == len(set(models))
 
     def test_each_of_them_is_on_disk(self):
-        import os
         for weapon in weapons.default_table().weapons:
             assert os.path.exists(weapons.model_path(weapon)), weapon.key
 
@@ -258,14 +258,11 @@ class TestEveryModelIsCredited:
     """
 
     def credits(self):
-        import os
         path = os.path.join(art.IN_WHEEL, 'weapons', 'CREDITS.md')
         with open(path, encoding='utf-8') as source:
             return source.read()
 
     def shipped_models(self):
-        import glob
-        import os
         return sorted(glob.glob(os.path.join(art.IN_WHEEL, 'weapons',
                                              '*.glb')))
 
@@ -273,21 +270,17 @@ class TestEveryModelIsCredited:
         assert self.shipped_models()
 
     def test_every_shipped_model_is_named_in_the_credits(self):
-        import os
         text = self.credits()
         for path in self.shipped_models():
             assert os.path.basename(path) in text, os.path.basename(path)
 
     def test_every_model_the_table_names_is_credited(self):
-        import os
         text = self.credits()
         for weapon in weapons.default_table().weapons:
             assert os.path.basename(str(weapon.model)) in text
 
     def drawn_models(self):
         """Every model in this directory something asks to be drawn."""
-        import os
-        from twig_bb import projectiles
         named = [str(weapon.model) for weapon in weapons.default_table().weapons]
         named += [str(kind.model) for kind in projectiles.default_table().kinds]
         return {os.path.basename(name) for name in named if name}
@@ -299,7 +292,6 @@ class TestEveryModelIsCredited:
         what is held, and what is thrown -- so a file here that neither names
         is one to delete rather than to carry.
         """
-        import os
         shipped = {os.path.basename(path) for path in self.shipped_models()}
         assert shipped == self.drawn_models()
 
@@ -310,7 +302,6 @@ class TestEveryModelIsCredited:
 
     def test_the_models_are_small_enough_to_belong_in_a_repository(self):
         """Source art carries 2048px maps; a game model has no business doing so."""
-        import os
         for path in self.shipped_models():
             megabytes = os.path.getsize(path) / 1e6
             assert megabytes < 1.5, '%s is %.1f MB' % (os.path.basename(path),
@@ -318,7 +309,5 @@ class TestEveryModelIsCredited:
 
     def test_each_model_carries_whatever_textures_it_needs(self):
         """Self-contained .glb: no sidecar files to lose on the way in."""
-        import glob
-        import os
         loose = glob.glob(os.path.join(art.IN_WHEEL, 'weapons', '*', '*'))
         assert loose == [], 'a model depends on files beside it: %r' % (loose,)

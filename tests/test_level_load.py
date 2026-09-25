@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import glob
 import os
+import struct
 
 import pytest
 
-from twig_bb import viewer, weapons
+from twig_bb import q3bsp, viewer, weapons
 
 
 def config(**over):
@@ -46,10 +47,6 @@ def _a_supported_map():
     of formats twig-bb does not read; picking the first name off the disk tests
     the loader against a file it was never meant to open.
     """
-    import struct
-
-    from twig_bb import q3bsp
-
     for path in sorted(glob.glob(os.path.expanduser(
             '~/.config/OpenGLContext/twig-bb-maps/*/maps/*.bsp'))):
         with open(path, 'rb') as handle:

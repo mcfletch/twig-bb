@@ -36,6 +36,8 @@ import os
 import sys
 from typing import Any, Optional
 
+from PIL import Image
+
 #: What an imported model's maps are resampled to unless told otherwise.  Big
 #: enough that a weapon held at the camera still reads, small enough to commit.
 DEFAULT_TEXTURE_SIZE = 512
@@ -73,7 +75,6 @@ def resample(data: bytes, limit: int) -> Optional[bytes]:
     Re-encoded as PNG regardless of what it arrived as, because the sources are
     PNG and a second format in the file buys nothing.
     """
-    from PIL import Image
     image = Image.open(io.BytesIO(data))
     if max(image.size) <= limit:
         return None
@@ -199,7 +200,7 @@ def rebuild(gltf: Any, replacements: dict) -> None:
 def prepare(source: str, target: str, limit: int = DEFAULT_TEXTURE_SIZE,
             strip: bool = False, fill: float = DEFAULT_FILL) -> str:
     """Write a trimmed copy of ``source`` to ``target``; returns what it did."""
-    from pygltflib import GLTF2
+    from pygltflib import GLTF2  # noqa: PLC0415 pygltflib is a tool dependency the game does not declare
 
     gltf = GLTF2().load(source)
     before = os.path.getsize(source)

@@ -7,7 +7,11 @@ import pytest
 
 from twig_bb.surfaces import SurfaceStyle
 from twig_bb.worldgeometry import (
-    GeometryBuilder, SCENE_SCALE, to_scene_directions, to_scene_points,
+    SCENE_SCALE,
+    GeometryBuilder,
+    orient_triangles,
+    to_scene_directions,
+    to_scene_points,
 )
 
 
@@ -247,7 +251,6 @@ def test_triangles_are_wound_to_agree_with_their_surface_normal():
     renderer's, and a reader may reverse it uniformly.  Deriving the sense from
     each face's own outward normal decides it from the data rather than from an
     assumption about either engine."""
-    from twig_bb.worldgeometry import orient_triangles
     positions = np.array([(0, 0, 0), (1, 0, 0), (0, 1, 0)], 'f')
     up = np.tile(np.array([0, 0, 1], 'f'), (3, 1))
     for winding in ([0, 1, 2], [0, 2, 1]):
@@ -258,7 +261,6 @@ def test_triangles_are_wound_to_agree_with_their_surface_normal():
 
 def test_orientation_is_decided_per_triangle():
     """One reversed triangle among correct ones is fixed on its own."""
-    from twig_bb.worldgeometry import orient_triangles
     positions = np.array([(0, 0, 0), (1, 0, 0), (0, 1, 0), (1, 1, 0)], 'f')
     up = np.tile(np.array([0, 0, 1], 'f'), (4, 1))
     indices = np.array([0, 1, 2, 1, 2, 3], np.uint32)        # second is reversed
@@ -268,7 +270,6 @@ def test_orientation_is_decided_per_triangle():
 
 def test_a_degenerate_triangle_is_left_alone():
     """A zero-area triangle has no normal to agree or disagree with."""
-    from twig_bb.worldgeometry import orient_triangles
     positions = np.array([(0, 0, 0), (1, 0, 0), (2, 0, 0)], 'f')
     up = np.tile(np.array([0, 0, 1], 'f'), (3, 1))
     assert orient_triangles(np.array([0, 1, 2], np.uint32), positions, up).tolist() \

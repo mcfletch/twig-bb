@@ -10,7 +10,11 @@ and a number on the audio engine, and both are data.
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
+from omi_audio.device import NullDevice
+from omi_audio.engine import AudioEngine
+from OpenGLContext.audio import scene as audioscene
 
 from twig_bb import liquids, underwater
 
@@ -30,10 +34,6 @@ class FakeContext:
 @pytest.fixture
 def context():
     """A context with a real audio engine attached the way one really is."""
-    from OpenGLContext.audio import scene as audioscene
-    from omi_audio.device import NullDevice
-    from omi_audio.engine import AudioEngine
-
     made = FakeContext()
     audioscene._engines[made] = AudioEngine(device=NullDevice(sample_rate=8000),  # noqa: SLF001 the engine has no public way to give a context an audio engine
                                             voices=4)
@@ -42,12 +42,10 @@ def context():
 
 
 def muffle(context):
-    from OpenGLContext.audio import scene as audioscene
     return audioscene.existing_engine(context).muffle
 
 
 def pool(kind, lo=(0, 0, 0), hi=(10, 5, 10)):
-    import numpy as np
     return liquids.LiquidVolumes([
         liquids.LiquidVolume(mins=np.array(lo, 'd'), maxs=np.array(hi, 'd'),
                              kind=kind)])
@@ -165,8 +163,6 @@ class TestTheWholeStepFromAViewer:
         A machine with no audio has no engine on its context at all, and
         walking into a pool must not be the thing that tries to make one.
         """
-        from OpenGLContext.audio import scene as audioscene
-
         silent = FakeContext()
         underwater.update(silent, pool(liquids.WATER), (5, 2, 5))
         assert silent.fog.visibilityRange > 0.0

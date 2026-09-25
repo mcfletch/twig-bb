@@ -30,16 +30,16 @@ load; see :mod:`twig_bb.sounds`.
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
 from collections.abc import Iterable
+from typing import Any, Optional
 
 import numpy as np
-
 from OpenGLContext.scenegraph.audio import AudioEmitter, AudioSource
 from OpenGLContext.scenegraph.group import Group
 from OpenGLContext.scenegraph.transform import Transform
 
 from .entities import Entity
+from .sounds import SoundLibrary
 from .worldgeometry import to_scene_points
 
 log = logging.getLogger(__name__)
@@ -78,7 +78,6 @@ RANDOM_IS_SYMMETRIC = True
 def from_map(loaded: Any, library: Optional[Any] = None) -> Group:
     """Every speaker of a loaded map, as one group to put in the scene."""
     if library is None:
-        from .sounds import SoundLibrary
         library = SoundLibrary(loaded.roots)
     return from_entities(loaded.entities, library)
 

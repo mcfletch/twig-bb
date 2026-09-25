@@ -137,7 +137,6 @@ def test_opus_is_searched_for_as_well(tmp_path):
     A map there names `sound/x/y.wav` and ships `y.opus`, so the extension
     being advisory (``SPEC-Q3ENTITIES §1.2.2``) is what finds it at all.
     """
-    from twig_bb.sounds import SoundLibrary
     directory = tmp_path / 'sound' / 'yocto'
     directory.mkdir(parents=True)
     (directory / 'motor1.opus').write_bytes(b'OggS-not-real-audio')
@@ -147,7 +146,6 @@ def test_opus_is_searched_for_as_well(tmp_path):
 
 def test_a_wav_still_wins_over_an_opus_beside_it(tmp_path):
     """The order is most-likely-first, and `.opus` is the newcomer."""
-    from twig_bb.sounds import SoundLibrary
     directory = tmp_path / 'sound'
     directory.mkdir(parents=True)
     (directory / 'x.opus').write_bytes(b'OggS')

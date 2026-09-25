@@ -7,6 +7,8 @@ long before there is a network to send it over.  All of it is arithmetic.
 
 from __future__ import annotations
 
+import copy
+
 import pytest
 
 from twig_bb import weapons
@@ -37,7 +39,6 @@ class TestStartingOut:
 
     def test_the_state_can_be_copied_whole(self, player):
         """§11: a thing that can be copied can be snapshotted and compared."""
-        import copy
         clone = copy.deepcopy(player)
         clone.health = 1
         assert player.health != 1

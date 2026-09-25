@@ -14,15 +14,27 @@ from unittest import mock
 
 import numpy as np
 import pytest
-
 from omi_physics import model
 from omi_physics.character import CharacterCapabilities
 from omi_physics.world import PhysicsWorld
-
+from OpenGLContext import visitor
 from OpenGLContext.scenegraph.box import Box
+from vrml.vrml97 import nodetypes
 
-from twig_bb import (arena, art, avatar, bots, characters, game,
-                        match as matchmod, walkers, weapons)
+from twig_bb import (
+    arena,
+    art,
+    avatar,
+    bots,
+    characters,
+    falling,
+    game,
+    items,
+    projectiles,
+    walkers,
+    weapons,
+)
+from twig_bb import match as matchmod
 
 
 class FakeSpawn:
@@ -481,7 +493,6 @@ class TestDrawingWhatTheMapPlaced:
     """A map places fifty of these on average, so they are made once."""
 
     def pickups(self, count=2, colour=(1.0, 0.0, 0.0), key='test', **named):
-        from twig_bb import items
         kind = items.ItemKind(key=key, title='TEST', health=25,
                               colour=colour, **named)
         return items.Pickups([
@@ -543,13 +554,11 @@ class TestDrawingAPickupAsItsModel:
     """A kind that names a model is drawn as one; anything else is a box."""
 
     def kind(self, **named):
-        from twig_bb import items
         named.setdefault('key', 'test')
         named.setdefault('colour', (0.2, 0.55, 0.95))
         return items.ItemKind(title='TEST', health=25, **named)
 
     def medikit(self, **named):
-        from twig_bb import items
         return self.kind(**dict(items.MEDPACK, **named))
 
     def test_a_kind_with_no_model_is_still_a_box(self):
@@ -588,7 +597,6 @@ class TestDrawingAPickupAsItsModel:
 
     def test_art_that_came_coloured_keeps_its_colours(self):
         """A launcher in a red bubble is a launcher, not a red launcher."""
-        from twig_bb import items
         look = game.item_look(self.kind(colour=(0.9, 0.2, 0.15),
                                         **dict(items.LAUNCHER_PICKUP)))
         painted = {tuple(round(float(value), 3)
@@ -598,7 +606,6 @@ class TestDrawingAPickupAsItsModel:
 
     def test_but_it_still_carries_its_own_light(self):
         """Unlit maps: art that is not repainted still may not be a silhouette."""
-        from twig_bb import items
         look = game.item_look(self.kind(colour=(0.9, 0.2, 0.15),
                                         **dict(items.LAUNCHER_PICKUP)))
         assert any(max(shape.appearance.material.emissiveColor) > 0.0
@@ -612,7 +619,6 @@ class TestDrawingAPickupAsItsModel:
 
     def test_one_kind_is_one_subtree_however_many_a_map_places(self):
         """Fifty pickups a map, several of a kind; one medikit, not eight."""
-        from twig_bb import items
         kind = self.medikit()
         where = items.Pickups([
             items.Pickup(kind=kind, position=np.array([index * 4.0, 1.0, 0.0]))
@@ -621,7 +627,6 @@ class TestDrawingAPickupAsItsModel:
         assert len({id(body.children[0]) for body in bodies}) == 1
 
     def test_two_kinds_are_two_subtrees_so_they_can_differ_in_colour(self):
-        from twig_bb import items
         where = items.Pickups([
             items.Pickup(kind=self.medikit(key='a', colour=(1.0, 0.0, 0.0)),
                          position=np.array([0.0, 1.0, 0.0])),
@@ -646,7 +651,6 @@ class TestWhatABurstDoesToSomebodyStandingOnIt:
     """
 
     def fire(self, at, standing, aim=None):  # noqa: ARG002 a stand-in for `fire`, keeping its signature
-        from twig_bb import projectiles
         world = floor()
         found = arena.Arena(weapons=weapons.default_table(), fragLimit=15,
                             timeLimit=10.0)
@@ -691,7 +695,6 @@ class TestDrawingWhatIsInFlight:
     """
 
     def flight(self, count=0):
-        from twig_bb import projectiles
         table = projectiles.default_table()
         made = projectiles.Projectiles(table, capacity=4)
         for index in range(count):
@@ -717,19 +720,16 @@ class TestDrawingWhatIsInFlight:
 
     def test_every_kind_gets_a_model_of_its_own(self):
         """A grenade is not a rocket, and neither is a ball."""
-        from twig_bb import projectiles
         group, bodies = game.projectile_bodies()
         assert set(bodies) == {projectiles.ROCKET, projectiles.GRENADE}
         assert len(group.children) == len(bodies)
 
     def test_nothing_in_the_air_draws_nothing(self):
-        from twig_bb import projectiles
         _group, bodies = game.projectile_bodies()
         game.move_projectiles(self.flight(), bodies)
         assert self.drawn(bodies[projectiles.ROCKET]) == 0
 
     def test_a_copy_is_drawn_for_each_thing_of_that_kind_aloft(self):
-        from twig_bb import projectiles
         _group, bodies = game.projectile_bodies()
         game.move_projectiles(self.flight(3), bodies)
         assert self.drawn(bodies[projectiles.ROCKET]) == 3
@@ -741,7 +741,6 @@ class TestDrawingWhatIsInFlight:
         Measured as a *change*, because a part sits at its own offset within
         the model and the question here is whose position it follows.
         """
-        from twig_bb import projectiles
         _group, bodies = game.projectile_bodies()
         flight = self.flight(1)
         game.move_projectiles(flight, bodies)
@@ -755,7 +754,6 @@ class TestDrawingWhatIsInFlight:
             abs=1e-4)
 
     def test_two_projectiles_are_drawn_a_projectile_apart(self):
-        from twig_bb import projectiles
         _group, bodies = game.projectile_bodies()
         game.move_projectiles(self.flight(2), bodies)
         places = self.positions(bodies[projectiles.ROCKET])
@@ -765,7 +763,6 @@ class TestDrawingWhatIsInFlight:
                             places[:, 0].shape), abs=1e-4)
 
     def test_two_kinds_at_once_each_go_to_their_own_model(self):
-        from twig_bb import projectiles
         table = projectiles.default_table()
         flight = projectiles.Projectiles(table, capacity=4)
         flight.launch(table.by_key(projectiles.ROCKET), origin=(1, 0, 0),
@@ -784,9 +781,6 @@ class TestDrawingWhatIsInFlight:
         for every part of every one of them, on every frame, whether or not any
         can be seen.
         """
-        from vrml.vrml97 import nodetypes
-        from OpenGLContext import visitor
-        from twig_bb import projectiles
         group, bodies = game.projectile_bodies()
         parked = len(visitor.find(group, nodetypes.Rendering))
         table = projectiles.default_table()
@@ -800,14 +794,12 @@ class TestDrawingWhatIsInFlight:
         assert len(visitor.find(group, nodetypes.Rendering)) == parked
 
     def test_a_projectile_is_drawn_as_a_rocket(self):
-        from twig_bb import projectiles
         _group, bodies = game.projectile_bodies()
         assert len(bodies[projectiles.ROCKET]), \
             'the rocket model brought no shapes'
 
     def test_a_missing_model_still_leaves_something_to_see(self):
         """Art that will not load is not a reason for an invisible rocket."""
-        from twig_bb import projectiles
         table = projectiles.ProjectileTable(kinds=[
             projectiles.Projectile(key='ghost', model='weapons/absent.glb')])
         _group, bodies = game.projectile_bodies(table=table)
@@ -890,7 +882,6 @@ class TestPointingARocketWhereItIsGoing:
 
     def test_a_flying_projectile_is_turned_to_face_its_flight(self):
         """Two rockets on different headings are not drawn at the same angle."""
-        from twig_bb import projectiles
         table = projectiles.default_table()
         flight = projectiles.Projectiles(table, capacity=2)
         flight.launch(table.by_key(projectiles.ROCKET), origin=(0, 1, 0),
@@ -925,7 +916,6 @@ class TestSayingHowSomebodyDied:
 
     def test_falling_out_of_the_world_is_named(self):
         """The one death a player has no other way of understanding."""
-        from twig_bb import falling
         assert 'fell' in self.line(target=game.PLAYER_ID, by='',
                                    cause=falling.FELL)
 
@@ -950,14 +940,12 @@ class TestBodiesDrawnAsFigures:
         assert len(bodies['bot1'].children) == len(game.capsule())
 
     def test_with_a_cast_a_bot_is_its_figure(self):
-        from twig_bb import characters
         found = started(bots=1)
         cast = characters.Cast([one.id for one in found.bots()])
         _group, bodies = game.bot_bodies(found, cast=cast)
         assert list(bodies['bot1'].children) == [cast.subtree('bot1')]
 
     def test_a_cast_with_no_figure_falls_back_to_the_capsule(self):
-        from twig_bb import characters
         found = started(bots=1)
         cast = characters.Cast([one.id for one in found.bots()],
                                builds=['nobody-by-that-name'])
@@ -965,7 +953,6 @@ class TestBodiesDrawnAsFigures:
         assert len(bodies['bot1'].children) == len(game.capsule())
 
     def test_moving_them_plays_a_clip_and_turns_them(self):
-        from twig_bb import characters
         found = started(bots=1)
         cast = characters.Cast([one.id for one in found.bots()])
         _group, bodies = game.bot_bodies(found, cast=cast)
@@ -982,7 +969,6 @@ class TestBodiesDrawnAsFigures:
         assert tuple(bodies['bot1'].rotation) != (0.0, 1.0, 0.0, 0.0)
 
     def test_a_dead_bot_keeps_its_body_where_it_fell(self):
-        from twig_bb import characters
         found = started(bots=1)
         cast = characters.Cast([one.id for one in found.bots()])
         _group, bodies = game.bot_bodies(found, cast=cast)
@@ -1173,7 +1159,6 @@ class TestHowOftenAPickupTurns:
     """
 
     def pickups(self, *positions):
-        from twig_bb import items
         kind = items.ItemKind(key='test', title='TEST', health=25)
         return items.Pickups([
             items.Pickup(kind=kind, position=np.array(at, dtype='d'))

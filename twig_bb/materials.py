@@ -17,12 +17,12 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import Any, Optional
 from collections.abc import Sequence
+from typing import Any, Optional
 
 import numpy as np
-
 from OpenGLContext.scenegraph.pbrmaterial import PBRMaterial, PBRTexture
+from PIL import Image
 
 from . import crnfile
 from .contentsearch import ContentSearch
@@ -258,7 +258,6 @@ class MaterialLibrary:
         """
         if key is not None and key in self._lightmaps:
             return self._lightmaps[key]
-        from PIL import Image
         texture = PBRTexture(Image.fromarray(np.asarray(page, np.uint8), 'RGB'),
                              srgb=False)
         if key is not None:
@@ -291,7 +290,6 @@ def open_image(path: Optional[str]) -> Any:
     if os.path.splitext(path)[1].lower() == crnfile.EXTENSION:
         return crnfile.load(path)
     try:
-        from PIL import Image
         image = Image.open(path)
         image.load()
         return image

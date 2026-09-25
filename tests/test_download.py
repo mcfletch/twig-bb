@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import io
 import os
+import sys
 import tarfile
 import zipfile
 
-import pytest
-
 import bspbuilder
+import pytest
 from OpenGLContext.contentpacks import ContentStore
+from OpenGLContext.contentpacks.archive import TooLarge
+
 from twig_bb import download
 
 
@@ -31,7 +33,6 @@ def _map_archive(name='maps/test.bsp', version=46):
 def test_the_download_path_does_not_import_requests():
     """The plan's requirement: the resolver replaces `requests`, which is not
     installed, so importing it would break the module outright."""
-    import sys
     assert 'requests' not in sys.modules or True     # nothing forces it in
     source = open(download.__file__).read()
     assert 'import requests' not in source
@@ -680,7 +681,6 @@ class TestAnArchiveThatWouldFillTheDisk:
         return target
 
     def test_it_is_refused_by_what_it_would_write(self, tmp_path):
-        from OpenGLContext.contentpacks.archive import TooLarge
         target = self.bomb(tmp_path)
         with pytest.raises(TooLarge):
             download.unpack(str(target), str(tmp_path / 'out'))

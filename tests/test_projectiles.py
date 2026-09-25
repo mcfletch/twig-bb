@@ -13,11 +13,10 @@ import time
 
 import numpy as np
 import pytest
-
 from omi_physics import model
 from omi_physics.world import PhysicsWorld
 
-from twig_bb import arena, projectiles, weapons
+from twig_bb import arena, blast, projectiles, weapons
 
 
 def world():
@@ -377,7 +376,6 @@ class TestAGrenadeThrownStraightAtSomebody:
         for _ in range(2000):
             gone = flight.step(w, found, dt=dt)
             if gone:
-                from twig_bb import blast
                 blast.answer(w, found, flight.table, gone)
                 return found, gone
             if not len(flight):

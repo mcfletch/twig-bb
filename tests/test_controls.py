@@ -9,8 +9,10 @@ the weapon's own numbers.
 from __future__ import annotations
 
 import pytest
-
+from OpenGLContext.events import mouseevents
 from OpenGLContext.events.inputstate import InputState
+from OpenGLContext.events.mouseevents import MouseButtonEvent
+from OpenGLContext.move.modes import KeyBinding
 
 from twig_bb import controls, weapons
 from twig_bb.player import PlayerState
@@ -42,7 +44,6 @@ def key(state, name, down=1):
 
 def button(state, index, down=1):
     """Feed one mouse-button transition, as the event system spells it."""
-    from OpenGLContext.events.mouseevents import MouseButtonEvent
     event = MouseButtonEvent()
     event.button = index
     event.state = down
@@ -172,7 +173,6 @@ class TestZooming:
 
 class TestBindingPage:
     def test_the_table_holds_movement_and_weapons_together(self, bindings):
-        from OpenGLContext.move.modes import KeyBinding
         walk = FakeMode('walk', [KeyBinding(command='forward', keys=['w'])])
         table = controls.Controls(FakeNavigation([walk]),
                                   bindings).binding_table()
@@ -181,7 +181,6 @@ class TestBindingPage:
         assert 'weapons' in groups
 
     def test_movement_comes_first(self, bindings):
-        from OpenGLContext.move.modes import KeyBinding
         walk = FakeMode('walk', [KeyBinding(command='forward', keys=['w'])])
         table = controls.Controls(FakeNavigation([walk]),
                                   bindings).binding_table()
@@ -346,6 +345,5 @@ class TestTheTriggerIsTheMouseButton:
 
     def test_the_binding_page_can_show_it(self):
         """It is a declared binding like any other, not a special case."""
-        from OpenGLContext.events import mouseevents
         keys = self.bindings().keys_for(controls.FIRE)
         assert mouseevents.button_name(controls.LEFT_BUTTON) in keys

@@ -27,10 +27,11 @@ import argparse
 import math
 import os
 import sys
-from typing import (
-    Any, Optional,
-)
 from collections.abc import Callable, Sequence
+from typing import (
+    Any,
+    Optional,
+)
 
 os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
@@ -39,6 +40,9 @@ os.environ.setdefault('OPENGLCONTEXT_DISABLE_FPS_DISPLAY', '1')
 os.environ.setdefault('OPENGLCONTEXT_HIDDEN', '1')
 
 import numpy as np
+from OpenGLContext import contactsheet, testingcontext
+from OpenGLContext.capture import read_back_buffer
+from OpenGLContext.scenegraph import basenodes
 
 from twig_bb import arena as arenamod
 from twig_bb import characters, game
@@ -226,7 +230,6 @@ def _floor(size: float = 12.0, grid: int = 12) -> Any:
     ends underneath the world are all invisible over a void and obvious over a
     surface with a scale on it.
     """
-    from OpenGLContext.scenegraph import basenodes
     step = size / grid
     tiles = []
     for row in range(grid):
@@ -260,7 +263,6 @@ class Stage:
     ID = 'bot0'
 
     def __init__(self, review: Review) -> None:
-        from OpenGLContext.scenegraph import basenodes
         self.review = review
         self.table = weapontable.default_table()
         self.match = arenamod.Arena(weapons=self.table)
@@ -346,7 +348,6 @@ class ReviewContext:
         self.context: Any = None
 
     def build(self) -> None:
-        from OpenGLContext import testingcontext
         base: Any = testingcontext.getInteractive()
         self.stage = Stage(self.review)
         scene = self.stage.scene
@@ -369,7 +370,6 @@ class ReviewContext:
 
     def frame(self) -> Any:
         """Draw once and hand back what landed in the framebuffer."""
-        from OpenGLContext.capture import read_back_buffer
         # Let the window system deliver whatever it has queued; a window that
         # is never pumped is one some platforms decide has stopped responding.
         pump = getattr(self.context, 'pumpWindowEvents', None)
@@ -384,7 +384,6 @@ class ReviewContext:
 
     def run(self) -> list[str]:
         """Draw every take and write the sheets; returns what it wrote."""
-        from OpenGLContext import contactsheet
         review, stage = self.review, self.stage
         os.makedirs(review.out, exist_ok=True)
         for _ in range(review.WARMUP):

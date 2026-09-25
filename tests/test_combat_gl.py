@@ -26,10 +26,17 @@ os.environ['OPENGLCONTEXT_SHADOWS'] = '0'
 # under the default pass and were dropped under this one.
 os.environ['OPENGLCONTEXT_RENDERER'] = 'pbr'
 
+import gc
+
 import numpy as np
 import pytest
 
 glfw = pytest.importorskip('glfw')
+
+from OpenGLContext import testingcontext  # noqa: E402 imported once the skip without glfw has run
+from OpenGLContext.capture import read_back_buffer  # noqa: E402 imported once the skip without glfw has run
+from OpenGLContext.passes import renderpass  # noqa: E402 imported once the skip without glfw has run
+from OpenGLContext.scenegraph import basenodes  # noqa: E402 imported once the skip without glfw has run
 
 from twig_bb import arena, effects, game, projectiles, weapons  # noqa: E402
 
@@ -65,9 +72,6 @@ def render():
     change what is in the scene and compare two frames — which is how "it
     moved" is asserted without a reference image.
     """
-    from OpenGLContext import testingcontext
-    from OpenGLContext.scenegraph import basenodes
-
     Base = testingcontext.getInteractive()
     made: dict = {}
 
@@ -111,9 +115,6 @@ def render():
     # The pass that last rendered is a module global and outlives the window
     # it belongs to; left set, it hands the next test a shader program whose
     # GL context is gone.
-    import gc
-
-    from OpenGLContext.passes import renderpass
 
     renderpass.FLAT = None
     context = made.pop('context', None)
@@ -134,8 +135,6 @@ def _pixels(context):
     default framebuffer first, which a post-process pass would otherwise have
     left pointing at its own.
     """
-    from OpenGLContext.capture import read_back_buffer
-
     return context.drawAndReadFrame(read_back_buffer)[0].astype(int)
 
 

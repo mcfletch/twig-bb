@@ -12,10 +12,11 @@ its context classes, so the modules that use it are the ones
 
 from __future__ import annotations
 
+import bspbuilder
 from OpenGLContext.move import viewplatform
+from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
 from OpenGLContext.move.viewplatformmixin import ViewPlatformMixin
 
-import bspbuilder
 from twig_bb import collision, maploader, viewer
 
 
@@ -28,7 +29,6 @@ def synthetic_map(tmp_path, lumps=None, name='ctf-test.bsp'):
 
 
 def walking_platform(tmp_path):
-    from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
     loaded = maploader.load(synthetic_map(tmp_path))
     return PhysicsViewPlatform(collision.from_map(loaded).world,
                                viewer.character_capabilities(), position=(0, 1, 0))

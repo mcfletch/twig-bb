@@ -22,15 +22,14 @@ places, which reads as a bug in the lighting rather than as an absence of it.
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
 from collections.abc import Sequence
+from typing import Any, Optional
 
 import numpy as np
-
 from OpenGLContext.scenegraph.lightgrid import LightGrid
 
 from .materials import DEFAULT_LIGHTMAP_STRENGTH
-from .worldgeometry import SCENE_SCALE
+from .worldgeometry import SCENE_SCALE, to_scene_directions
 
 log = logging.getLogger(__name__)
 
@@ -131,7 +130,6 @@ def _towards_light(angles: np.ndarray) -> np.ndarray:
     ``SPEC-BSP46 §4.14.5``: the first byte is measured from map +Z and the
     second about it from map +X.
     """
-    from .worldgeometry import to_scene_directions
     phi = angles[:, 0].astype('d') * ANGLE_STEP
     theta = angles[:, 1].astype('d') * ANGLE_STEP
     return to_scene_directions(np.column_stack((

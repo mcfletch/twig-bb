@@ -48,9 +48,9 @@ import logging
 import math
 import os
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Optional
-from collections.abc import Callable
 
 os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')  # noqa: TID251 the program's start-up sets the environment the engine reads
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')  # noqa: TID251 the program's start-up sets the environment the engine reads
@@ -60,50 +60,65 @@ os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')  # noqa: TID251 the progr
 os.environ.setdefault('OPENGLCONTEXT_IBL_INTENSITY', '0.15')  # noqa: TID251 the program's start-up sets the environment the engine reads
 
 import numpy as np
-
+from omi_physics.character import CharacterCapabilities
 from OpenGLContext import renderoptions, testingcontext
+from OpenGLContext.audio import scene as audioscene
 from OpenGLContext.capture import SettleCapture
 from OpenGLContext.contextdefinition import ContextDefinition
+from OpenGLContext.events import systemtime
+from OpenGLContext.events.mouseevents import WHEEL_DOWN, WHEEL_UP
 from OpenGLContext.move import modes as movemodes
 from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
 from OpenGLContext.scenegraph.background import Background
 from OpenGLContext.scenegraph.light import (
-    DirectionalLight, PointLight,
+    DirectionalLight,
+    PointLight,
 )
 from OpenGLContext.scenegraph.scenegraph import SceneGraph
 from OpenGLContext.testing.process_exit import flush_and_exit
-from omi_physics.character import CharacterCapabilities
-
-from OpenGLContext.events import systemtime
-from OpenGLContext.events.mouseevents import WHEEL_DOWN, WHEEL_UP
 from OpenGLContext.ui import bindings, dialogs, settings
 from OpenGLContext.ui.overlay import OverlayMixin
-from OpenGLContext.viewer.asyncscene import AsyncSceneMixin
 from OpenGLContext.ui.panel import Panel
+from OpenGLContext.viewer.asyncscene import AsyncSceneMixin
 
-from . import art
-from . import avatar
-from . import blast, collision, combat, combatsound
-from . import controls
-from . import projectiles
-from . import download
-from . import effects, falling, feedback, fetcher, game
-from . import arena
-from . import characters
-from . import deathcam
-from . import items as itemsmod
-from . import jumppads, liquids, mapnotice, maploader, menu, notices
-from . import match
-from . import rules
-from . import underwater
+from . import (
+    arena,
+    art,
+    avatar,
+    blast,
+    characters,
+    collision,
+    combat,
+    combatsound,
+    controls,
+    deathcam,
+    download,
+    effects,
+    falling,
+    feedback,
+    fetcher,
+    game,
+    jumppads,
+    liquids,
+    maploader,
+    mapnotice,
+    match,
+    menu,
+    notices,
+    projectiles,
+    rules,
+    underwater,
+)
 from . import debug as twigdebug
+from . import items as itemsmod
 from . import telemetry as gamemarks
 from . import weapons as weapontable
+from .animator import SurfaceAnimator
 from .firstperson import WeaponHand, aim_at_camera, view_rig
 from .frameclock import FrameClock
-from .hud import GameHUD, now as hudclock
+from .hud import GameHUD
+from .hud import now as hudclock
 from .player import PlayerState
-from .animator import SurfaceAnimator
 from .worldgeometry import SCENE_SCALE
 
 log = logging.getLogger(__name__)
@@ -1319,7 +1334,6 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         device and starts an audio thread: a capture run and a map walked
         through in silence should pay for neither.
         """
-        from OpenGLContext.audio import scene as audioscene
         return audioscene.engine_for(self)
 
     def _sampleWeapons(self) -> None:           # pragma: no cover - GL

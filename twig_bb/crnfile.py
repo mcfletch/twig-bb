@@ -22,7 +22,14 @@ import logging
 import struct
 from typing import Any, Optional
 
+from PIL import Image
+
 log = logging.getLogger(__name__)
+
+try:
+    import texture2ddecoder as _texture2ddecoder
+except ImportError:                 # the optional "crn" extra is not installed
+    _texture2ddecoder = None
 
 #: ``SPEC-CRN §1.1`` -- the two bytes every Crunch file opens with.
 MAGIC = b'Hx'
@@ -51,11 +58,7 @@ def available() -> bool:
 
 def _decoder() -> Any:
     """The decoding library, or None if it is not installed."""
-    try:
-        import texture2ddecoder
-    except ImportError:
-        return None
-    return texture2ddecoder
+    return _texture2ddecoder
 
 
 def dimensions(data: bytes) -> Any:
@@ -109,7 +112,6 @@ def loads(data: bytes, path: str = '<bytes>') -> Optional[Any]:
             return None
         pixels, block_bytes = blocks
         decode = library.decode_bc1 if block_bytes == 8 else library.decode_bc3
-        from PIL import Image
         return Image.frombytes('RGBA', (width, height),
                                decode(pixels, width, height), 'raw', 'BGRA')
     except MalformedCRN as error:

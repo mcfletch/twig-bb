@@ -99,7 +99,7 @@ class Counts:
 
 def _mesh_objects() -> list[Any]:
     """Every mesh in the open file, in a stable order."""
-    import bpy
+    import bpy  # noqa: PLC0415 bpy exists only inside Blender or its own 3.11 wheel; --help runs without it
     return sorted((one for one in bpy.data.objects if one.type == 'MESH'),
                   key=lambda one: one.name)
 
@@ -141,7 +141,7 @@ def leave_edit_mode() -> None:
     its geometry in the editor's own copy, and writing to it raises rather than
     quietly losing the edits -- so this is a precondition, not a tidy-up.
     """
-    import bpy
+    import bpy  # noqa: PLC0415 bpy exists only inside Blender or its own 3.11 wheel; --help runs without it
     for obj in _mesh_objects():
         if obj.mode == 'OBJECT':
             continue
@@ -160,7 +160,7 @@ def clean_mesh(obj: Any, fill_holes: bool = False) -> Counts:
     Every count is zero for a mesh that was already tidy, which is what makes
     this safe to leave in a build.
     """
-    import bmesh
+    import bmesh  # noqa: PLC0415 part of Blender, like bpy
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     bm.faces.ensure_lookup_table()
@@ -199,7 +199,7 @@ def clean_mesh(obj: Any, fill_holes: bool = False) -> Counts:
 
 def _local_centre(obj: Any) -> Any:
     """The middle of one mesh's own bounding box, in its own coordinates."""
-    from mathutils import Vector
+    from mathutils import Vector  # noqa: PLC0415 part of Blender, like bpy
     coords = [vertex.co for vertex in obj.data.vertices]
     low = Vector((min(co[axis] for co in coords) for axis in range(3)))
     high = Vector((max(co[axis] for co in coords) for axis in range(3)))
@@ -283,7 +283,7 @@ def clean(blend: Optional[str] = None, save: Optional[str] = None,
     parts have gone.  A stray face two metres away would otherwise decide where
     the whole model turns.
     """
-    import bpy
+    import bpy  # noqa: PLC0415 bpy exists only inside Blender or its own 3.11 wheel; --help runs without it
     if blend:
         bpy.ops.wm.open_mainfile(filepath=os.path.abspath(blend))
 

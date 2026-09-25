@@ -27,9 +27,9 @@ import argparse
 import os
 import re
 import sys
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Optional
-from collections.abc import Callable, Sequence
 
 from OpenGLContext.ui.dialogs import notice
 from OpenGLContext.ui.panel import Panel
@@ -37,6 +37,7 @@ from OpenGLContext.ui.panel import Panel
 from . import catalog
 from .assetpack import AssetPack
 from .mapnotice import MapNotice
+from .menu import GAME_TITLE
 
 __all__ = ['NOTICES_PATH', 'Acknowledgement', 'acknowledged',
            'content_notices', 'declared_dependencies', 'full_text',
@@ -229,7 +230,6 @@ def full_text(current: Optional[MapNotice] = None) -> str:
     running the screen is the catalogue's, which is what it has to be before a
     map is chosen.
     """
-    from .menu import GAME_TITLE
     parts = [
         '%s' % (GAME_TITLE,),
         'BSD-3-Clause — Mike C. Fletcher',

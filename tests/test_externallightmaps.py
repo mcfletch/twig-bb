@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-
-
 import bspbuilder
+from PIL import Image
+
 from twig_bb import externallightmaps, maploader, q3bsp
 from twig_bb.materials import TEXTURE_EXTENSIONS
 
@@ -23,7 +23,6 @@ def _write_map(tmp_path, lm_index: int, lightmaps: bytes = None) -> str:
 
 def _write_pages(tmp_path, indices, colour=(200, 100, 50)) -> None:
     """Write ``lm_NNNN.png`` pages beside the map (``SPEC-EXTLM §2.1``)."""
-    from PIL import Image
     directory = tmp_path / 'maps' / 'test'
     directory.mkdir(parents=True, exist_ok=True)
     for index in indices:

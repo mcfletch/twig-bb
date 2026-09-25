@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import os
 
+import bspbuilder
 import numpy as np
 import pytest
 
-from twig_bb import speakers
+from twig_bb import maploader, speakers
 from twig_bb.entities import Entity
+from twig_bb.sounds import SoundLibrary
 from twig_bb.worldgeometry import SCENE_SCALE
 
 
@@ -233,9 +235,6 @@ class TestThroughTheMapLoader:
     """The seam a viewer actually uses."""
 
     def test_a_loaded_map_offers_its_speakers(self, write_map, tmp_path):
-        import bspbuilder
-
-        from twig_bb import maploader
         write_sound(tmp_path / "content", "sound/world/wind1.wav")
         path = write_map(46, {'entities': bspbuilder.entity_text([
             {'classname': 'worldspawn'},
@@ -248,9 +247,6 @@ class TestThroughTheMapLoader:
     def test_a_map_whose_sounds_were_never_fetched_still_loads(
             self, write_map):
         """Most installs have the maps and not the base game's sounds."""
-        import bspbuilder
-
-        from twig_bb import maploader
         path = write_map(46, {'entities': bspbuilder.entity_text([
             {'classname': 'worldspawn'},
             {'classname': 'target_speaker', 'origin': '0 0 0',
@@ -270,6 +266,5 @@ class TestAgainstRealContent:
 
     def test_the_star_prefixed_name_in_am_galmevish_is_silent_not_fatal(self):
         """SPEC-Q3ENTITIES §1.2.5, hit by real content on the first load."""
-        from twig_bb.sounds import SoundLibrary
         library = SoundLibrary([self.content_root()])
         assert library.resolve('*falling1.wav') is None

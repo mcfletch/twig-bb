@@ -31,9 +31,11 @@ from __future__ import annotations
 import os
 import re
 import textwrap
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Optional
-from collections.abc import Callable, Sequence
+
+from . import download
 
 __all__ = ['CREDIT_WIDTH', 'LICENCE_NAMES', 'Locator', 'MapNotice', 'for_map',
            'licence_documents', 'title_and_author']
@@ -261,7 +263,6 @@ def _pack_roots(packs: Optional[Sequence[Any]],
     somebody else are answered against this same list.
     """
     if packs is None or directory_of is None:
-        from . import download
         packs = download.ASSET_PACKS if packs is None else packs
         directory_of = directory_of or download.pack_directory
     return [(pack, os.path.abspath(directory_of(pack))) for pack in packs]

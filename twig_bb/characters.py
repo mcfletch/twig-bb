@@ -34,6 +34,9 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 import numpy as np
+from OpenGLContext.character import CharacterModel
+from OpenGLContext.character.crowd import Crowd
+from OpenGLContext.loaders.gltf import load_gltf, parse_gltf
 
 from . import art
 
@@ -613,7 +616,6 @@ def _level_document(name: str) -> Any:
     if not os.path.exists(path):
         return None
     try:
-        from OpenGLContext.loaders.gltf import parse_gltf
         return parse_gltf(path)
     except Exception:                       # art, not rules
         log.warning('could not parse the character level %s', path, exc_info=True)
@@ -629,7 +631,6 @@ def _parse_document(name: str) -> Any:
     """
     path = _character_path(name)
     try:
-        from OpenGLContext.loaders.gltf import parse_gltf
         return parse_gltf(path)
     except Exception:                       # art, not rules
         log.warning('could not parse the character %s', path, exc_info=True)
@@ -650,9 +651,7 @@ def load(name: str, group: Any = None, document: Any = None,
     mesh, which is drawn instead beyond :data:`LOD_DISTANCE`.
     """
     try:
-        from OpenGLContext.character import CharacterModel
         if document is not None:
-            from OpenGLContext.loaders.gltf import load_gltf
             model = CharacterModel.from_scene(load_gltf(document=document))
         else:
             model = CharacterModel.load(_character_path(name))
@@ -727,7 +726,6 @@ class Cast:
         figure.model.mixer.pose_write = 'exposed'
         crowd = self.crowds.get(build)
         if crowd is None:
-            from OpenGLContext.character.crowd import Crowd
             crowd = self.crowds[build] = Crowd()
         figure.member = crowd.add(figure.model)
         figure.crowd = crowd

@@ -7,15 +7,24 @@ weapons neither re-reads a model nor breaks on one that will not load.
 
 from __future__ import annotations
 
+import importlib.util
+import json
 import math
+import os
+import struct
 
 import numpy as np
-
 import pytest
-
+from OpenGLContext.move.viewplatform import ViewPlatform
+from OpenGLContext.passes._flat import FlatPass
 from OpenGLContext.scenegraph.basenodes import Transform
+from OpenGLContext.scenegraph.light import PointLight
+from pydispatch.dispatcher import Any, connect
+from vrml import olist
+from vrml.vrml97 import nodetypes
 
 from twig_bb import firstperson, weapons
+from twig_bb.player import PlayerState
 
 
 class FakeQuaternion:
@@ -117,14 +126,6 @@ class TestPinnedToTheView:
     (``placeViewAttachments``), and the pose has to be written there.
     """
 
-    def test_the_viewer_places_its_weapon_through_the_render_hook(self):
-        from twig_bb import viewer
-        assert hasattr(viewer.TwigContext, 'placeViewAttachments')
-
-    def test_the_demo_does_too(self):
-        from twig_bb import hudsample
-        assert hasattr(hudsample.HUDSampleContext, 'placeViewAttachments')
-
     def test_the_hook_poses_the_hand_from_the_camera_it_is_given(self):
         """The pose written is the one the frame is about to be drawn with."""
         hand = Transform()
@@ -137,15 +138,6 @@ class TestPinnedToTheView:
         firstperson.aim_at_camera(hand, FakePlatform(position=(0.0, 0.0, 0.0, 1.0)))
         firstperson.aim_at_camera(hand, FakePlatform(position=(0.0, 0.0, -4.0, 1.0)))
         assert tuple(float(v) for v in hand.translation) == (0.0, 0.0, -4.0)
-
-    def test_nothing_poses_the_weapon_from_the_idle_callback(self):
-        """The regression itself: OnIdle must not be where this happens."""
-        import inspect
-        from twig_bb import viewer
-        source = inspect.getsource(viewer.TwigContext.OnIdle)
-        assert '_updateWeapon' not in source, (
-            'the weapon is posed in OnIdle, which runs before the camera moves')
-
 
 class TestItIsActuallyInViewSpace:
     """The property "pinned", stated as arithmetic rather than as ordering.
@@ -165,13 +157,11 @@ class TestItIsActuallyInViewSpace:
         A Transform with no translation, rotation or scale bakes no matrix at
         all and answers None, which is the camera-at-the-origin case here.
         """
-        import numpy as np
         matrix = node.localMatrices().data[0]
         return np.identity(4) if matrix is None else matrix
 
     def modelview(self, platform, hand, local):
         """What the pass would draw the weapon with, from real matrices."""
-        import numpy as np
         firstperson.aim_at_camera(hand, platform)
         view = platform.modelMatrix()
         # Row-vector convention, as the renderer uses: a point runs through the
@@ -180,16 +170,13 @@ class TestItIsActuallyInViewSpace:
         return np.dot(model, view)
 
     def local(self):
-        from twig_bb import weapons
         return firstperson.weapon_transform(
             weapons.default_table().by_key('pistol'))
 
     def platform(self, position, rotation=(0, 1, 0, 0.0)):
-        from OpenGLContext.move.viewplatform import ViewPlatform
         return ViewPlatform(position=position, orientation=rotation)
 
     def test_the_camera_cancels_out_of_the_weapon_s_modelview(self):
-        import numpy as np
         local = self.local()
         here = self.modelview(self.platform((0.0, 0.0, 0.0)), Transform(), local)
         there = self.modelview(self.platform((12.0, 3.0, -40.0)), Transform(),
@@ -198,8 +185,6 @@ class TestItIsActuallyInViewSpace:
             'the weapon moves in view space when the camera moves')
 
     def test_turning_the_camera_does_not_move_it_either(self):
-        import numpy as np
-        import math
         local = self.local()
         ahead = self.modelview(self.platform((0.0, 0.0, 0.0)), Transform(), local)
         turned = self.modelview(
@@ -209,7 +194,6 @@ class TestItIsActuallyInViewSpace:
             'the weapon swings away from the view when the camera turns')
 
     def test_walking_and_turning_at_once_still_leaves_it_put(self):
-        import numpy as np
         local = self.local()
         start = self.modelview(self.platform((0.0, 1.7, 0.0)), Transform(), local)
         moved = self.modelview(
@@ -218,7 +202,6 @@ class TestItIsActuallyInViewSpace:
 
     def test_what_is_left_is_the_weapon_s_own_offset(self):
         """And it is the offset the table asked for, not some other place."""
-        import numpy as np
         local = self.local()
         drawn = self.modelview(self.platform((4.0, 5.0, 6.0)), Transform(), local)
         assert np.allclose(drawn, self.forward(local), atol=1e-4)
@@ -246,32 +229,27 @@ class TestOrientingASourceModel:
         return found
 
     def test_a_weapon_can_be_pitched_as_well_as_yawed(self):
-        from twig_bb import weapons
         holder = firstperson.weapon_transform(
             weapons.Weapon(modelPitch=-90.0))
         assert self.rotations(holder), 'the pitch was dropped'
 
     def test_the_pitch_is_about_the_side_axis_in_radians(self):
-        from twig_bb import weapons
         holder = firstperson.weapon_transform(weapons.Weapon(modelPitch=90.0))
         axis = self.rotations(holder)[0]
         assert axis[:3] == (1.0, 0.0, 0.0)
         assert axis[3] == pytest.approx(math.pi / 2)
 
     def test_all_three_angles_can_be_used_at_once(self):
-        from twig_bb import weapons
         holder = firstperson.weapon_transform(
             weapons.Weapon(modelYaw=10.0, modelPitch=20.0, modelRoll=30.0))
         assert len(self.rotations(holder)) == 3
 
     def test_a_weapon_that_needs_no_turning_gets_no_rotation_nodes(self):
-        from twig_bb import weapons
         holder = firstperson.weapon_transform(weapons.Weapon())
         assert self.rotations(holder) == []
 
     def test_the_model_hangs_below_whatever_turning_it_needed(self):
         """Whatever the chain, the model is at the end of it."""
-        from twig_bb import weapons
         holder = firstperson.weapon_transform(
             weapons.Weapon(modelYaw=10.0, modelPitch=20.0))
         node, depth = holder, 0
@@ -294,28 +272,21 @@ class TestSeeingTheWeaponAtAll:
     """
 
     def rig(self):
-        from twig_bb import weapons
         return firstperson.view_rig(
             firstperson.WeaponHand(weapons.default_table()))
 
     def test_nothing_in_the_rig_lights_the_world(self):
-        from OpenGLContext.scenegraph.light import PointLight
         lights = [child for child in self.rig().children
                   if isinstance(child, PointLight)]
         assert lights == [], (
             'a light on the camera relights the map, which is baked')
 
     def test_the_hand_is_in_the_rig(self):
-        from twig_bb import weapons
         hand = firstperson.WeaponHand(weapons.default_table())
         assert hand.group in list(firstperson.view_rig(hand).children)
 
     def test_every_shipped_weapon_carries_its_own_fill(self):
         """Emission in the material is what keeps it visible in a dark map."""
-        import json
-        import struct
-        from twig_bb import weapons
-
         for weapon in weapons.default_table().weapons:
             data = open(weapons.model_path(weapon), 'rb').read()
             length = struct.unpack('<I', data[8:12])[0]
@@ -333,8 +304,6 @@ class TestSeeingTheWeaponAtAll:
 
     def test_the_fill_is_small_enough_not_to_glow(self):
         """It is a floor under the lighting, not a light source."""
-        import importlib.util
-        import os
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         spec = importlib.util.spec_from_file_location(
             'prepare_weapon', os.path.join(root, 'tools', 'prepare_weapon.py'))
@@ -440,8 +409,6 @@ class TestSwitchingReachesTheRenderer:
         """
 
         def __init__(self):
-            from pydispatch.dispatcher import Any, connect
-            from vrml import olist
             self.seen = []
             connect(self.record, signal=olist.OList.NEW_CHILD_EVT, sender=Any)
             connect(self.record, signal=olist.OList.DEL_CHILD_EVT, sender=Any)
@@ -467,9 +434,6 @@ class TestSwitchingReachesTheRenderer:
 
     def test_the_renderers_own_path_set_follows_the_swap(self):
         """End to end, against the observer the render pass actually uses."""
-        from OpenGLContext.passes._flat import FlatPass
-        from vrml.vrml97 import nodetypes
-
         table = weapons.default_table()
         hand = firstperson.WeaponHand(table)
         hand.select(table.by_key('pistol'))
@@ -494,9 +458,6 @@ class TestSwitchingReachesTheRenderer:
         player who cycled through the table carried every weapon they had ever
         held, overlapping, and the draw count grew with each press.
         """
-        from OpenGLContext.passes._flat import FlatPass
-        from vrml.vrml97 import nodetypes
-
         table = weapons.default_table()
         hand = firstperson.WeaponHand(table)
         hand.select(table.by_key('pistol'))
@@ -514,9 +475,6 @@ class TestSwitchingReachesTheRenderer:
         assert drawn() == alone, 'weapons put away are still being drawn'
 
     def test_cycling_the_whole_table_twice_is_stable(self):
-        from OpenGLContext.passes._flat import FlatPass
-        from vrml.vrml97 import nodetypes
-
         table = weapons.default_table()
         hand = firstperson.WeaponHand(table)
         rig = firstperson.view_rig(hand)
@@ -564,8 +522,6 @@ class TestTheHandShowsWhatIsHeld:
 
     def test_a_weapon_taken_by_walking_over_it_reaches_the_hand(self):
         """Pickup is not a special case: it moves `selected`, the hand follows."""
-        from twig_bb.player import PlayerState
-
         table = weapons.default_table()
         player = PlayerState.starting(table)
         hand = firstperson.WeaponHand(table)

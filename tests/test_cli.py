@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import bspbuilder
 import numpy as np
 
-import bspbuilder
-from twig_bb import download, jumppads, maploader
+from twig_bb import download, jumppads, maploader, q3shader
 
 
 def _map(tmp_path, lumps=None, name='cli-test.bsp'):
@@ -87,7 +87,6 @@ def test_the_summary_calls_out_freeze_volumes():
 
 
 def test_a_shader_file_that_cannot_be_read_is_skipped(tmp_path, caplog):
-    from twig_bb import q3shader
     (tmp_path / 'scripts').mkdir()
     (tmp_path / 'scripts' / 'broken.shader').mkdir()
     with caplog.at_level('WARNING'):

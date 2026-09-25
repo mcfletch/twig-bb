@@ -21,12 +21,13 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
 from collections.abc import Sequence
+from typing import Optional
 
 import numpy as np
 
 from .contentsearch import ContentSearch
+from .materials import open_image
 
 log = logging.getLogger(__name__)
 
@@ -106,7 +107,6 @@ class ExternalLightmaps:
         path = self._search.find(PAGE_NAME % (index,), self.extensions)
         if path is None:
             return None
-        from .materials import open_image
         image = open_image(path)
         if image is None:
             return None

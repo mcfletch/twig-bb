@@ -19,14 +19,15 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from OpenGLContext.scenegraph.lod import LOD
+from OpenGLContext.scenegraph.transform import Transform
 
 # Imported for its side effects as much as for the fixture: it selects the
 # renderer, profile and backend the game itself uses, before any GL import.
-from test_combat_gl import AHEAD, _lit, render        # noqa: F401
-
-from OpenGLContext.scenegraph.transform import Transform
+from test_combat_gl import AHEAD, _lit, render  # noqa: F401
 
 from twig_bb import characters, weapons
+from twig_bb import characters as charactersmod
 
 pytestmark = [pytest.mark.gl]
 
@@ -115,7 +116,6 @@ class TestTheCastIsPosedTogether:
     IDS = ('bot0', 'bot1', 'bot2', 'bot3')
 
     def _cast(self):
-        from twig_bb import characters as charactersmod
         return charactersmod.Cast(self.IDS)
 
     def test_figures_of_a_build_share_one_crowd(self):
@@ -128,9 +128,6 @@ class TestTheCastIsPosedTogether:
 
     def test_a_figure_updated_alone_is_not_posed_until_the_cast_is(self):
         """Updating says what to play; posing is what moves the skeleton."""
-        import numpy as np
-        from twig_bb import characters as charactersmod
-
         cast = self._cast()
         figure = cast.of('bot0')
         cast.update('bot0', charactersmod.Motion(speed=4.0), 1 / 60.0)
@@ -146,9 +143,6 @@ class TestTheCastIsPosedTogether:
                        in zip(_skin_of(figure), settled, strict=True))
 
     def test_posing_the_cast_moves_every_figure_and_skins_it(self):
-        import numpy as np
-        from twig_bb import characters as charactersmod
-
         cast = self._cast()
         for _ in range(24):
             for one in self.IDS:
@@ -196,9 +190,6 @@ class TestFiguresAreDrawnLighterAtRange:
     """
 
     def test_a_figure_carries_the_lighter_mesh_as_a_level(self):
-        from OpenGLContext.scenegraph.lod import LOD
-        from twig_bb import characters as charactersmod
-
         cast = charactersmod.Cast(['bot0'])
         figure = cast.of('bot0')
 
@@ -207,9 +198,6 @@ class TestFiguresAreDrawnLighterAtRange:
             assert len(skin.meshes) == 2, 'both meshes should be posed as one'
 
     def test_the_level_beyond_the_range_is_the_lighter_of_the_two(self):
-        from OpenGLContext.scenegraph.lod import LOD
-        from twig_bb import characters as charactersmod
-
         cast = charactersmod.Cast(['bot0'])
         node = _levels(cast.of('bot0').group, LOD)[0]
 
@@ -219,9 +207,6 @@ class TestFiguresAreDrawnLighterAtRange:
         assert far < near, (near, far)
 
     def test_both_levels_are_posed_together(self):
-        import numpy as np
-        from twig_bb import characters as charactersmod
-
         cast = charactersmod.Cast(['bot0'])
         for _ in range(6):
             cast.update('bot0', charactersmod.Motion(speed=4.0), 1 / 60.0)

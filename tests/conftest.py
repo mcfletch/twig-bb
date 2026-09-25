@@ -4,19 +4,21 @@ from __future__ import annotations
 
 import glob
 import os
-from typing import Optional
 from collections.abc import Callable
-
-import pytest
+from typing import Optional
 
 import bspbuilder
+import pytest
+
+from twig_bb import download
 
 WORKSPACE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 QUAKE3_MAP = os.path.join(WORKSPACE, 'tmp', 'q3', 'ztn', 'maps', 'ztn3dm1.bsp')
 
 
-# Two test modules define an OpenGLContext window class at import time, which
-# needs a real GL backend: with none present (a headless box, plain `tox`) the
+# The test modules that import the viewer at the top define an OpenGLContext
+# window class as they import, which needs a real GL backend: with none present
+# (a headless box, plain `tox`) the
 # engine raises RuntimeError naming the backend it could not find before any
 # test is collected, and the whole run errors out.  Skip *collecting* those
 # files when the viewer will not import, so the suite is green headless and
@@ -26,7 +28,8 @@ try:
     from twig_bb import viewer as _viewer  # noqa: F401
 except (ImportError, RuntimeError):
     collect_ignore = ['test_viewer.py', 'test_viewer_match.py',
-                      'test_hudsample.py']
+                      'test_viewer_content.py', 'test_hudsample.py',
+                      'test_level_load.py', 'test_scene_budget.py']
 
 
 @pytest.fixture
@@ -63,10 +66,6 @@ def _map_from_pack() -> Optional[str]:
     decide on the user's behalf to accept a content licence, which is the
     player's decision and the downloader's job to ask about.
     """
-    try:
-        from twig_bb import download
-    except ImportError:                     # pragma: no cover - twig_bb absent
-        return None
     key, name = PACK_MAP
     pack = download.pack_for_key(key)
     root = download.pack_root(pack) if pack is not None else None
@@ -122,8 +121,6 @@ def quake3_scripts_roots(quake3_map) -> list:
     scripts in another -- which is what a pack's ``needs`` are -- so those
     are searched next.
     """
-    from twig_bb import download
-
     roots = _script_roots(os.path.dirname(os.path.dirname(quake3_map)))
     if roots:
         return roots

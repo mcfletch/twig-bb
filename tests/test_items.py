@@ -9,11 +9,15 @@ with. That is what was reported.
 
 from __future__ import annotations
 
+import ast
+import inspect
+import os
 import random
+
 import numpy as np
 import pytest
 
-from twig_bb import arena, avatar, items, weapons
+from twig_bb import arena, art, avatar, items, weapons
 from twig_bb.entities import Entity
 from twig_bb.player import PlayerState
 
@@ -386,9 +390,6 @@ class TestTellingTheHealthPickupsApart:
         a misspelt filename would quietly take a pickup back to a box rather
         than failing.
         """
-        import os
-
-        from twig_bb import art
         for kind in items.default_table().kinds:
             named = str(kind.model)
             assert named, 'no model for %r' % (str(kind.key),)
@@ -398,8 +399,6 @@ class TestTellingTheHealthPickupsApart:
 class TestNothingHereReadsAClock:
 
     def test_the_module_imports_no_clock(self):
-        import ast
-        import inspect
         tree = ast.parse(inspect.getsource(items))
         imported = set()
         for node in ast.walk(tree):

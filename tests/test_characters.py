@@ -7,6 +7,7 @@ speeds, mid-air and on the frame somebody lands.
 import pytest
 
 from twig_bb import characters
+from twig_bb import weapons as weapontable
 
 
 def moving(**named):
@@ -410,18 +411,15 @@ class TestArmoury:
         assert armoury.of('') is None
 
     def test_it_reads_the_weapon_table_for_the_file(self):
-        from twig_bb import weapons as weapontable
         armoury = characters.Armoury(weapontable.default_table())
         first = armoury.of('rifle')
         assert first is not None
         assert armoury.of('rifle') is first, 'loaded once and shared'
 
     def test_a_weapon_the_table_has_never_heard_of(self):
-        from twig_bb import weapons as weapontable
         assert characters.Armoury(weapontable.default_table()).of('harpoon') is None
 
     def test_the_model_is_mounted_by_the_grip_it_declares(self):
-        from twig_bb import weapons as weapontable
         armoury = characters.Armoury(weapontable.default_table())
         held = armoury.of('rifle')
         # The rifle says it is held 0.15 m from its origin along its own bore,
@@ -438,7 +436,6 @@ class TestACastThatIsArmed:
     def test_the_shipped_figures_end_up_holding_the_shipped_weapons(self):
         """The whole path, with the real files: rules to a rifle in a hand."""
         pytest.importorskip('OpenGLContext.character')
-        from twig_bb import weapons as weapontable
         cast = characters.Cast(['a'], armoury=characters.Armoury(
             weapontable.default_table()))
         figure = cast.of('a')

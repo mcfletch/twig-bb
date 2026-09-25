@@ -12,10 +12,13 @@ getting right before either exists.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
+from OpenGLContext.ui import pictures
+from PIL import Image
 
-from twig_bb import match
+from twig_bb import download, match
 
 
 class TestTheDefaults:
@@ -136,7 +139,6 @@ class TestWhatCanBePlayedNow:
         assert levels == []
 
     def test_a_fetched_pack_offers_its_maps(self, tmp_path):
-        from twig_bb import download
         pack = download.pack_for_key('openarena-maps')
         root = tmp_path / 'packs' / 'twig-bb' / pack.directory / 'maps'
         root.mkdir(parents=True)
@@ -147,7 +149,6 @@ class TestWhatCanBePlayedNow:
         assert levels[0].target == 'openarena-maps:oa_dm1'
 
     def test_a_level_knows_which_pack_it_came_from(self, tmp_path):
-        from twig_bb import download
         pack = download.pack_for_key('openarena-maps')
         root = tmp_path / 'packs' / 'twig-bb' / pack.directory / 'maps'
         root.mkdir(parents=True)
@@ -159,8 +160,6 @@ class TestWhatCanBePlayedNow:
                                                                tmp_path):
         """A pack from another publisher with the same short name as one of
         ours must not be read back as ours."""
-        from dataclasses import replace
-        from twig_bb import download
         ours = download.pack_for_key('openarena-maps')
         theirs = replace(ours, key='others/openarena-maps')
         root = tmp_path / 'packs' / 'others' / theirs.directory / 'maps'
@@ -172,13 +171,11 @@ class TestWhatCanBePlayedNow:
         assert found is None or found[0].key == theirs.key
 
     def test_a_whole_key_is_a_target_too(self):
-        from twig_bb import download
         found = download.parse_pack_target('twig-bb/openarena-maps:oa_dm1')
         assert found is not None and found[0].key == 'twig-bb/openarena-maps'
         assert download.parse_pack_target('maps/oa_dm1.bsp:x') is None
 
     def test_every_target_of_ours_reads_back_as_its_pack(self):
-        from twig_bb import download
         for pack in download.ASSET_PACKS:
             target = match.level_target(pack, 'somewhere')
             found = download.parse_pack_target(target)
@@ -195,7 +192,6 @@ class TestWhereALevelsPictureLives:
     """
 
     def _picture(self, path, size=(4, 2)):
-        from PIL import Image
         path.parent.mkdir(parents=True, exist_ok=True)
         Image.new('RGB', size, (10, 20, 30)).save(path)
 
@@ -245,7 +241,6 @@ class TestReadingThosePictures:
     """The toolkit decodes through the imaging library, which has no Crunch."""
 
     def test_registering_teaches_the_picture_cache_crunch(self):
-        from OpenGLContext.ui import pictures
         saved = dict(pictures._decoders)  # noqa: SLF001 the engine has no public way to remove a picture decoder
         try:
             pictures._decoders.clear()  # noqa: SLF001 the engine has no public way to remove a picture decoder
@@ -259,11 +254,9 @@ class TestReadingThosePictures:
     def test_registering_twice_is_harmless(self):
         match.register_picture_decoders()
         match.register_picture_decoders()
-        from OpenGLContext.ui import pictures
         assert pictures.decoderFor('x.crn') is not None
 
     def test_webp_is_left_to_the_imaging_library(self):
         """It reads WebP already; a decoder here would be a layer for nothing."""
-        from OpenGLContext.ui import pictures
         match.register_picture_decoders()
         assert pictures.decoderFor('x.webp') is None

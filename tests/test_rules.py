@@ -7,14 +7,15 @@ that broke: the two worst bugs this game has had were both a line inside
 
 from __future__ import annotations
 
+import ast
+import inspect
+
 import numpy as np
 import pytest
-
 from omi_physics import model
 from omi_physics.world import PhysicsWorld
 
-from twig_bb import (arena, avatar, bots, falling, game, liquids,
-                        projectiles, rules, weapons)
+from twig_bb import arena, avatar, bots, falling, game, items, liquids, projectiles, rules, weapons
 
 
 def world():
@@ -91,7 +92,6 @@ class TestATickOfAMatch:
 class TestWhatTheMapLeftLyingAbout:
 
     def pickups(self):
-        from twig_bb import items
         return items.Pickups([items.Pickup(
             kind=items.ItemKind(key='health', title='HEALTH', health=25),
             position=np.zeros(3))])
@@ -232,8 +232,6 @@ class TestNothingHereReadsAClock:
     """The rule that makes a match replayable from its inputs."""
 
     def test_the_module_imports_no_clock(self):
-        import ast
-        import inspect
         tree = ast.parse(inspect.getsource(rules))
         imported = set()
         for node in ast.walk(tree):

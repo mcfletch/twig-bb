@@ -141,6 +141,8 @@ select = [
     "SLF001",
     # Every parameter is read, or the protocol that fixes it is named.
     "ARG",
+    # Imports are at the top of the module; a function-level one names why.
+    "PLC0415",
     # The raw forms the engine has an API for (banned-api, below).
     "TID251",
 ]

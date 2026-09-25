@@ -13,22 +13,39 @@ means is decided by its material script, producing a
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Optional
-from collections.abc import Callable, Sequence
 
 import numpy as np
 
-from . import bspfile, externallightmaps, jumppads, q3bsp, q3geometry, q3shader
+from . import (
+    bspfile,
+    externallightmaps,
+    items,
+    jumppads,
+    lighting,
+    liquids,
+    q3bsp,
+    q3geometry,
+    q3shader,
+    speakers,
+)
 from .entities import Entity
 from .lightmapatlas import LightmapAtlas
-from .materials import (DEFAULT_LIGHTMAP_STRENGTH, TEXTURE_EXTENSIONS,
-                        MaterialLibrary, auto_lightmap_strength)
+from .materials import (
+    DEFAULT_LIGHTMAP_STRENGTH,
+    TEXTURE_EXTENSIONS,
+    MaterialLibrary,
+    auto_lightmap_strength,
+)
 from .scene import build_scene
 from .surfaces import SurfaceStyle
+from .visibility import Visibility
 from .worldgeometry import SCENE_SCALE, WorldGeometry, to_scene_points
 
 log = logging.getLogger(__name__)
@@ -92,7 +109,6 @@ class LoadedMap:
         """
         found = getattr(self, '_visibility', None)
         if found is None:
-            from .visibility import Visibility
             found = Visibility.from_bsp(self.bsp)
             self._visibility = found
         return found
@@ -109,7 +125,6 @@ class LoadedMap:
         it stands on reads as pasted onto the room.
         """
         if '_lightGrid' not in self.__dict__:
-            from . import lighting
             self._lightGrid = lighting.light_grid(
                 self.bsp, strength=self.library.lightmap_strength)
         return self._lightGrid
@@ -192,17 +207,14 @@ class LoadedMap:
         was skipped -- which matters, because a level whose whole weapon
         circuit is content nobody has plays exactly like a broken reader.
         """
-        from . import items
         return items.from_entities(self.entities, table)
 
     def unplaceable_pickups(self) -> Any:
         """Pickup classnames this game has nothing for, and how many of each."""
-        from . import items
         return items.unknown_classnames(self.entities)
 
     def liquid_volumes(self) -> Any:
         """The map's water, slime and lava as boxes to swim in."""
-        from . import liquids
         return liquids.from_map(self)
 
     def speakers(self) -> Any:
@@ -211,7 +223,6 @@ class LoadedMap:
         ``SPEC-Q3ENTITIES §1``.  Empty for the 21 of 50 shipped maps that place
         none, and for any map loaded without the content its sounds live in.
         """
-        from . import speakers
         return speakers.from_map(self)
 
     def push_volumes(self, scene_gravity: Optional[float] = None
@@ -320,7 +331,6 @@ def _attach_external_lightmaps(path: str, bsp: Any) -> None:
 
 def main() -> None:
     """Report what a map contains, without opening a window."""
-    import argparse
     parser = argparse.ArgumentParser(
         description='Read a Quake 3 map and report it')
     parser.add_argument('target', help='a .bsp map file')

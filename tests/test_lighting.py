@@ -14,11 +14,12 @@ lighting it at all.
 
 from __future__ import annotations
 
+import bspbuilder
 import numpy as np
 import pytest
+from OpenGLContext.scenegraph.lightgrid import LightGrid
 
-import bspbuilder
-from twig_bb import lighting, q3bsp
+from twig_bb import lighting, maploader, q3bsp
 from twig_bb.worldgeometry import SCENE_SCALE
 
 
@@ -107,7 +108,6 @@ class TestTheNodeAScenegraphGets:
         return lighting.light_grid(bsp, **named)
 
     def test_it_is_the_engine_s_own_node(self, tmp_path):
-        from OpenGLContext.scenegraph.lightgrid import LightGrid
         assert isinstance(self._grid(tmp_path), LightGrid)
 
     def test_it_holds_a_sample_for_every_point(self, tmp_path):
@@ -142,7 +142,6 @@ class TestWhatALoadedMapOffers:
     """The grid reaches the scenegraph through the map that carries it."""
 
     def _loaded(self, tmp_path, samples):
-        from twig_bb import maploader
         maps = tmp_path / 'maps'
         maps.mkdir(parents=True, exist_ok=True)
         path = maps / 'loaded.bsp'

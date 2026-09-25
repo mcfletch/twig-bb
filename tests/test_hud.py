@@ -9,7 +9,8 @@ from __future__ import annotations
 import math
 
 import pytest
-
+from OpenGLContext.events import systemtime
+from OpenGLContext.ui.debugoverlay import DebugPanel
 from OpenGLContext.ui.metrics import FontMetrics
 
 from twig_bb import hud, weapons
@@ -234,7 +235,6 @@ class TestMessages:
 class TestDeveloperInformation:
     def test_nothing_developer_facing_is_on_the_game_hud(self, screen):
         """§3: the two must not drift back together."""
-        from OpenGLContext.ui.debugoverlay import DebugPanel
         assert not [child for child in screen.walk()
                     if isinstance(child, DebugPanel)]
 
@@ -329,7 +329,6 @@ class TestOneClock:
         screen.tick(at)
 
     def test_the_hud_clock_is_the_engine_s(self):
-        from OpenGLContext.events import systemtime
         previous = systemtime.setTimeSource(lambda: 1234.5)
         try:
             assert hud.now() == 1234.5

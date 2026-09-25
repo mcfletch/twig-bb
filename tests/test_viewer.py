@@ -5,18 +5,35 @@ Everything here is arranged so it can be checked without a live GL window.
 
 from __future__ import annotations
 
+import dataclasses
+import inspect
 import os
 
+import bspbuilder
 import numpy as np
 import pytest
-
-import bspbuilder
+from omi_physics import model
+from omi_physics.world import PhysicsWorld
+from OpenGLContext.contextdefinition import ContextDefinition
+from OpenGLContext.events import eventhandlermixin, keyboardevents
+from OpenGLContext.move import modes as movemodes
+from OpenGLContext.move.navigation import NavigationManager
+from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
+from OpenGLContext.ui.metrics import FontMetrics
+from OpenGLContext.ui.widgets import Label
 from viewersupport import (
-    BindingRecorder, HeadlessContext, KeyEvent, NavStub, NullInput,
-    look_once, synthetic_map, walking_platform,
+    BindingRecorder,
+    HeadlessContext,
+    KeyEvent,
+    NavStub,
+    NullInput,
+    look_once,
+    synthetic_map,
+    walking_platform,
 )
-from twig_bb import collision, maploader, viewer
 
+from twig_bb import collision, liquids, mapnotice, maploader, viewer
+from twig_bb import debug as twigdebug
 
 # -- rendering environment ----------------------------------------------------
 
@@ -26,7 +43,6 @@ def test_the_viewer_draws_in_a_core_profile_with_the_pbr_pass():
     Core is what OpenGLContext resolves to on its own, so the viewer names
     the renderer and the backend and leaves the profile to the engine.
     """
-    from OpenGLContext.contextdefinition import ContextDefinition
     assert ContextDefinition().profile == 'core'
     assert os.environ['OPENGLCONTEXT_RENDERER'] == 'pbr'
     assert os.environ['OPENGLCONTEXT_BACKEND'] == 'glfw'
@@ -98,7 +114,6 @@ def test_the_spawn_index_selects_among_several(tmp_path):
 
 def _forward(map_angle_degrees: float) -> np.ndarray:
     """The world-space direction 'forward' walks for a map's `angle` key."""
-    from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
     platform = PhysicsViewPlatform.__new__(PhysicsViewPlatform)
     platform.yaw = viewer.yaw_for_angle(map_angle_degrees)
     return platform._world_dir(1.0, 0.0)  # noqa: SLF001 the engine has no public direction for a walk input on its physics platform
@@ -124,7 +139,6 @@ def test_a_map_yaw_of_two_seventy_faces_along_the_maps_minus_y():
 
 def test_turning_left_swings_the_gaze_anticlockwise_seen_from_above():
     """A rising platform yaw turns the camera *right*, so turn-left subtracts."""
-    from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
     platform = PhysicsViewPlatform.__new__(PhysicsViewPlatform)
     platform.yaw = viewer.yaw_for_angle(0.0)
     before = platform._world_dir(1.0, 0.0)  # noqa: SLF001 the engine has no public direction for a walk input on its physics platform
@@ -164,7 +178,6 @@ def test_a_map_with_nothing_solid_has_no_collision_world(tmp_path):
 def test_the_jump_pad_impulse_reaches_the_character(tmp_path):
     """The end-to-end rule: a pad sets the capsule's motion outright, which is
     what `apply_impulse` does (SPEC-TRIGGER-PUSH §2.4)."""
-    from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
     loaded = maploader.load(synthetic_map(tmp_path))
     world = collision.from_map(loaded).world
     nav = PhysicsViewPlatform(world, viewer.character_capabilities(),
@@ -394,7 +407,6 @@ def test_the_declared_modes_are_scaled_to_map_units():
 
 def test_a_swim_mode_is_declared_for_when_liquid_volumes_arrive():
     """It is world-imposed, so it is declared but never cycled into."""
-    from OpenGLContext.move import modes as movemodes
     swim = [m for m in viewer.movement_modes()
             if isinstance(m, movemodes.SwimMode)]
     assert swim
@@ -675,7 +687,6 @@ def test_the_prompt_asks_about_every_missing_pack_at_once(tmp_path, monkeypatch)
 
 def _prompt_text(prompt):
     """Everything the prompt puts in front of the user, as one string."""
-    from OpenGLContext.ui.widgets import Label
     return '\n'.join(widget.text for widget in prompt.walk()
                      if isinstance(widget, Label))
 
@@ -709,7 +720,6 @@ def test_declining_the_download_answers_no(tmp_path, monkeypatch):
 
 
 def _metrics():
-    from OpenGLContext.ui.metrics import FontMetrics
     return FontMetrics(8, 16, 2)
 
 
@@ -735,7 +745,6 @@ def test_the_mouse_look_mode_is_the_one_the_viewer_starts_in():
     The navigation manager takes the first selectable declared mode, so being
     the default is a matter of being declared first.
     """
-    from OpenGLContext.move.navigation import NavigationManager
     definition = viewer.context_definition()
     NavigationManager(definition, _platform_stub())
     assert str(definition.movementMode.name) == 'fps'
@@ -908,7 +917,6 @@ def test_leaving_the_water_takes_the_character_out_of_swimming():
 def test_being_in_a_liquid_volume_puts_the_avatar_in_the_swim_mode(tmp_path):
     """The world imposes the mode: nothing is selected, entering water is what
     decides it (`SPEC-BSP38 §9.4`)."""
-    from twig_bb import liquids
     nav = walking_platform(tmp_path)
     context = HeadlessContext(nav)
     volumes = liquids.LiquidVolumes([
@@ -920,7 +928,6 @@ def test_being_in_a_liquid_volume_puts_the_avatar_in_the_swim_mode(tmp_path):
 
 
 def test_leaving_the_water_gives_the_mode_back(tmp_path):
-    from twig_bb import liquids
     nav = walking_platform(tmp_path)
     context = HeadlessContext(nav)
     empty = liquids.LiquidVolumes([])
@@ -930,7 +937,6 @@ def test_leaving_the_water_gives_the_mode_back(tmp_path):
 
 
 def test_a_map_with_no_liquid_never_reports_being_submerged(tmp_path):
-    from twig_bb import liquids
     nav = walking_platform(tmp_path)
     viewer.update_submerged(nav, liquids.LiquidVolumes([]))
     assert not nav.submerged
@@ -959,7 +965,6 @@ class _Body:
 
 def _pool_volumes(surface=0.0, floor=-2.0):
     """One pool, wide enough that only the height decides these tests."""
-    from twig_bb import liquids
     return liquids.LiquidVolumes([liquids.LiquidVolume(
         mins=np.array([-10.0, floor, -10.0]),
         maxs=np.array([10.0, surface, 10.0]))])
@@ -1028,9 +1033,6 @@ def _quad(points, corners):
 
 def _pool_world():
     """A deck at y=0 with a pit in the middle of it, as one static trimesh."""
-    from omi_physics import model
-    from omi_physics.world import PhysicsWorld
-
     half, floor, edge = POOL_HALF, POOL_FLOOR, 8.0
     points, triangles = [], []
     spans = [(-edge, -half), (half, edge)]
@@ -1085,9 +1087,6 @@ def _swim_out(seconds=12.0, keys=('w', ' ')):
     applies from what the liquid volumes say, and the character controller
     moves the capsule against the real pit.
     """
-    from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
-    from twig_bb import liquids
-
     volumes = liquids.LiquidVolumes([liquids.LiquidVolume(
         mins=np.array([-POOL_HALF, POOL_FLOOR, -POOL_HALF]),
         maxs=np.array([POOL_HALF, POOL_SURFACE, POOL_HALF]))])
@@ -1133,7 +1132,6 @@ def test_a_companion_key_naming_no_registered_pack_is_ignored(tmp_path, monkeypa
     maps_root = tmp_path / 'pack'
     (maps_root / 'maps').mkdir(parents=True)
     (maps_root / 'maps' / 'oa_dm1.bsp').write_bytes(b'IBSP')
-    import dataclasses
     pack = dataclasses.replace(viewer.download.pack_for_key('openarena-maps'),
                                needs=('nonsense',))
     monkeypatch.setattr(viewer.download, 'parse_pack_target',
@@ -1153,9 +1151,6 @@ def test_a_texture_pack_key_naming_no_registered_pack_is_ignored(tmp_path):
 
 # -- the keys that open a screen ---------------------------------------------
 
-from OpenGLContext.contextdefinition import ContextDefinition  # noqa: E402
-from OpenGLContext.events import eventhandlermixin, keyboardevents  # noqa: E402
-from OpenGLContext.move.navigation import NavigationManager  # noqa: E402
 
 
 def test_function_keys_are_bound_where_they_are_actually_delivered():
@@ -1224,8 +1219,6 @@ def test_a_key_nothing_binds_reaches_nothing():
 
 def _mode_row(definition):
     """What the developer overlay's Player section says the mode is."""
-    from twig_bb import debug as twigdebug
-
     class Viewer:
         contextDefinition = definition
         _walking = True
@@ -1359,3 +1352,72 @@ def test_a_capture_leaves_the_hud_out_unless_it_is_asked_for():
     assert visible(['m.bsp', '--capture', 'out.png']) is False
     assert visible(['m.bsp', '--capture', 'out.png', '--hud']) is True
     assert visible(['m.bsp', '--no-hud']) is False
+
+
+class TestTheWeaponIsPinnedToTheView:
+    """A held weapon is posed where the camera is settled, not in OnIdle.
+
+    The arithmetic is tested in ``test_firstperson``; this is the viewer's side
+    of it: the pose is written from ``placeViewAttachments``.
+    """
+
+    def test_the_viewer_places_its_weapon_through_the_render_hook(self):
+        assert hasattr(viewer.TwigContext, 'placeViewAttachments')
+
+    def test_nothing_poses_the_weapon_from_the_idle_callback(self):
+        """The regression itself: OnIdle must not be where this happens."""
+        source = inspect.getsource(viewer.TwigContext.OnIdle)
+        assert '_updateWeapon' not in source, (
+            'the weapon is posed in OnIdle, which runs before the camera moves')
+
+
+class TestCalledOutWhenTheMapStarts:
+    """A player is told what they are standing in, on the screen they are on."""
+
+    class _HUD:
+        def __init__(self):
+            self.posted = []
+
+        def post(self, text):
+            self.posted.append(text)
+
+    def _context(self, notice):
+        class _Context:
+            pass
+
+        context = _Context()
+        context.notice = notice
+        context.hud = self._HUD()
+        viewer.TwigContext._creditMap(context)  # noqa: SLF001 a viewer method bound to a headless context
+        return context.hud.posted
+
+    def test_the_map_names_itself(self):
+        posted = self._context(mapnotice.MapNotice(name='oa_dm1',
+                                                   title='Big Arena'))
+        assert any('Big Arena' in line for line in posted)
+
+    def test_its_terms_are_said_out_loud(self):
+        posted = self._context(mapnotice.MapNotice(name='oa_dm1',
+                                                   licence='CC BY-SA 3.0'))
+        assert any('CC BY-SA 3.0' in line for line in posted)
+
+    def test_what_is_posted_fits_a_line(self):
+        """`MessageQueue` does not wrap: a long line runs off the screen."""
+        posted = self._context(mapnotice.MapNotice(
+            name='oa_dm1', title='Aggressor', author='Tyrann',
+            licence='OpenArena project, CC BY-SA 3.0 / GPL; Debian main'))
+        assert posted and all(len(line) <= mapnotice.CREDIT_WIDTH
+                              for line in posted)
+
+    def test_it_reads_downwards_from_the_map_name(self):
+        """The queue shows newest first, so the credit is posted backwards."""
+        posted = self._context(mapnotice.MapNotice(
+            name='oa_dm1', title='Aggressor', licence='CC BY-SA 3.0'))
+        assert posted[-1] == 'Aggressor'
+
+    def test_a_map_that_states_no_terms_says_only_its_name(self):
+        posted = self._context(mapnotice.MapNotice(name='mine'))
+        assert posted == ['mine']
+
+    def test_no_notice_yet_posts_nothing_rather_than_failing(self):
+        assert self._context(None) == []

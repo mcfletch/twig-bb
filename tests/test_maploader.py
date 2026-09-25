@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import time
 
+import bspbuilder
 import numpy as np
 import pytest
+from PIL import Image
 
-import bspbuilder
 from twig_bb import maploader
 from twig_bb.bspfile import MalformedBSP
+from twig_bb.materials import DEFAULT_LIGHTMAP_STRENGTH
 
 
 def _q3(tmp_path, lumps=None, name='q3test.bsp'):
@@ -160,7 +162,6 @@ def test_a_map_reports_the_textures_it_could_not_find(tmp_path):
 
 
 def test_a_texture_that_is_present_is_not_reported_missing(tmp_path):
-    from PIL import Image
     directory = tmp_path / 'textures' / 'base'
     directory.mkdir(parents=True)
     Image.new('RGB', (8, 8)).save(str(directory / 'wall.tga'))
@@ -227,8 +228,6 @@ class TestTheCostOfAskingTwice:
 
 def test_an_explicit_exposure_is_honoured_over_the_measured_one(write_map):
     """`--lightmap` is the user overriding a decision, not a hint."""
-    import bspbuilder
-    from twig_bb import maploader
     lumps = bspbuilder.v46_quad(
         lm_index=0, lightmaps=bytes(bytearray([200]) * (128 * 128 * 3)))
     path = write_map(46, lumps)
@@ -237,9 +236,6 @@ def test_an_explicit_exposure_is_honoured_over_the_measured_one(write_map):
 
 def test_a_brightly_baked_map_is_exposed_down_by_default(write_map):
     """No `--lightmap` means "work it out from the map", not "use 2.0"."""
-    import bspbuilder
-    from twig_bb import maploader
-    from twig_bb.materials import DEFAULT_LIGHTMAP_STRENGTH
     lumps = bspbuilder.v46_quad(
         lm_index=0, lightmaps=bytes(bytearray([200]) * (128 * 128 * 3)))
     loaded = maploader.load(write_map(46, lumps))
@@ -247,9 +243,6 @@ def test_a_brightly_baked_map_is_exposed_down_by_default(write_map):
 
 
 def test_a_darkly_baked_map_keeps_the_default(write_map):
-    import bspbuilder
-    from twig_bb import maploader
-    from twig_bb.materials import DEFAULT_LIGHTMAP_STRENGTH
     lumps = bspbuilder.v46_quad(
         lm_index=0, lightmaps=bytes(bytearray([8]) * (128 * 128 * 3)))
     loaded = maploader.load(write_map(46, lumps))
@@ -257,8 +250,5 @@ def test_a_darkly_baked_map_keeps_the_default(write_map):
 
 
 def test_a_map_with_no_lightmap_keeps_the_default(write_map):
-    import bspbuilder
-    from twig_bb import maploader
-    from twig_bb.materials import DEFAULT_LIGHTMAP_STRENGTH
     loaded = maploader.load(write_map(46, bspbuilder.v46_quad(lm_index=-1)))
     assert loaded.library.lightmap_strength == DEFAULT_LIGHTMAP_STRENGTH

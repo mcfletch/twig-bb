@@ -9,14 +9,17 @@ is half built.
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
-
 from OpenGLContext.ui.debugoverlay import DebugOverlay
 
+from twig_bb import arena, effects, falling, items, liquids, projectiles, rules, weapons
 from twig_bb import debug as twigdebug
-from twig_bb import weapons
+from twig_bb.entities import Entity
 from twig_bb.frameclock import FrameClock
+from twig_bb.mapnotice import MapNotice
 from twig_bb.player import PlayerState
+from twig_bb.speakers import from_entities
 
 
 class FakeWorld:
@@ -132,7 +135,6 @@ class TestMapSection:
 
     def test_it_credits_the_map_it_is_showing(self, viewer):
         """A level is somebody's work; the overlay says whose, and under what."""
-        from twig_bb.mapnotice import MapNotice
         viewer.notice = MapNotice(name='ztn3dm1', title='Blood Run',
                                   author='Tyrann', pack='OpenArena maps',
                                   licence='CC BY-SA 3.0')
@@ -143,7 +145,6 @@ class TestMapSection:
         assert found['licence'] == 'CC BY-SA 3.0'
 
     def test_a_map_that_credits_nobody_grows_no_empty_rows(self, viewer):
-        from twig_bb.mapnotice import MapNotice
         viewer.notice = MapNotice(name='ztn3dm1')
         twigdebug.install(viewer)
         found = rows(viewer, 'Map')
@@ -152,9 +153,6 @@ class TestMapSection:
 
     def test_it_counts_the_speakers_that_found_a_sound(self):
         """"Why is it silent" is answered by this number being zero."""
-        from twig_bb.speakers import from_entities
-        from twig_bb.entities import Entity
-
         class Found:
             def resolve(self, noise):
                 return '/content/' + noise
@@ -200,7 +198,6 @@ class TestMapSection:
         assert 'pickups not answered' not in rows(Viewer(), 'Map')
 
     def test_it_counts_the_pickups_that_are_placed(self):
-        from twig_bb import items, projectiles, rules
         viewer = Viewer(rules=rules.Rules(
             None, minds={}, flight=projectiles.Projectiles(),
             ))
@@ -215,7 +212,6 @@ class TestMapSection:
         volumes and its lava is scenery; a level with no floor under it is a
         fall that never ends.
         """
-        from twig_bb import falling, liquids, projectiles, rules
         viewer = Viewer(rules=rules.Rules(
             None, minds={}, flight=projectiles.Projectiles(),
             harm=liquids.LiquidHarm(liquids.LiquidVolumes([])),
@@ -236,10 +232,6 @@ class TestWhichLiquidThePlayerIsIn:
     """"Submerged: True" cannot tell a right liquid from a wrong one."""
 
     def submerged_in(self, kind):
-        import numpy as np
-
-        from twig_bb import liquids
-
         class Swimming:
             submerged = True
             grounded = False
@@ -264,10 +256,6 @@ class TestWhichLiquidThePlayerIsIn:
         in the air and the rest of them in the pool, and the row is there to
         name the liquid rather than to say "something".
         """
-        import numpy as np
-
-        from twig_bb import liquids
-
         class Surfacing:
             submerged = True
 
@@ -392,7 +380,6 @@ class TestTheCombatSection:
         pass
 
     def context(self):
-        from twig_bb import arena, effects, projectiles, weapons
         made = self.Context()
         made.arena = arena.Arena(weapons=weapons.default_table())
         made.arena.add('player', name='You')
@@ -404,7 +391,6 @@ class TestTheCombatSection:
         return dict(twigdebug.combat_provider(context)())
 
     def test_it_says_how_much_of_the_budget_is_in_the_air(self):
-        from twig_bb import projectiles
         context = self.context()
         context.flight.launch(
             context.flight.table.by_key(projectiles.ROCKET),
@@ -412,13 +398,11 @@ class TestTheCombatSection:
         assert self.rows(context)['in flight'].startswith('1 /')
 
     def test_it_says_what_the_effects_setting_is(self):
-        from twig_bb import effects
         context = self.context()
         context.effects.intensity = effects.REDUCED
         assert self.rows(context)['effects'] == effects.REDUCED
 
     def test_it_counts_the_particles_alive(self):
-        from twig_bb import arena
         context = self.context()
         context.effects.show([arena.Impact(point=(0, 0, 0), normal=(0, 1, 0),
                                            surface='stone')])

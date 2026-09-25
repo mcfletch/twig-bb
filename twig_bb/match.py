@@ -26,7 +26,11 @@ import tempfile
 from dataclasses import dataclass
 from typing import Any, ClassVar, Optional
 
+from OpenGLContext.contextconfig import ContextConfigMixin
+from OpenGLContext.ui import pictures
 from vrml import field, node
+
+from . import catalog, crnfile, download
 
 log = logging.getLogger(__name__)
 
@@ -100,7 +104,6 @@ def validate(setup: MatchSetup) -> MatchSetup:
 def setup_path(directory: Optional[str] = None) -> str:
     """Where the last choice is kept: a named directory, or the user's own."""
     if directory is None:
-        from OpenGLContext.contextconfig import ContextConfigMixin
         directory = ContextConfigMixin.getUserAppDataDirectory()
     return os.path.join(directory, SETUP_FILE)
 
@@ -201,8 +204,6 @@ def register_picture_decoders() -> None:
 
     Idempotent, and safe to call before a window exists.
     """
-    from OpenGLContext.ui import pictures
-    from . import crnfile
     pictures.registerDecoder(crnfile.EXTENSION, crnfile.load)
 
 
@@ -230,7 +231,6 @@ def levels_available(cache_dir: Optional[str] = None,
     *not* fetched is offered as a download instead, which is a different
     question and belongs on a different screen.
     """
-    from . import download
     found: list[Level] = []
     for pack in (download.ASSET_PACKS if packs is None else packs):
         root = download.pack_root(pack, cache_dir)
@@ -250,7 +250,6 @@ def level_target(pack: Any, name: str) -> str:
     any other pack by its whole key, so a short name another publisher shares
     with one of ours is not read back as ours.
     """
-    from . import catalog
     namespace, _, short = pack.key.partition('/')
     return '%s:%s' % (short if namespace == catalog.NAMESPACE else pack.key,
                       name)

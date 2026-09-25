@@ -9,6 +9,7 @@ import logging
 
 import numpy as np
 import pytest
+from PIL import Image
 
 from twig_bb import materials
 from twig_bb.materials import MaterialLibrary
@@ -16,7 +17,6 @@ from twig_bb.surfaces import SurfaceStyle
 
 
 def write_image(path, size=(8, 4), colour=(255, 0, 0)):
-    from PIL import Image
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.new('RGB', size, colour).save(str(path))
     return path
@@ -267,7 +267,6 @@ class TestTextureForName:
         assert library.texture_for('textures/absent') is None
 
     def test_a_name_with_an_image_resolves_to_a_texture(self, tmp_path):
-        from PIL import Image
         directory = tmp_path / 'textures'
         directory.mkdir()
         Image.new('RGB', (4, 4), (255, 0, 0)).save(directory / 'frame.png')
@@ -276,7 +275,6 @@ class TestTextureForName:
 
     def test_the_same_name_gives_the_same_texture(self, tmp_path):
         """One decode however many surfaces or frames name it."""
-        from PIL import Image
         directory = tmp_path / 'textures'
         directory.mkdir()
         Image.new('RGB', (4, 4), (0, 255, 0)).save(directory / 'frame.png')
@@ -297,8 +295,6 @@ class TestOpenImage:
     def test_a_decoder_failure_is_logged_with_its_traceback(self, tmp_path,
                                                             monkeypatch, caplog):
         """Anything past "not an image" is a decoder's fault, worth a traceback."""
-        from PIL import Image
-
         def broken(path):  # noqa: ARG001 a stand-in taking the arguments its caller passes
             raise ValueError('a damaged stream')
 

@@ -11,13 +11,14 @@ game's store.
 
 from __future__ import annotations
 
-from typing import Any, Optional
 from collections.abc import Callable, Sequence
+from typing import Any, Optional
 
 from OpenGLContext.contentpacks.fetch import Cancelled
 from OpenGLContext.contentpacks.fetch import FetchJob as _FetchJob
 from OpenGLContext.contentpacks.fetch import fetch_pack as _fetch_pack
 
+from . import download
 from .assetpack import AssetPack
 
 __all__ = ['Cancelled', 'FetchJob', 'fetch_pack']
@@ -26,7 +27,6 @@ __all__ = ['Cancelled', 'FetchJob', 'fetch_pack']
 def fetch_pack(pack: AssetPack, progress: Any, cancel: Any,
                cache_dir: Optional[str] = None) -> str:
     """Fetch and unpack one pack, reporting progress and honouring a cancel."""
-    from . import download
     return _fetch_pack(pack, download.store(cache_dir), progress, cancel)
 
 
@@ -41,7 +41,6 @@ class FetchJob(_FetchJob):
                  fetch: Optional[Callable[..., str]] = None,
                  cache_dir: Optional[str] = None,
                  on_progress: Optional[Callable[[], None]] = None) -> None:
-        from . import download
         super().__init__(packs, download.store(cache_dir), fetch=fetch,
                          cache_dir=None, on_progress=on_progress)
 

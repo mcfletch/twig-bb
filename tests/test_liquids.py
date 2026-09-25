@@ -7,11 +7,11 @@ is the same question either way.
 
 from __future__ import annotations
 
+import bspbuilder
 import numpy as np
 import pytest
 
-import bspbuilder
-from twig_bb import liquids, maploader
+from twig_bb import arena, liquids, maploader, weapons
 from twig_bb.worldgeometry import SCENE_SCALE, to_scene_points
 
 
@@ -219,7 +219,6 @@ class TestTheVolumeIsTheLiquidRatherThanTheLeaf:
 
     def shallow(self, tmp_path):
         """A leaf reaching the ceiling with a shin-deep pool of water in it."""
-        import bspbuilder
         lumps = bspbuilder.v46_water(brush_maxs=(64, 64, -16))
         return _v46_map(tmp_path, lumps, WATER_SHADER)
 
@@ -255,7 +254,6 @@ class TestWhatStandingInItCosts:
                                  kind=kind)])
 
     def match(self, where=(0.0, -1.0, 0.0)):
-        from twig_bb import arena, weapons
         made = arena.Arena(weapons=weapons.default_table())
         made.add('player', position=where, name='You')
         return made
@@ -294,7 +292,6 @@ class TestWhatStandingInItCosts:
         assert not self.harm('lava', seconds=8.0).combatant('player').alive
 
     def test_the_death_says_what_did_it(self):
-        from twig_bb import arena
         found = self.harm('lava', seconds=8.0)
         deaths = [event for event in found.events
                   if isinstance(event, arena.Death)]
@@ -370,7 +367,6 @@ class TestWhatStandingInItCosts:
         assert liquids.LiquidVolumes([]).kind_along((0.0, 0.0, 0.0), 1.8) == ''
 
     def test_every_combatant_is_burned_not_only_the_player(self):
-        from twig_bb import arena, weapons
         found = arena.Arena(weapons=weapons.default_table())
         found.add('player', position=(0.0, -1.0, 0.0))
         found.add('bot1', position=(1.0, -1.0, 0.0), bot=True)

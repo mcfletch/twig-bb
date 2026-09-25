@@ -16,18 +16,23 @@ would write is bounded by its own size, before anything is written.
 
 from __future__ import annotations
 
+import argparse
 import fnmatch
 import hashlib
 import logging
 import os
+import tempfile
 import zipfile
-from typing import Optional
 from collections.abc import Sequence
+from typing import Optional
 
-from OpenGLContext import atomicfiles
-from OpenGLContext.contentpacks import ContentStore, archive as engine_archive
+from OpenGLContext import atomicfiles, userpaths
+from OpenGLContext.contentpacks import ContentStore
+from OpenGLContext.contentpacks import archive as engine_archive
 from OpenGLContext.contentpacks import catalog as engine_catalog
+from OpenGLContext.contentpacks import fetch as engine_fetch
 from OpenGLContext.contentpacks.archive import UnsafeArchive as UnsafeArchive
+
 # Re-exported: what a pack of a declared size is fetched under is the
 # engine's answer, and the game's callers ask it here.
 from OpenGLContext.contentpacks.fetch import fetch_limit as fetch_limit
@@ -423,7 +428,6 @@ def fetch_pack(pack: AssetPack, cache_dir: Optional[str] = None) -> str:
     this is available". Raises ``OSError`` when the pack does not arrive or
     will not unpack.
     """
-    from OpenGLContext.contentpacks import fetch as engine_fetch
     return engine_fetch.fetch_pack(pack, store(cache_dir))
 
 
@@ -440,11 +444,9 @@ def _unpack_dir(target: str, cache_dir: Optional[str]) -> str:
 
 def _default_cache() -> str:
     """The per-user cache root the rest of OpenGLContext writes under."""
-    from OpenGLContext import userpaths
     try:
         return os.path.join(userpaths.appdatadirectory(), 'OpenGLContext')
     except OSError:                             # pragma: no cover - no home dir
-        import tempfile
         return tempfile.gettempdir()
 
 
@@ -475,7 +477,6 @@ def purge(cache_dir: Optional[str] = None) -> None:
 
 def main() -> None:
     """Download and unpack a map archive from the command line."""
-    import argparse
     parser = argparse.ArgumentParser(
         description='Fetch and unpack a Quake-style map archive')
     parser.add_argument('target', help='a http(s) URL, a .pk3/.zip, or a .bsp')

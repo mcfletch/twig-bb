@@ -12,6 +12,9 @@ events** and never draws, and nothing in here reads a wall clock.
 
 from __future__ import annotations
 
+import ast
+import inspect
+
 import numpy as np
 import pytest
 
@@ -20,7 +23,6 @@ from twig_bb import arena, weapons
 
 def _imported_from(node):
     """Every module name one AST node imports, or nothing for other nodes."""
-    import ast
     if isinstance(node, ast.Import):
         return [alias.name for alias in node.names]
     if isinstance(node, ast.ImportFrom):
@@ -220,7 +222,6 @@ class TestTheEventsItEmits:
 
     def test_nothing_in_the_rules_reads_a_clock(self):
         """§11: rules read the tick number; a wall clock cannot be replayed."""
-        import inspect
         source = inspect.getsource(arena)
         assert 'time.time' not in source
         assert 'perf_counter' not in source
@@ -232,8 +233,6 @@ class TestTheEventsItEmits:
         own prose says the word "HUD" while being the thing that must not
         touch one.
         """
-        import ast
-        import inspect
         for node in ast.walk(ast.parse(inspect.getsource(arena))):
             for name in _imported_from(node):
                 assert not name.startswith('OpenGLContext')

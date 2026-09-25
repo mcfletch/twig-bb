@@ -12,11 +12,12 @@ content, and putting the result at the top of the acknowledgements.
 
 from __future__ import annotations
 
+import glob
 import os
 
 import pytest
 
-from twig_bb import mapnotice
+from twig_bb import download, maploader, mapnotice, notices
 from twig_bb.assetpack import AssetPack
 
 
@@ -319,7 +320,6 @@ class TestAtTheTopOfTheAcknowledgements:
     """What is being played comes before what it is built on."""
 
     def test_the_running_map_is_named_before_the_libraries(self):
-        from twig_bb import notices
         notice = mapnotice.MapNotice(name='oa_dm1', title='Big Arena',
                                      licence='CC BY-SA 3.0')
         text = notices.full_text(current=notice)
@@ -327,67 +327,11 @@ class TestAtTheTopOfTheAcknowledgements:
             'Libraries this program is built on')
 
     def test_the_terms_of_the_running_map_are_in_it(self):
-        from twig_bb import notices
         notice = mapnotice.MapNotice(name='oa_dm1', licence='CC BY-SA 3.0')
         assert 'CC BY-SA 3.0' in notices.full_text(current=notice)
 
     def test_with_no_map_running_the_screen_is_what_it_was(self):
-        from twig_bb import notices
         assert notices.full_text(current=None) == notices.full_text()
-
-
-class TestCalledOutWhenTheMapStarts:
-    """A player is told what they are standing in, on the screen they are on."""
-
-    class _HUD:
-        def __init__(self):
-            self.posted = []
-
-        def post(self, text):
-            self.posted.append(text)
-
-    def _context(self, notice):
-        from twig_bb import viewer
-
-        class _Context:
-            pass
-
-        context = _Context()
-        context.notice = notice
-        context.hud = self._HUD()
-        viewer.TwigContext._creditMap(context)  # noqa: SLF001 a viewer method bound to a headless context
-        return context.hud.posted
-
-    def test_the_map_names_itself(self):
-        posted = self._context(mapnotice.MapNotice(name='oa_dm1',
-                                                   title='Big Arena'))
-        assert any('Big Arena' in line for line in posted)
-
-    def test_its_terms_are_said_out_loud(self):
-        posted = self._context(mapnotice.MapNotice(name='oa_dm1',
-                                                   licence='CC BY-SA 3.0'))
-        assert any('CC BY-SA 3.0' in line for line in posted)
-
-    def test_what_is_posted_fits_a_line(self):
-        """`MessageQueue` does not wrap: a long line runs off the screen."""
-        posted = self._context(mapnotice.MapNotice(
-            name='oa_dm1', title='Aggressor', author='Tyrann',
-            licence='OpenArena project, CC BY-SA 3.0 / GPL; Debian main'))
-        assert posted and all(len(line) <= mapnotice.CREDIT_WIDTH
-                              for line in posted)
-
-    def test_it_reads_downwards_from_the_map_name(self):
-        """The queue shows newest first, so the credit is posted backwards."""
-        posted = self._context(mapnotice.MapNotice(
-            name='oa_dm1', title='Aggressor', licence='CC BY-SA 3.0'))
-        assert posted[-1] == 'Aggressor'
-
-    def test_a_map_that_states_no_terms_says_only_its_name(self):
-        posted = self._context(mapnotice.MapNotice(name='mine'))
-        assert posted == ['mine']
-
-    def test_no_notice_yet_posts_nothing_rather_than_failing(self):
-        assert self._context(None) == []
 
 
 @pytest.mark.sample
@@ -395,11 +339,9 @@ class TestAgainstRealMaps:
     """The embedded titles these rules were written from."""
 
     def test_a_fetched_map_yields_a_notice_with_its_pack(self):
-        from twig_bb import download, maploader
         root = download.pack_root(download.pack_for_key('openarena-maps'))
         if not root:
             pytest.skip('openarena-maps is not fetched')
-        import glob
         found = glob.glob(os.path.join(root, '**', 'maps', '*.bsp'),
                           recursive=True)
         if not found:

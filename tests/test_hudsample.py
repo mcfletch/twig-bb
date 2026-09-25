@@ -11,7 +11,11 @@ import os
 import subprocess
 import sys
 
+import numpy as np
 import pytest
+from OpenGLContext.scenegraph.basenodes import Transform
+from OpenGLContext.scenegraph.light import DirectionalLight, PointLight
+from PIL import Image
 
 from twig_bb import hudsample
 
@@ -24,14 +28,12 @@ class TestTheRoom:
 
     def test_it_is_lit(self):
         """A HUD over an unlit room says nothing about whether it reads."""
-        from OpenGLContext.scenegraph.light import DirectionalLight, PointLight
         lights = [child for child in hudsample.build_room()
                   if isinstance(child, (DirectionalLight, PointLight))]
         assert lights
 
     def test_it_is_closed_in(self):
         """Floor, ceiling and four walls: six slabs before the blocks."""
-        from OpenGLContext.scenegraph.basenodes import Transform
         boxes = [child for child in hudsample.build_room()
                  if isinstance(child, Transform)]
         assert len(boxes) >= 6
@@ -59,8 +61,6 @@ def test_the_demo_renders_the_hud_and_the_weapon(tmp_path):
                  OPENGLCONTEXT_BACKEND='glfw'))
     assert out.exists(), 'no capture written:\n%s\n%s' % (result.stdout,
                                                           result.stderr)
-    from PIL import Image
-    import numpy as np
     pixels = np.asarray(Image.open(out).convert('RGB')).astype(int)
     height, width = pixels.shape[:2]
     # The reticule is in the middle and the weapon bar along the bottom; both
@@ -80,3 +80,8 @@ class TestChoosingAWeaponUpFront:
 
     def test_none_is_the_default(self):
         assert hudsample.build_parser().parse_args([]).weapon is None
+
+
+def test_the_demo_places_its_weapon_through_the_render_hook():
+    """The demo poses the held weapon where the viewer does; see test_firstperson."""
+    assert hasattr(hudsample.HUDSampleContext, 'placeViewAttachments')

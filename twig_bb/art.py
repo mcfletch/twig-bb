@@ -22,12 +22,14 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Optional
 from collections.abc import Iterator, Sequence
+from typing import Any, Optional
 
+from OpenGLContext.character.attachment import mounted
 from OpenGLContext.contentpacks import Application, ContentStore
+from OpenGLContext.loaders.gltf import load_gltf
 
-from . import catalog
+from . import catalog, download
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +44,6 @@ class _Content(Application):
     """The game's packs, in the store :func:`twig_bb.download.store` opens."""
 
     def store(self, root: Optional[str] = None) -> ContentStore:
-        from . import download
         return download.store(root or self.root)
 
 
@@ -59,7 +60,6 @@ def assets_directory(cache_dir: Optional[str] = None) -> str:
     Asked each time, since the game is imported before a first run can have
     fetched anything.
     """
-    from . import download
     return CONTENT.base_directory(download.store(cache_dir))
 
 
@@ -94,11 +94,9 @@ def load(relative: str, mount: Optional[str] = None) -> Optional[Any]:
     path = relative
     try:
         path = path_for(relative)
-        from OpenGLContext.loaders.gltf import load_gltf
         scene = load_gltf(path)
         if mount is None:
             return scene.group
-        from OpenGLContext.character.attachment import mounted
         return mounted(scene, mount)
     except Exception:                       # art, not rules
         log.warning('could not load the model %s', path, exc_info=True)

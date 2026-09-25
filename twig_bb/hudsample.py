@@ -42,8 +42,8 @@ import logging
 import math
 import os
 import sys
-from typing import Any
 from collections.abc import Sequence
+from typing import Any
 
 os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
@@ -51,23 +51,31 @@ os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
 from OpenGLContext import testingcontext
 from OpenGLContext.capture import SettleCapture
 from OpenGLContext.contextdefinition import ContextDefinition
+from OpenGLContext.events.mouseevents import WHEEL_DOWN, WHEEL_UP
 from OpenGLContext.scenegraph.appearance import Appearance
 from OpenGLContext.scenegraph.basenodes import (
-    Box, Material, Shape, Transform,
+    Box,
+    Material,
+    Shape,
+    Transform,
 )
 from OpenGLContext.scenegraph.light import (
-    DirectionalLight, PointLight,
+    DirectionalLight,
+    PointLight,
 )
 from OpenGLContext.scenegraph.scenegraph import SceneGraph
 from OpenGLContext.testing.process_exit import flush_and_exit
 from OpenGLContext.ui import bindings, settings
 from OpenGLContext.ui.overlay import OverlayMixin
 
-from . import controls, weapons as weapontable
+from . import controls
 from . import debug as twigdebug
+from . import weapons as weapontable
 from .firstperson import WeaponHand, aim_at_camera
-from .hud import GameHUD, now as hudclock
+from .hud import GameHUD
+from .hud import now as hudclock
 from .player import PlayerState
+from .viewer import disable_vsync
 
 log = logging.getLogger(__name__)
 
@@ -155,7 +163,6 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
         # messages fade on their own -- and a vsynced swap blocks on a
         # compositor frame callback that a window nobody is watching never
         # gets, so a capture would draw one frame and then wait forever.
-        from .viewer import disable_vsync
         disable_vsync(self)
         self.weapons = weapontable.default_table()
         # Carrying everything: this demo is *for* looking at the weapons, and
@@ -207,7 +214,6 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
                              function=self._bindingsScreen)
         self.addEventHandler('keyboard', name='<F10>', state=1,
                              function=self._settingsScreen)
-        from OpenGLContext.events.mouseevents import WHEEL_DOWN, WHEEL_UP
         for button, step in ((WHEEL_UP, 1), (WHEEL_DOWN, -1)):
             self.addEventHandler('mousebutton', button=button, state=1,
                                  function=self._wheel(step))

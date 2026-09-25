@@ -7,11 +7,14 @@ three boxes rather than against a level.
 
 from __future__ import annotations
 
+import ast
+import inspect
+
 import numpy as np
 import pytest
-
-from omi_physics import model
+from omi_physics import model, raycast
 from omi_physics.world import PhysicsWorld
+from test_game import floor, started
 
 from twig_bb import arena, collision, combat, weapons
 from twig_bb.surfaces import SurfaceStyle
@@ -24,7 +27,6 @@ def _imported_from(node):
     ``from x import y`` counts as ``x.y``, so a rule about what a module may
     reach can name the one module it allows rather than the package it is in.
     """
-    import ast
     if isinstance(node, ast.Import):
         return [alias.name for alias in node.names]
     if isinstance(node, ast.ImportFrom):
@@ -287,8 +289,6 @@ class TestWhatAShotSays:
     ENGINE = ('OpenGLContext.entropy',)
 
     def test_nothing_in_the_shooting_rules_can_reach_the_presentation(self):
-        import ast
-        import inspect
         for node in ast.walk(ast.parse(inspect.getsource(combat))):
             for name in _imported_from(node):
                 if name in self.ENGINE:
@@ -708,13 +708,11 @@ class TestSeeingIsOneFactAboutAPair:
     """
 
     def world_and_match(self):
-        from test_game import floor, started
         return floor(), started(bots=3, spawns=((0, 1, 0), (6, 1, 0),
                                                 (0, 1, 6), (6, 1, 6)))
 
     def casts(self, world, found, seen):
         """How many rays a full round of mutual looking costs."""
-        from omi_physics import raycast
         counted = []
         real = raycast.line_of_sight
 

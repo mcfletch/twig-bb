@@ -10,7 +10,10 @@ recolour that has repainted the wrong thing.
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 
+from OpenGLContext.contentpacks import fetch
 from OpenGLContext.scenegraph.appearance import Appearance
 from OpenGLContext.scenegraph.box import Box
 from OpenGLContext.scenegraph.group import Group
@@ -18,7 +21,7 @@ from OpenGLContext.scenegraph.material import Material
 from OpenGLContext.scenegraph.shape import Shape
 from OpenGLContext.scenegraph.transform import Transform
 
-from twig_bb import art, items
+from twig_bb import art, download, items
 
 
 def painted(colour=(1.0, 1.0, 1.0)):
@@ -40,7 +43,6 @@ class TestWhereTheArtIs:
 
     def test_it_follows_a_pack_installed_after_import(self, tmp_path,
                                                       monkeypatch):
-        from twig_bb import download
         pack = download.pack_for_key('twig-bb/art')
         root = tmp_path / 'local' / 'twig-bb' / pack.directory
         (root / pack.marker).mkdir(parents=True)
@@ -207,13 +209,11 @@ class TestWhereTheGamesOwnArtComesFrom:
     """
 
     def test_it_is_the_wheel_until_the_pack_is_here(self, tmp_path):
-        from twig_bb import art
         where = art.assets_directory(cache_dir=str(tmp_path))
         assert os.path.isdir(os.path.join(where, 'characters'))
         assert where == art.IN_WHEEL
 
     def test_and_the_pack_once_it_is(self, tmp_path):
-        from twig_bb import art, download
         pack = download.pack_for_key('twig-bb/art')
         assert pack is not None and pack.base
         root = download.store(str(tmp_path)).directory_for(pack)
@@ -223,14 +223,10 @@ class TestWhereTheGamesOwnArtComesFrom:
     def test_the_base_pack_carries_a_digest(self):
         """The one thing the game cannot start without: a truncated download of
         it should be a refusal, not a missing character."""
-        from twig_bb import download
         pack = download.pack_for_key('twig-bb/art')
         assert len(pack.sha256) == 64
 
     def test_a_first_run_asks_for_it(self, tmp_path):
-        from OpenGLContext.contentpacks import fetch
-
-        from twig_bb import download
         wanted = fetch.missing_base(list(download.ASSET_PACKS),
                                     download.store(str(tmp_path)))
         assert [one.key for one in wanted] == ['twig-bb/art']
@@ -241,8 +237,6 @@ class TestImportingTheGameTouchesNoFiles:
     megabytes, and belongs to the game starting, not to a module loading."""
 
     def test_importing_the_art_moves_nothing(self, tmp_path):
-        import subprocess
-        import sys
         legacy = tmp_path / 'OpenGLContext' / 'twig-bb-content' / \
             'xcsv_hires' / 'textures'
         legacy.mkdir(parents=True)

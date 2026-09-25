@@ -33,8 +33,8 @@ import re
 import subprocess
 import sys
 import tempfile
-from typing import Any, Optional
 from collections.abc import Sequence
+from typing import Any, Optional
 
 #: A hidden window that renders and reads back exactly as a mapped one does.
 #: A window nothing is showing is never handed a frame callback by a Wayland
@@ -84,9 +84,8 @@ def play(argv: list[str], scripted: bool = True) -> None:
     The **replayed** run takes no script at all: its input is the journal, and
     a game given both would be given every key twice.
     """
-    from OpenGLContext.events import synthetic
-
-    from twig_bb import viewer
+    from OpenGLContext.events import synthetic  # noqa: PLC0415 only the process that plays imports the engine
+    from twig_bb import viewer  # noqa: PLC0415 twig_bb.viewer sets the engine's environment on import; only the process that plays imports it
 
     class Scripted(viewer.TwigContext):
         """The game, with the script delivered as the platform would deliver it.

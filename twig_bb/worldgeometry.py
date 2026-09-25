@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 import numpy as np
+from OpenGLContext.loaders.gltf.meshes import estimate_tangents
 
 from .surfaces import SurfaceStyle
 
@@ -287,7 +288,6 @@ class GeometryBuilder:
             packed = np.concatenate(supplied)
             return np.column_stack(
                 (to_scene_directions(packed[:, :3]), packed[:, 3]))
-        from OpenGLContext.loaders.gltf.meshes import estimate_tangents
         return estimate_tangents(positions, normals, texcoords, indices)
 
 

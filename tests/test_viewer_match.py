@@ -12,15 +12,30 @@ import types
 
 import numpy as np
 import pytest
+from OpenGLContext.events.inputstate import InputState
+from OpenGLContext.events.mouseevents import MouseButtonEvent
 from OpenGLContext.move import viewplatform
+from OpenGLContext.move.viewplatform import ViewPlatform
+from viewersupport import (
+    BindingRecorder,
+    HeadlessContext,
+    look_once,
+    walking_platform,
+)
 
 from twig_bb import (
-    arena, deathcam, firstperson, game, hud, player, projectiles, rules,
-    viewer, weapons,
+    arena,
+    deathcam,
+    firstperson,
+    game,
+    hud,
+    player,
+    projectiles,
+    rules,
+    viewer,
+    weapons,
 )
-from viewersupport import (
-    BindingRecorder, HeadlessContext, look_once, walking_platform,
-)
+from twig_bb import telemetry as gamemarks
 
 
 class TestDyingAndComingBack:
@@ -36,7 +51,6 @@ class TestDyingAndComingBack:
 
     def context(self, tmp_path, monkeypatch):
         """A viewer's match wiring with a real character and no window."""
-        from OpenGLContext.move.viewplatform import ViewPlatform
         nav = walking_platform(tmp_path)
         context = HeadlessContext(nav)
         # The physics platform drives a plain view platform, which is what the
@@ -251,7 +265,6 @@ class TestWhatTheSessionRecordingIsTold:
     """
 
     def context(self):
-        from twig_bb import telemetry as gamemarks
         recorder = _WheelRecorder()
         recorder.weapons = weapons.default_table()
         recorder.player = player.PlayerState.carrying(recorder.weapons)
@@ -494,7 +507,6 @@ class TestTheMouseFiresInTheGame:
     """
 
     def context(self):
-        from OpenGLContext.events.inputstate import InputState
         made = HeadlessContext(None)
         made.config = viewer.build_parser().parse_args(['map.bsp'])
         made.weapons = weapons.default_table()
@@ -518,7 +530,6 @@ class TestTheMouseFiresInTheGame:
         return made, fired
 
     def press(self, made, down=1, button=viewer.controls.LEFT_BUTTON):
-        from OpenGLContext.events.mouseevents import MouseButtonEvent
         event = MouseButtonEvent()
         event.button = button
         event.state = down
@@ -563,7 +574,6 @@ class TestTheMouseSightsTheRifle:
     """
 
     def context(self, key='rifle'):
-        from OpenGLContext.events.inputstate import InputState
         made = HeadlessContext(None)
         made.config = viewer.build_parser().parse_args(['map.bsp'])
         made.weapons = weapons.default_table()
@@ -581,7 +591,6 @@ class TestTheMouseSightsTheRifle:
         return made
 
     def press(self, made, down=1):
-        from OpenGLContext.events.mouseevents import MouseButtonEvent
         event = MouseButtonEvent()
         event.button = viewer.controls.RIGHT_BUTTON
         event.state = down

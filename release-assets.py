@@ -31,6 +31,8 @@ import os
 
 from OpenGLContext.contentpacks import ContentStore, publish
 
+from twig_bb import download
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(HERE, 'twig_bb', 'assets')
 CATALOG = os.path.join(HERE, 'twig_bb', 'packs.json')
@@ -54,7 +56,6 @@ def declare(build: publish.Build) -> list[dict]:
 
 def store() -> ContentStore:
     """The store the game reads, which is where ``--install`` puts the art."""
-    from twig_bb import download
     return download.store()
 
 
