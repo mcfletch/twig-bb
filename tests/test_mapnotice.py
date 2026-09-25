@@ -110,7 +110,7 @@ class TestWhichPackItCameFrom:
 
     def test_a_locator_that_raises_is_not_hidden(self, tmp_path):
         """Where a pack unpacks is a path computation; its failure is a defect."""
-        def broken(pack):
+        def broken(pack):  # noqa: ARG001 a stand-in taking the arguments its caller passes
             raise ValueError('a bug in the locator')
 
         with pytest.raises(ValueError):

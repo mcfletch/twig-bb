@@ -46,7 +46,7 @@ class TestAJobThatSucceeds:
     def fetch(self, **named):
         seen = []
 
-        def work(pack, progress, cancel):
+        def work(pack, progress, cancel):  # noqa: ARG001 a stand-in taking the arguments its caller passes
             for done in (250, 500, 1000):
                 progress(done, 1000)
                 seen.append(done)
@@ -111,7 +111,7 @@ class TestSeveralPacks:
         first_done = threading.Event()
         release = threading.Event()
 
-        def work(pack, progress, cancel):
+        def work(pack, progress, cancel):  # noqa: ARG001 a stand-in taking the arguments its caller passes
             # The second pack waits *before* reporting anything, so the first
             # pack's quarter is still what the job shows when it is polled.
             if pack.key == 'b':
@@ -138,7 +138,7 @@ class TestAJobThatFails:
 
     def test_a_failure_is_reported_rather_than_raised(self):
         """A frame loop cannot catch an exception raised on another thread."""
-        def broken(pack, progress, cancel):
+        def broken(pack, progress, cancel):  # noqa: ARG001 a stand-in taking the arguments its caller passes
             raise IOError('the network went away')
 
         job = fetcher.FetchJob([pack()], fetch=broken)
@@ -149,7 +149,7 @@ class TestAJobThatFails:
 
     def test_a_failure_partway_keeps_what_did_arrive(self):
         """Two of three packs is better than nothing, and is usable."""
-        def half(pack, progress, cancel):
+        def half(pack, progress, cancel):  # noqa: ARG001 a stand-in taking the arguments its caller passes
             if pack.key == 'b':
                 raise IOError('gone')
             return '/content/' + pack.key
@@ -167,7 +167,7 @@ class TestCancelling:
     def test_a_cancelled_job_stops(self):
         started = threading.Event()
 
-        def slow(pack, progress, cancel):
+        def slow(pack, progress, cancel):  # noqa: ARG001 a stand-in taking the arguments its caller passes
             started.set()
             while not cancel():
                 time.sleep(0.005)
@@ -182,7 +182,7 @@ class TestCancelling:
 
     def test_a_cancelled_job_is_not_a_failure(self):
         """Nothing went wrong; the user changed their mind."""
-        def slow(pack, progress, cancel):
+        def slow(pack, progress, cancel):  # noqa: ARG001 a stand-in taking the arguments its caller passes
             while not cancel():
                 time.sleep(0.005)
             raise fetcher.Cancelled()
@@ -196,7 +196,7 @@ class TestCancelling:
     def test_cancelling_stops_the_packs_that_have_not_started(self):
         touched = []
 
-        def work(pack, progress, cancel):
+        def work(pack, progress, cancel):  # noqa: ARG001 a stand-in taking the arguments its caller passes
             touched.append(pack.key)
             job.cancel()
             raise fetcher.Cancelled()

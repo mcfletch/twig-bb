@@ -37,13 +37,13 @@ def walking_platform(tmp_path):
 class NullInput:
     """Nobody touching anything: the input a mode is driven with by default."""
 
-    def held(self, *names):
+    def held(self, *names):  # noqa: ARG002 a stand-in for `held`, keeping its signature
         return False
 
-    def pressed(self, *names):
+    def pressed(self, *names):  # noqa: ARG002 a stand-in for `pressed`, keeping its signature
         return False
 
-    def modifiers(self, name):
+    def modifiers(self, name):  # noqa: ARG002 a stand-in for `modifiers`, keeping its signature
         return (0, 0, 0)
 
     def mouse_delta(self):
@@ -59,7 +59,7 @@ class LookInput:
     def held(self, *names):
         return self.key in names
 
-    def pressed(self, *names):
+    def pressed(self, *names):  # noqa: ARG002 a stand-in for `pressed`, keeping its signature
         return False
 
     def modifiers(self, name):
@@ -124,10 +124,10 @@ class HeadlessContext(ViewPlatformMixin):
 
     physicsWorld = viewer.TwigContext.physicsWorld
 
-    def getEventManager(self, kind):
+    def getEventManager(self, kind):  # noqa: ARG002 a stand-in for `getEventManager`, keeping its signature
         return None
 
-    def ProcessEvent(self, event):
+    def ProcessEvent(self, event):  # noqa: ARG002 a stand-in for `ProcessEvent`, keeping its signature
         return None
 
     def triggerRedraw(self, value=1):

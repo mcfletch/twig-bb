@@ -357,7 +357,7 @@ def test_an_aimed_pad_launches_towards_its_destination():
     assert velocity[2] > 0                       # and upwards
 
 
-def test_the_arc_actually_arrives(monkeypatch):
+def test_the_arc_actually_arrives():
     """Integrating the launch under the same gravity must pass through the
     destination, or the pad throws the player at the wall beside it."""
     source = np.array([0.0, 0.0, 0.0])

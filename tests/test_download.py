@@ -151,7 +151,7 @@ def test_a_url_is_fetched_through_the_resolver(tmp_path, monkeypatch):
     archive.write_bytes(_map_archive())
     calls = []
 
-    def fake_fetch(url, cache_dir=None, max_bytes=None, **named):
+    def fake_fetch(url, cache_dir=None, max_bytes=None, **named):  # noqa: ARG001 a stand-in taking the arguments its caller passes
         calls.append(url)
         return str(archive)
 
@@ -233,7 +233,7 @@ def test_the_pack_is_not_downloaded_when_it_is_already_unpacked(tmp_path, monkey
     unpacked = os.path.join(str(tmp_path), os.path.basename(root or '') or '')
     del unpacked
 
-    def fail(*args, **named):
+    def fail(*args, **named):  # noqa: ARG001 a stand-in taking the arguments its caller passes
         raise AssertionError('should not fetch when the tree is present')
 
     archive = tmp_path / 'pack.zip'
@@ -488,7 +488,7 @@ def test_a_pack_larger_than_the_resolvers_default_cap_is_still_fetched(tmp_path,
     in advance."""
     seen = {}
 
-    def _fetch(url, cache_dir=None, max_bytes=None, **named):
+    def _fetch(url, cache_dir=None, max_bytes=None, **named):  # noqa: ARG001 a stand-in taking the arguments its caller passes
         seen['max_bytes'] = max_bytes
         path = tmp_path / 'p.tar.bz2'
         with tarfile.open(path, 'w:bz2') as archive:

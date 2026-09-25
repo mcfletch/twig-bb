@@ -119,7 +119,7 @@ class TestTheMaskForAskingAboutMany:
 class TestContentThisCannotRead:
     """A map is drawn whether or not its visibility can be made sense of."""
 
-    def test_a_truncated_lump_is_a_map_with_no_culling(self, caplog):
+    def test_a_truncated_lump_is_a_map_with_no_culling(self):
         cut = vectors([(0, 1), (1,)])[:-1]
         found = Visibility(visdata=cut)
         assert not found and found.sees(0, 1)

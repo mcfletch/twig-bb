@@ -248,7 +248,7 @@ def test_always_fetches_the_pack_the_map_named(monkeypatch, tmp_path):
 
 
 def test_a_failed_download_does_not_stop_the_map_loading(monkeypatch):
-    def boom(pack, cache_dir=None):
+    def boom(pack, cache_dir=None):  # noqa: ARG001 a stand-in taking the arguments its caller passes
         raise OSError('no network')
 
     monkeypatch.setattr(viewer.download, 'pack_root', lambda pack, cache_dir=None: None)
@@ -258,7 +258,7 @@ def test_a_failed_download_does_not_stop_the_map_loading(monkeypatch):
 
 def test_a_defect_in_fetching_is_not_taken_for_a_failed_download(monkeypatch):
     """Only a download that did not arrive (an OSError) is skipped over."""
-    def broken(pack, cache_dir=None):
+    def broken(pack, cache_dir=None):  # noqa: ARG001 a stand-in taking the arguments its caller passes
         raise TypeError('a bug, not a network')
 
     monkeypatch.setattr(viewer.download, 'pack_root', lambda pack, cache_dir=None: None)
@@ -337,7 +337,7 @@ def test_loading_a_map_never_asks_on_the_console(tmp_path, monkeypatch):
     """The viewer asks in the window, over the map.  A console prompt here
     blocks before the window is even open, so the overlay never gets a chance
     and the user answers a question they cannot see the context for."""
-    def refuse(*args, **named):
+    def refuse(*args, **named):  # noqa: ARG001 a stand-in taking the arguments its caller passes
         raise AssertionError('load_map prompted on the console')
 
     # A real run has a terminal attached; without this the console path skips
@@ -475,7 +475,7 @@ def test_no_map_on_the_command_line_is_a_start_screen_rather_than_an_error(
     assert viewer.TwigContext.target in (None, '')
 
 
-def test_a_named_map_still_goes_straight_into_it(monkeypatch, tmp_path):
+def test_a_named_map_still_goes_straight_into_it(monkeypatch):
     """The start screen is the *default*, not a step everyone has to walk past."""
     started = []
     monkeypatch.setattr(viewer.TwigContext, 'ContextMainLoop',
@@ -492,7 +492,7 @@ def test_naming_a_map_inside_a_pack_fetches_the_pack(tmp_path, monkeypatch):
     (root / 'maps' / 'oa_dm1.bsp').write_bytes(b'IBSP')
     fetched = []
 
-    def _fetch(pack, cache_dir=None):
+    def _fetch(pack, cache_dir=None):  # noqa: ARG001 a stand-in taking the arguments its caller passes
         fetched.append(pack.key)
         return str(root)
 
@@ -585,7 +585,7 @@ def test_a_pack_can_be_fetched_deliberately_from_the_command_line(monkeypatch, c
     assert '/x' in capsys.readouterr().out
 
 
-def test_fetching_an_unknown_pack_says_so(capsys):
+def test_fetching_an_unknown_pack_says_so():
     with pytest.raises(SystemExit) as exit_info:
         viewer.main(['--fetch', 'nonsense'])
     assert exit_info.value.code != 0
@@ -1190,10 +1190,10 @@ class _KeyStub(eventhandlermixin.EventHandlerMixin):
         self.opened = []
         viewer.TwigContext.bindScreenKeys(self)
 
-    def _settings(self, event):
+    def _settings(self, event):  # noqa: ARG002 a stand-in for `_settings`, keeping its signature
         self.opened.append('settings')
 
-    def _bindings(self, event):
+    def _bindings(self, event):  # noqa: ARG002 a stand-in for `_bindings`, keeping its signature
         self.opened.append('bindings')
 
     def press(self, name):

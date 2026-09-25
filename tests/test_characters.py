@@ -154,7 +154,7 @@ class _Layer:
         self.played.append((name, named))
         self.tracks.append(name)
 
-    def stop(self, **named):
+    def stop(self, **named):  # noqa: ARG002 a stand-in for `stop`, keeping its signature
         self.stopped += 1
         self.tracks = []
 
@@ -171,13 +171,13 @@ class _Model:
         self.attached = []
         self.updated = 0.0
 
-    def mask(self, *bones, **named):
+    def mask(self, *bones, **named):  # noqa: ARG002 a stand-in for `mask`, keeping its signature
         return frozenset({1, 2})
 
     def play(self, name, **named):
         self.played.append((name, named))
 
-    def layer(self, name, **named):
+    def layer(self, name, **named):  # noqa: ARG002 a stand-in for `layer`, keeping its signature
         return self.layers.setdefault(name, _Layer())
 
     def update(self, dt):
@@ -192,7 +192,7 @@ class _Model:
         self.attached.append(node)
         return node
 
-    def detach(self, point, node):
+    def detach(self, point, node):  # noqa: ARG002 a stand-in for `detach`, keeping its signature
         if node in self.attached:
             self.attached.remove(node)
             return True
@@ -269,7 +269,7 @@ class TestCharacter:
 
     def test_a_model_with_no_hand_to_put_it_in(self):
         class NoGrip(_Model):
-            def attach(self, point, node):
+            def attach(self, point, node):  # noqa: ARG002 a stand-in for `attach`, keeping its signature
                 return None
 
         figure = characters.Character(NoGrip())

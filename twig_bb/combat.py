@@ -393,7 +393,7 @@ def _capsules(world: Any) -> _Capsules:
     return pool
 
 
-def unstage(world: Any, bodies: dict) -> None:
+def unstage(world: Any, bodies: dict) -> None:  # noqa: ARG001 taken so stage and unstage read as a pair; see the docstring
     """Take the staged capsules back out of the world, ready to be used again.
 
     By dropping their colliders rather than by removing the bodies: see

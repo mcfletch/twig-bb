@@ -246,7 +246,7 @@ class TestThroughTheMapLoader:
         assert speakers.count(loaded.speakers()) == 1
 
     def test_a_map_whose_sounds_were_never_fetched_still_loads(
-            self, write_map, tmp_path):
+            self, write_map):
         """Most installs have the maps and not the base game's sounds."""
         import bspbuilder
 

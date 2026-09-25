@@ -144,9 +144,9 @@ class Presenter:
                 self._pickedUp(event)
         self.update(now)
 
-    def update(self, now: float = 0.0) -> None:
+    def update(self, now: float = 0.0) -> None:  # noqa: ARG002 the per-frame signature; the death countdown reads the arena, not this time
         """Bring the parts that change without an event up to date."""
-        self._deathNotice(now)
+        self._deathNotice()
 
     # -- one event at a time ---------------------------------------------
     def _damaged(self, event: arenamod.Damaged, camera: Sequence[float],
@@ -219,7 +219,7 @@ class Presenter:
         return min(1.0, float(amount) / full)
 
     # -- the state that is not an event ----------------------------------
-    def _deathNotice(self, now: float) -> None:
+    def _deathNotice(self) -> None:
         """Put the death notice up, count it down, and take it away again."""
         if self.hud is None:
             return

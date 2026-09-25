@@ -212,17 +212,17 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
             self.addEventHandler('mousebutton', button=button, state=1,
                                  function=self._wheel(step))
 
-    def _wake(self, event: Any = None) -> None:
+    def _wake(self, event: Any = None) -> None:  # noqa: ARG002 an event handler; the engine passes the event
         self.triggerRedraw(1)
 
     def _wheel(self, step: int) -> Any:
-        def turn(event: Any = None) -> None:
+        def turn(event: Any = None) -> None:  # noqa: ARG001 an event handler; the engine passes the event
             self._run([controls.NEXT_WEAPON if step > 0
                        else controls.PREVIOUS_WEAPON], firing=False)
         self._handlers.append(turn)     # the event system holds callbacks weakly
         return turn
 
-    def _pickup(self, event: Any = None) -> None:
+    def _pickup(self, event: Any = None) -> None:  # noqa: ARG002 an event handler; the engine passes the event
         """Give the player the next weapon they do not have."""
         for weapon in self.weapons.weapons:
             key = str(weapon.key)
@@ -234,7 +234,7 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
         self.hud.post('YOU HAVE EVERYTHING')
         self.triggerRedraw(1)
 
-    def _hurt(self, event: Any = None) -> None:
+    def _hurt(self, event: Any = None) -> None:  # noqa: ARG002 an event handler; the engine passes the event
         """Take a hit from somewhere new each time.
 
         From a *direction*, because the directional wash is the part of being
@@ -249,22 +249,22 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
             self.hud.died('Killed by the demo', respawn_in=0.0)
         self.triggerRedraw(1)
 
-    def _heal(self, event: Any = None) -> None:
+    def _heal(self, event: Any = None) -> None:  # noqa: ARG002 an event handler; the engine passes the event
         was_dead = not self.player.alive
         self.player.heal(25)
         if was_dead and self.player.alive:
             self.hud.revived()
         self.triggerRedraw(1)
 
-    def _armour(self, event: Any = None) -> None:
+    def _armour(self, event: Any = None) -> None:  # noqa: ARG002 an event handler; the engine passes the event
         self.player.give_armour(25)
         self.triggerRedraw(1)
 
-    def _bindingsScreen(self, event: Any = None) -> None:
+    def _bindingsScreen(self, event: Any = None) -> None:  # noqa: ARG002 an event handler; the engine passes the event
         bindings.open_bindings(self, navigation=controls.Controls(
             self.getNavigation(), self.weaponBindings))
 
-    def _settingsScreen(self, event: Any = None) -> None:
+    def _settingsScreen(self, event: Any = None) -> None:  # noqa: ARG002 an event handler; the engine passes the event
         settings.open_settings(self)
 
     def _run(self, commands: Sequence[str], firing: bool) -> None:
@@ -275,7 +275,7 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
         self.triggerRedraw(1)
 
     # -- the frame --------------------------------------------------------
-    def OnIdle(self, *args: Any) -> int:
+    def OnIdle(self, *args: Any) -> int:  # noqa: ARG002 overrides the engine's OnIdle, which is called with arguments
         state = self.getInputState()
         commands = self.weaponBindings.triggered(state)
         firing = self.weaponBindings.firing(state)
@@ -286,7 +286,7 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
         self.triggerRedraw(1)
         return 1
 
-    def placeViewAttachments(self, pass_: Any = None) -> None:
+    def placeViewAttachments(self, pass_: Any = None) -> None:  # noqa: ARG002 overrides the engine's placeViewAttachments, which is passed the render pass
         """Pin the weapon to the view for the frame about to be drawn.
 
         The render pass calls this once the camera is settled and before any

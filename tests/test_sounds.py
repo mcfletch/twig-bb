@@ -65,7 +65,7 @@ def test_wav_is_preferred_over_ogg(content):
     assert library(content).resolve('sound/world/both').endswith('.wav')
 
 
-def test_the_supported_extensions_are_the_ones_the_content_ships(content):
+def test_the_supported_extensions_are_the_ones_the_content_ships():
     """The encodings the content this viewer reads actually carries.
 
     ``SPEC-Q3ENTITIES §2.1``: Quake 3 content is 255 `.wav` and 98 `.ogg` and
@@ -127,7 +127,7 @@ def test_a_name_may_not_escape_the_content_root(content, tmp_path):
     assert library(content).resolve('../outside.wav') is None
 
 
-def _never(*args, **named):
+def _never(*args, **named):  # noqa: ARG001 a stand-in taking the arguments its caller passes
     return False
 
 

@@ -139,6 +139,8 @@ select = [
     "RUF012",
     # A private name is used only by its own module, or with a noqa saying why.
     "SLF001",
+    # Every parameter is read, or the protocol that fixes it is named.
+    "ARG",
     # The raw forms the engine has an API for (banned-api, below).
     "TID251",
 ]
@@ -179,7 +181,10 @@ ignore = ["E501"]
 "twig_bb/botreview.py" = ["TID251"]
 "twig_bb/hudsample.py" = ["TID251"]
 "tools/*" = ["TID251"]
-"tests/*" = ["TID251"]
+# TID251 as above.  ARG005: a lambda in a test is a stand-in passed to
+# monkeypatch or as a callback, and takes the arguments of what it replaces
+# whether or not it reads them.
+"tests/*" = ["TID251", "ARG005"]
 
 [tool.mypy]
 # The numpy stubs in this environment use `type` statements, which mypy only

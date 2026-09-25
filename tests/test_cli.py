@@ -47,7 +47,7 @@ def test_the_downloader_prints_the_path_it_resolved(tmp_path, capsys, monkeypatc
     assert capsys.readouterr().out.strip() == target
 
 
-def test_the_downloader_can_purge_its_cache(tmp_path, capsys, monkeypatch):
+def test_the_downloader_can_purge_its_cache(tmp_path, monkeypatch):
     cache = tmp_path / 'cache'
     (cache / 'stale').mkdir(parents=True)
     monkeypatch.setattr('sys.argv', ['twig-bb-fetch', 'ignored', '--purge',

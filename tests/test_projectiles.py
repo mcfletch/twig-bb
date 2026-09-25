@@ -124,7 +124,7 @@ class TestHowLongAShotTakes:
         assert earlier == sorted(earlier)
         assert all(b > a for a, b in zip(earlier, earlier[1:], strict=False))
 
-    def test_a_round_that_cannot_move_never_arrives(self, kinds):
+    def test_a_round_that_cannot_move_never_arrives(self):
         still = projectiles.Projectile(key='still', speed=0.0, acceleration=0.0)
         assert still.time_to(10.0) == float('inf')
 

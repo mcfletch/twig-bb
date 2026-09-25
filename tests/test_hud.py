@@ -73,8 +73,7 @@ class TestVitals:
         assert screen.health.value == player.health
         assert screen.armour.value == player.armour
 
-    def test_a_wounded_player_reads_low_and_then_critical(self, table, player,
-                                                          metrics):
+    def test_a_wounded_player_reads_low_and_then_critical(self, table, player):
         screen = hud.GameHUD(table)
         skin = screen.activeSkin()
         player.health = 40
@@ -160,7 +159,7 @@ class TestAmmunition:
         screen.update(player, now=0.0)
         assert screen.ammo.critical
 
-    def test_a_full_pouch_is_not(self, screen, player):
+    def test_a_full_pouch_is_not(self, screen):
         assert not screen.ammo.critical
 
 
@@ -168,7 +167,7 @@ class TestWeaponBar:
     def test_it_shows_every_weapon_in_the_table(self, screen, table):
         assert len(screen.weaponbar.slots) == len(table.weapons)
 
-    def test_a_weapon_that_is_not_held_is_dimmed(self, screen, player):
+    def test_a_weapon_that_is_not_held_is_dimmed(self, screen):
         skin = screen.activeSkin()
         held, missing = screen.weaponbar.slots[0], screen.weaponbar.slots[1]
         assert colour(screen.weaponbar.slotColour(held, skin)) \
@@ -200,13 +199,13 @@ class TestReticule:
         assert screen.crosshair.shape == table.by_key('pistol').crosshair.shape
 
     def test_switching_weapon_switches_the_reticule(self, screen, player,
-                                                    table, metrics):
+                                                    table):
         player.give('shotgun')
         player.select('shotgun')
         screen.update(player, now=0.0)
         assert screen.crosshair.shape == table.by_key('shotgun').crosshair.shape
 
-    def test_firing_opens_the_reticule(self, screen, player, metrics):
+    def test_firing_opens_the_reticule(self, screen, player):
         tight = float(screen.crosshair.spread)
         player.fired(now=1.0)
         screen.update(player, now=1.01, viewport=(1280, 720),
@@ -306,7 +305,7 @@ class TestTheWeaponBarFitting:
         assert [screen.weaponbar.slotText(slot)
                 for slot in screen.weaponbar.slots] == ['1', '2', '3', '4', '5']
 
-    def test_a_bar_nobody_has_measured_shows_its_titles(self, table):
+    def test_a_bar_nobody_has_measured_shows_its_titles(self):
         """Before a layout there is no room to fit into, so nothing is dropped."""
         bar = hud.WeaponBar()
         bar.slots = [hud.WeaponSlot('1', 'PISTOL', 'pistol')]
@@ -363,7 +362,7 @@ class TestOneClock:
         assert all(colour[3] <= 1.0
                    for _rect, colour in screen.damage.bands(metrics))
 
-    def test_a_meter_flash_on_that_clock_fades_out(self, screen, player):
+    def test_a_meter_flash_on_that_clock_fades_out(self, screen):
         at = hud.now()
         screen.health.flash(at)
         self.tick(screen, at + 0.05)

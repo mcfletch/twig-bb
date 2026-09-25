@@ -170,7 +170,7 @@ class TCMod:
         """
         return False
 
-    def matrix(self, time: float) -> np.ndarray:
+    def matrix(self, time: float) -> np.ndarray:  # noqa: ARG002 the modifier signature; a constant ignores the time
         """This modifier as a 3x3 row-vector transform at ``time``."""
         return np.identity(3)
 
@@ -208,7 +208,7 @@ class TCModScale(TCMod):
     s: float = 1.0
     t: float = 1.0
 
-    def matrix(self, time: float) -> np.ndarray:
+    def matrix(self, time: float) -> np.ndarray:  # noqa: ARG002 the modifier signature; a constant ignores the time
         matrix = np.identity(3)
         matrix[0, 0], matrix[1, 1] = self.s, self.t
         return matrix
@@ -266,7 +266,7 @@ class TCModTransform(TCMod):
     t0: float = 0.0
     t1: float = 0.0
 
-    def matrix(self, time: float) -> np.ndarray:
+    def matrix(self, time: float) -> np.ndarray:  # noqa: ARG002 the modifier signature; a constant ignores the time
         matrix = np.identity(3)
         matrix[0, :2] = (self.m00, self.m01)
         matrix[1, :2] = (self.m10, self.m11)
@@ -376,11 +376,11 @@ def apply_transform(matrix: Any, coordinate: Sequence[float]) -> np.ndarray:
 class Deform:
     """Geometry that moves at run time."""
 
-    def displace(self, points: Any, normals: Any, time: float) -> np.ndarray:
+    def displace(self, points: Any, normals: Any, time: float) -> np.ndarray:  # noqa: ARG002 the Deform signature, which not every deformation uses whole
         """``points`` moved for the frame at ``time``.  Returns a new array."""
         return np.array(points, dtype='d')
 
-    def perturb(self, points: Any, normals: Any, time: float) -> np.ndarray:
+    def perturb(self, points: Any, normals: Any, time: float) -> np.ndarray:  # noqa: ARG002 the Deform signature, which not every deformation uses whole
         """``normals`` bent for the frame at ``time``.  Returns a new array."""
         return np.array(normals, dtype='d')
 
@@ -414,7 +414,7 @@ class DeformMove(Deform):
     axis: tuple[float, float, float] = (0.0, 0.0, 1.0)
     wave: Wave = field(default_factory=Wave)
 
-    def displace(self, points: Any, normals: Any, time: float) -> np.ndarray:
+    def displace(self, points: Any, normals: Any, time: float) -> np.ndarray:  # noqa: ARG002 the Deform signature, which not every deformation uses whole
         positions = np.asarray(points, dtype='d').reshape(-1, 3)
         amount = float(self.wave.at(time))
         return positions + np.asarray(self.axis, dtype='d') * amount

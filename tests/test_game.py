@@ -645,7 +645,7 @@ class TestWhatABurstDoesToSomebodyStandingOnIt:
     point flying produces.
     """
 
-    def fire(self, at, standing, aim=None):
+    def fire(self, at, standing, aim=None):  # noqa: ARG002 a stand-in for `fire`, keeping its signature
         from twig_bb import projectiles
         world = floor()
         found = arena.Arena(weapons=weapons.default_table(), fragLimit=15,
@@ -975,7 +975,7 @@ class TestBodiesDrawnAsFigures:
             grounded = True
 
         class Walking:
-            def of(self, id):
+            def of(self, id):  # noqa: ARG002 a stand-in for `of`, keeping its signature
                 return Walker()
 
         game.move_bodies(found, bodies, cast=cast, walking=Walking(), dt=0.1)
@@ -1010,15 +1010,15 @@ class _Watching:
         self.seen = seen
         self.facing = None
 
-    def face(self, id, wanted, dt):
+    def face(self, id, wanted, dt):  # noqa: ARG002 a stand-in for `face`, keeping its signature
         self.facing = wanted
         return (wanted, 0.0)
 
-    def update(self, id, motion, dt):
+    def update(self, id, motion, dt):  # noqa: ARG002 a stand-in for `update`, keeping its signature
         self.seen['motion'] = motion
         return ('idle', None)
 
-    def subtree(self, id):
+    def subtree(self, id):  # noqa: ARG002 a stand-in for `subtree`, keeping its signature
         return None
 
 
@@ -1095,7 +1095,7 @@ class TestWhatABodyIsSeenDoing:
             grounded = True
 
         class Walking:
-            def of(self, id):
+            def of(self, id):  # noqa: ARG002 a stand-in for `of`, keeping its signature
                 return Walker()
 
         game.move_bodies(found, bodies, cast=cast, walking=Walking(), dt=0.1)
@@ -1111,7 +1111,7 @@ class TestWhatABodyIsSeenDoing:
             grounded = True
 
         class Walking:
-            def of(self, id):
+            def of(self, id):  # noqa: ARG002 a stand-in for `of`, keeping its signature
                 return Walker()
 
         game.move_bodies(found, bodies, cast=cast, walking=Walking(), dt=0.1)

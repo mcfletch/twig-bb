@@ -885,7 +885,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         """
         self.showMenu(event)
 
-    def showMenu(self, event: Any = None) -> None:
+    def showMenu(self, event: Any = None) -> None:  # noqa: ARG002 an event handler; the engine passes the event
         """Put the start screen up: Play, content, settings, credits, quit.
 
         Modal, so nothing reaches the world behind it.  **One at a time**: a
@@ -980,7 +980,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         if not wanted and not running:
             self.pushOverlay(dialogs.message(
                 'Everything in the catalogue is already downloaded.',
-                title='Content', on_close=lambda panel: self.showMenu()))
+                title='Content', on_close=lambda _panel: self.showMenu()))
             return
         # The screen decides which of them, so it is the screen that says: one
         # set and the packs it needs, not the whole catalogue.  A download a
@@ -1026,7 +1026,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
     def _creditsScreen(self) -> None:           # pragma: no cover - GL
         """What this is built from and what it is playing."""
         self._closeMenu()
-        self.pushOverlay(notices.screen(on_close=lambda panel: self.showMenu(),
+        self.pushOverlay(notices.screen(on_close=lambda _panel: self.showMenu(),
                                         current=self.notice))
 
     # -- the in-window prompt --------------------------------------------
@@ -1176,7 +1176,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
                                  function=handler)
 
     def _wheelWeapon(self, step: int) -> Any:   # pragma: no cover - GL
-        def turn(event: Any = None) -> None:
+        def turn(event: Any = None) -> None:  # noqa: ARG001 an event handler; the engine passes the event
             command = (controls.NEXT_WEAPON if step > 0
                        else controls.PREVIOUS_WEAPON)
             self._runCommands([command], firing=False)
@@ -1408,7 +1408,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         self._updateHUD()
         super(TwigContext, self).renderShaderOverlay(pass_)
 
-    def placeViewAttachments(self, pass_: Any = None) -> None:
+    def placeViewAttachments(self, pass_: Any = None) -> None:  # noqa: ARG002 overrides the engine's placeViewAttachments, which is passed the render pass
         """Pin the weapon to the view for the frame that is about to be drawn.
 
         Called by the render pass once the camera is settled and before any
@@ -1579,21 +1579,21 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
                              origin, direction))
         return '' if found is None else str(found.name)
 
-    def _showScores(self, event: Any = None) -> None:   # pragma: no cover - key
+    def _showScores(self, event: Any = None) -> None:  # pragma: no cover - key  # noqa: ARG002 an event handler; the engine passes the event
         """Put the whole board up while the key is held."""
         hud = getattr(self, 'hud', None)
         if hud is not None:
             hud.scoreboard(game.scoreboard_lines(self.arena))
             self.triggerRedraw(1)
 
-    def _hideScores(self, event: Any = None) -> None:   # pragma: no cover - key
+    def _hideScores(self, event: Any = None) -> None:  # pragma: no cover - key  # noqa: ARG002 an event handler; the engine passes the event
         """Take it down again when the key is let go."""
         hud = getattr(self, 'hud', None)
         if hud is not None:
             hud.hide_scoreboard()
             self.triggerRedraw(1)
 
-    def _settings(self, event: Any) -> None:    # pragma: no cover - GL
+    def _settings(self, event: Any) -> None:  # pragma: no cover - GL  # noqa: ARG002 an event handler; the engine passes the event
         """Open the rendering settings over the map (F10).
 
         The screen is generated from ``ContextDefinition``'s own fields, so a
@@ -1602,7 +1602,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         """
         settings.open_settings(self)
 
-    def _bindings(self, event: Any) -> None:    # pragma: no cover - GL
+    def _bindings(self, event: Any) -> None:  # pragma: no cover - GL  # noqa: ARG002 an event handler; the engine passes the event
         """Open the key-binding page (F6): movement, and the weapon commands.
 
         One page for both, through :class:`~twig_bb.controls.Controls`,
@@ -1656,7 +1656,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         sys.stdout.flush()
 
     # -- walk / free-fly -------------------------------------------------
-    def _toggle_walk(self, event: Any = None) -> None:  # pragma: no cover - key
+    def _toggle_walk(self, event: Any = None) -> None:  # pragma: no cover - key  # noqa: ARG002 an event handler; the engine passes the event
         self._set_walking(not self._walking)
 
     def _set_walking(self, walking: bool) -> bool:      # pragma: no cover - GL
@@ -1746,11 +1746,11 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         self.addEventHandler('keypress', name='f', function=self._toggle_fly)
         self.addEventHandler('keypress', name='m', function=self._cycle_mode)
 
-    def _on_input(self, event: Any) -> None:    # pragma: no cover - key
+    def _on_input(self, event: Any) -> None:  # pragma: no cover - key  # noqa: ARG002 an event handler; the engine passes the event
         """Wake the frame loop; the sampler is fed by event dispatch itself."""
         self.triggerRedraw(1)
 
-    def _toggle_fly(self, event: Any = None) -> None:   # pragma: no cover - key
+    def _toggle_fly(self, event: Any = None) -> None:  # pragma: no cover - key  # noqa: ARG002 an event handler; the engine passes the event
         navigation = self.getNavigation()
         if navigation is None:
             return
@@ -1759,7 +1759,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         navigation.select(wanted)
         self.marks.movement(wanted)
 
-    def _cycle_mode(self, event: Any = None) -> None:   # pragma: no cover - key
+    def _cycle_mode(self, event: Any = None) -> None:  # pragma: no cover - key  # noqa: ARG002 an event handler; the engine passes the event
         navigation = self.getNavigation()
         if navigation is not None:
             navigation.cycle()
@@ -1767,7 +1767,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
                 self.contextDefinition, 'movementMode', None), 'name', '')))
 
     # -- frame -----------------------------------------------------------
-    def OnIdle(self, *args: Any) -> int:        # pragma: no cover - needs a window
+    def OnIdle(self, *args: Any) -> int:  # pragma: no cover - needs a window  # noqa: ARG002 overrides the engine's OnIdle, which is called with arguments
         # A download runs on a worker and is *published* here, once a frame.
         self._pollDownload()
         # So does a level load: the worker decodes it, and this is where the

@@ -141,5 +141,5 @@ def test_an_unreadable_directory_is_a_miss_rather_than_an_error(roots, monkeypat
     assert ContentSearch(roots).find('sound/world/wind1', ('.wav',)) is None
 
 
-def _raise_oserror(*args, **named):
+def _raise_oserror(*args, **named):  # noqa: ARG001 a stand-in taking the arguments its caller passes
     raise OSError('unreadable')

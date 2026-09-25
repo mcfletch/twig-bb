@@ -77,7 +77,7 @@ def test_a_decoder_failure_is_logged_with_its_traceback(monkeypatch, caplog):
     """The decoder is a compiled extension; what it raises is reported whole."""
     class Broken:
         @staticmethod
-        def unpack_unity_crunch(data):
+        def unpack_unity_crunch(data):  # noqa: ARG004 a stand-in taking the arguments its caller passes
             raise RuntimeError('inside the decoder')
 
     monkeypatch.setattr(crnfile, '_decoder', lambda: Broken)

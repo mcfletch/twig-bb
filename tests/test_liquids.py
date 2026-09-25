@@ -158,7 +158,7 @@ def test_the_kind_of_the_volume_a_point_is_in_is_reported():
     assert _kinded(liquids.LAVA).kind_at((5, 2, 5)) == liquids.LAVA
 
 
-def test_a_point_in_no_volume_has_no_kind(self=None):
+def test_a_point_in_no_volume_has_no_kind():
     assert _kinded(liquids.WATER).kind_at((99, 99, 99)) == ''
 
 

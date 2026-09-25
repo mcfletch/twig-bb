@@ -30,8 +30,8 @@ class FakeEngine:
         self.listened = platform
         return platform
 
-    def play(self, source, emitter=None, position=None, forward=(0, 0, -1),
-             gain=1.0, priority=0.0, loop=False, rate=1.0):
+    def play(self, source, emitter=None, position=None, forward=(0, 0, -1),  # noqa: ARG002 a stand-in for `play`, keeping its signature
+             gain=1.0, priority=0.0, loop=False, rate=1.0):  # noqa: ARG002 a stand-in for `play`, keeping its signature
         if not self.resolves:
             return None
         self.played.append({
@@ -229,7 +229,7 @@ class TestTheListener:
 class TestABurst:
     """A rocket that goes off silently is a rocket nobody takes cover from."""
 
-    def test_a_detonation_is_heard(self, sounds, engine, match):
+    def test_a_detonation_is_heard(self, sounds, match):
         match.detonated(point=(3, 1, 0), kind='rocket', by='bot1')
         assert sounds.show(match.drain()) == 1
 
@@ -413,19 +413,18 @@ class TestPickingSomethingUp:
         assert tuple(self.taken(sounds, engine, match)['position']) \
             == (4.0, 1.0, 2.0)
 
-    def test_one_with_nowhere_to_be_still_sounds(self, sounds, engine, match):
+    def test_one_with_nowhere_to_be_still_sounds(self, sounds, match):
         """A pickup that named no place is still a pickup, and never silence."""
         match.picked_up(game.PLAYER_ID, key='armour', title='ARMOUR')
         assert sounds.show(match.drain()) == 1
 
-    def test_it_is_a_pop_rather_than_a_thump(self, sounds, engine, match,
-                                             table):
+    def test_it_is_a_pop_rather_than_a_thump(self, sounds, engine):
         """Bright, where every weapon in the game is low."""
         clip = sounds.bank.clip(engine, combatsound.PICKUP)
         assert centroid(clip) > 1000.0
         assert clip.duration < 0.25
 
-    def test_it_rises_the_way_a_bubble_does(self, sounds, engine, table):
+    def test_it_rises_the_way_a_bubble_does(self, sounds, engine):
         """What tells a pop from a click: the pitch goes *up* as it goes.
 
         A bubble collapsing gets smaller as it closes, and a cavity that is
@@ -601,7 +600,7 @@ class TestWhatAWeaponSoundsLikeWhenItLands:
         assert self.landed(sounds, engine, match, 'nothing-like-this') \
             is self.clip(sounds, engine, combatsound.WORLD)
 
-    def test_an_impact_from_no_weapon_at_all_still_sounds(self, sounds, engine,
+    def test_an_impact_from_no_weapon_at_all_still_sounds(self, sounds,
                                                           match):
         """A hit that named nothing is still a hit; a silent one is a bug."""
         match.impact(point=(1, 0, 0), normal=(0, 1, 0), surface='stone')

@@ -102,7 +102,7 @@ class TestEveryShippedModelIsCredited:
 class TestAModelThatWillNotLoad:
     """An item's rules decide the match; its model only decides how it looks."""
 
-    def test_a_missing_file_is_none_rather_than_an_error(self, caplog):
+    def test_a_missing_file_is_none_rather_than_an_error(self):
         assert art.load('items/there-is-no-such-model.glb') is None
 
     def test_and_it_says_so(self, caplog):

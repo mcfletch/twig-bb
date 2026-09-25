@@ -135,7 +135,7 @@ class TestWhatCanBePlayedNow:
         levels = match.levels_available(cache_dir=str(tmp_path))
         assert levels == []
 
-    def test_a_fetched_pack_offers_its_maps(self, tmp_path, monkeypatch):
+    def test_a_fetched_pack_offers_its_maps(self, tmp_path):
         from twig_bb import download
         pack = download.pack_for_key('openarena-maps')
         root = tmp_path / 'packs' / 'twig-bb' / pack.directory / 'maps'

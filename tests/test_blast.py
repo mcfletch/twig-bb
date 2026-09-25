@@ -278,7 +278,7 @@ class TestWhoIsInIt:
 class TestAnsweringWhatFlew:
     """The seam: a projectile says it went off, and this is what that costs."""
 
-    def test_every_detonation_bursts(self, rocket):
+    def test_every_detonation_bursts(self):
         found = match((1.0, 0.0, 0.0))
         table = projectiles.default_table()
         blast.answer(world(), found, table, [projectiles.Detonation(
@@ -286,7 +286,7 @@ class TestAnsweringWhatFlew:
             by='player')])
         assert hurt(found, 'bot0') > 0
 
-    def test_the_direct_hit_is_carried_through(self, rocket):
+    def test_the_direct_hit_is_carried_through(self):
         found = match((1.0, 0.0, 0.0))
         table = projectiles.default_table()
         blast.answer(world(), found, table, [projectiles.Detonation(

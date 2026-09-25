@@ -210,7 +210,7 @@ class _MessageSink:
     def __init__(self):
         self.lines = []
 
-    def post(self, text, *args, **named):
+    def post(self, text, *args, **named):  # noqa: ARG002 a stand-in for `post`, keeping its signature
         self.lines.append(text)
 
 
@@ -493,7 +493,7 @@ class TestTheMouseFiresInTheGame:
     takes a shot.
     """
 
-    def context(self, monkeypatch):
+    def context(self):
         from OpenGLContext.events.inputstate import InputState
         made = HeadlessContext(None)
         made.config = viewer.build_parser().parse_args(['map.bsp'])
@@ -524,27 +524,27 @@ class TestTheMouseFiresInTheGame:
         event.state = down
         made._inputState.process(event)
 
-    def test_a_held_button_takes_a_shot(self, monkeypatch):
-        made, fired = self.context(monkeypatch)
+    def test_a_held_button_takes_a_shot(self):
+        made, fired = self.context()
         self.press(made)
         made._sampleWeapons()
         assert fired
 
-    def test_it_spends_a_round(self, monkeypatch):
-        made, _fired = self.context(monkeypatch)
+    def test_it_spends_a_round(self):
+        made, _fired = self.context()
         weapon = made.weapons.by_key(made.player.selected)
         before = made.player.ammo_for(weapon)
         self.press(made)
         made._sampleWeapons()
         assert made.player.ammo_for(weapon) < before
 
-    def test_nothing_is_fired_before_the_button_goes_down(self, monkeypatch):
-        made, fired = self.context(monkeypatch)
+    def test_nothing_is_fired_before_the_button_goes_down(self):
+        made, fired = self.context()
         made._sampleWeapons()
         assert not fired
 
-    def test_letting_go_stops_it(self, monkeypatch):
-        made, fired = self.context(monkeypatch)
+    def test_letting_go_stops_it(self):
+        made, fired = self.context()
         self.press(made)
         made._sampleWeapons()
         self.press(made, down=0)
@@ -716,7 +716,7 @@ class TestAShotGoesWhereTheCameraLooks:
         assert self.origin(made) == pytest.approx(
             np.asarray(made.camera_position()[:3], dtype='d'), abs=1e-6)
 
-    def test_with_no_navigator_it_aims_straight_ahead(self, tmp_path):
+    def test_with_no_navigator_it_aims_straight_ahead(self):
         """A viewer that has not started walking still answers something sane."""
         class _NotWalkingYet:
             _nav = None

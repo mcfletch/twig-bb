@@ -299,7 +299,7 @@ class TestOpenImage:
         """Anything past "not an image" is a decoder's fault, worth a traceback."""
         from PIL import Image
 
-        def broken(path):
+        def broken(path):  # noqa: ARG001 a stand-in taking the arguments its caller passes
             raise ValueError('a damaged stream')
 
         monkeypatch.setattr(Image, 'open', broken)

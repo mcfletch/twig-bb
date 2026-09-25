@@ -446,7 +446,7 @@ class TestSwitchingReachesTheRenderer:
             connect(self.record, signal=olist.OList.NEW_CHILD_EVT, sender=Any)
             connect(self.record, signal=olist.OList.DEL_CHILD_EVT, sender=Any)
 
-        def record(self, sender=None, value=None, **named):
+        def record(self, sender=None, value=None, **named):  # noqa: ARG002 a stand-in for `record`, keeping its signature
             self.seen.append(named.get('signal'))
 
     def test_taking_a_weapon_out_announces_the_change(self):
