@@ -10,6 +10,7 @@ import zipfile
 import pytest
 
 import bspbuilder
+from OpenGLContext.contentpacks import ContentStore
 from twig_bb import download
 
 
@@ -620,6 +621,31 @@ class TestContentAPreviousVersionUnpacked:
     def test_nothing_to_adopt_is_not_an_error(self, tmp_path, monkeypatch):
         store = self.store(tmp_path, monkeypatch)
         assert download.adopt_legacy_content(store) == []
+
+    def test_a_store_opened_elsewhere_leaves_the_player_s_content_alone(
+            self, tmp_path, monkeypatch):
+        """A test's directory or ``--cache-dir`` is not where a player's
+        downloads belong: that directory may be deleted the moment the run
+        ends, and the content with it."""
+        pack = download.pack_for_key('quake3-core')
+        home = tmp_path / 'home'
+        was = self.legacy(str(home), pack)
+        monkeypatch.setattr(download, '_default_cache', lambda: str(home))
+        monkeypatch.setattr(download, '_adopted', set())
+        elsewhere = str(tmp_path / 'elsewhere')
+        download.pack_directory(pack, cache_dir=elsewhere)
+        assert os.path.isfile(os.path.join(was, 'textures', 'x.tga'))
+        assert not os.path.exists(os.path.join(elsewhere, 'packs'))
+
+    def test_adopting_into_a_store_elsewhere_moves_nothing(
+            self, tmp_path, monkeypatch):
+        pack = download.pack_for_key('quake3-core')
+        home = tmp_path / 'home'
+        was = self.legacy(str(home), pack)
+        monkeypatch.setattr(download, '_default_cache', lambda: str(home))
+        elsewhere = ContentStore('twig-bb', root=str(tmp_path / 'elsewhere'))
+        assert download.adopt_legacy_content(elsewhere) == []
+        assert os.path.isfile(os.path.join(was, 'textures', 'x.tga'))
 
     def test_it_is_done_once_per_store_rather_than_per_call(
             self, tmp_path, monkeypatch):

@@ -67,13 +67,16 @@ _adopted: set = set()
 
 
 def store(cache_dir: Optional[str] = None) -> ContentStore:
-    """This game's content store, with anything a previous version left adopted.
+    """This game's content store.
 
     ``cache_dir`` names the root to use instead of the per-user one, which is
-    what a test and the ``--cache-dir`` option pass.
+    what a test and the ``--cache-dir`` option pass. The per-user store has
+    anything an earlier layout left adopted into it the first time it is
+    opened; a store opened anywhere else adopts nothing.
     """
-    made = ContentStore('twig-bb', root=cache_dir or os.path.join(
-        _default_cache(), 'content'))
+    if cache_dir:
+        return ContentStore('twig-bb', root=cache_dir)
+    made = ContentStore('twig-bb', root=_default_store_root())
     if made.root not in _adopted:
         _adopted.add(made.root)
         adopt_legacy_content(made)
@@ -81,14 +84,20 @@ def store(cache_dir: Optional[str] = None) -> ContentStore:
 
 
 def adopt_legacy_content(store: ContentStore) -> List[str]:
-    """Move content a previous version unpacked into the store; what moved.
+    """Move content an earlier layout unpacked into the store; what moved.
 
     A player who has fetched 450 MB of textures should not fetch them twice
     because the layout beneath them changed. Each pack's directory is moved
     across, which on one filesystem is a rename and costs nothing; a pack whose
     place in the store is already taken is left where it is rather than
     overwriting what is there.
+
+    Only the per-user store adopts: the earlier layout is the per-user one, and
+    a store rooted anywhere else (a test's directory, ``--cache-dir``) may be
+    deleted with everything moved into it.
     """
+    if os.path.abspath(store.root) != os.path.abspath(_default_store_root()):
+        return []
     legacy = os.path.join(_default_cache(), LEGACY_CONTENT)
     if not os.path.isdir(legacy):
         return []
@@ -107,6 +116,11 @@ def adopt_legacy_content(store: ContentStore) -> List[str]:
         log.info('adopted %s from %s', pack.key, was)
         moved.append(now)
     return moved
+
+
+def _default_store_root() -> str:
+    """Where the per-user store is."""
+    return os.path.join(_default_cache(), 'content')
 
 
 def pack_for_key(key: str) -> Optional[AssetPack]:
