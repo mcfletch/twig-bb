@@ -355,7 +355,7 @@ class TestCalledOutWhenTheMapStarts:
         context = _Context()
         context.notice = notice
         context.hud = self._HUD()
-        viewer.TwigContext._creditMap(context)
+        viewer.TwigContext._creditMap(context)  # noqa: SLF001 a viewer method bound to a headless context
         return context.hud.posted
 
     def test_the_map_names_itself(self):

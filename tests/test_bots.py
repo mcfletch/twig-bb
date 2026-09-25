@@ -426,24 +426,24 @@ class TestNotBeingPredictable:
         happens, and it drew a fresh angle sixty times a second.
         """
         brain = self.brain(2)
-        headings = {tuple(np.round(brain._wander(1.0 / 60.0), 6))
+        headings = {tuple(np.round(brain._wander(1.0 / 60.0), 6))  # noqa: SLF001 the wander heading is tested alone, without a map to walk
                     for _ in range(20)}
         assert len(headings) == 1
 
     def test_it_does_change_its_mind_eventually(self):
         brain = self.brain(2)
-        first = tuple(np.round(brain._wander(0.0), 6))
+        first = tuple(np.round(brain._wander(0.0), 6))  # noqa: SLF001 the wander heading is tested alone, without a map to walk
         for _ in range(40):
-            brain._wander(bots.WANDER_INTERVAL * 0.25)
-        assert tuple(np.round(brain._wander(0.0), 6)) != first
+            brain._wander(bots.WANDER_INTERVAL * 0.25)  # noqa: SLF001 the wander heading is tested alone, without a map to walk
+        assert tuple(np.round(brain._wander(0.0), 6)) != first  # noqa: SLF001 the wander heading is tested alone, without a map to walk
 
     def test_two_of_them_do_not_turn_on_the_same_tick(self):
         """Otherwise a room of bots pivots in unison, which reads as a script."""
         def turns(seed):
             brain = self.brain(seed)
-            was, at = tuple(np.round(brain._wander(0.0), 6)), []
+            was, at = tuple(np.round(brain._wander(0.0), 6)), []  # noqa: SLF001 the wander heading is tested alone, without a map to walk
             for tick in range(400):
-                now = tuple(np.round(brain._wander(1.0 / 60.0), 6))
+                now = tuple(np.round(brain._wander(1.0 / 60.0), 6))  # noqa: SLF001 the wander heading is tested alone, without a map to walk
                 if now != was:
                     at.append(tick)
                 was = now

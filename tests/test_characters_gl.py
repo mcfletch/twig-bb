@@ -57,7 +57,7 @@ def test_a_cast_parses_each_build_once(monkeypatch):
     once and every figure of that build is built from it.
     """
     seen = []
-    real = characters._parse_document
+    real = characters._parse_document  # noqa: SLF001 counts parses by wrapping the module helper
     monkeypatch.setattr(characters, '_parse_document',
                         lambda name: seen.append(name) or real(name))
     characters.Cast(['bot0', 'bot1', 'bot2', 'bot3'])
@@ -94,7 +94,7 @@ class TestABotHoldingItsWeapon:
         """The shared subtree is drawn at each of its parents, not one of them."""
         ids = ['bot0', 'bot1', 'bot2']
         cast = armed(ids=ids)
-        held = [cast.of(one)._held for one in ids]
+        held = [cast.of(one)._held for one in ids]  # noqa: SLF001 the node a figure holds is internal; the test checks where it hangs
         assert len({id(node) for node in held}) == 1, 'one model, shared'
         scene = standing(cast, ids)
         three = _lit(render(scene))
@@ -159,7 +159,7 @@ class TestTheCastIsPosedTogether:
             model = cast.of(one).model
             for skin in model.mixer.skins:
                 for mesh in skin.meshes:
-                    assert mesh._skin_matrices is not None
+                    assert mesh._skin_matrices is not None  # noqa: SLF001 the engine has no public read of a mesh's skin matrices
             # A body that is running is not a body in its bind pose.
             assert any(not np.allclose(matrices, np.eye(4))
                        for matrices in _skin_of(cast.of(one)))
@@ -172,10 +172,10 @@ class TestTheCastIsPosedTogether:
         and the rest are not.
         """
         cast = self._cast()
-        bare = len(cast.of('bot0').model.mixer._writable())
+        bare = len(cast.of('bot0').model.mixer._writable())  # noqa: SLF001 the engine has no public list of the joints a mixer writes
 
         holding = armed(ids=self.IDS)
-        written = len(holding.of('bot0').model.mixer._writable())
+        written = len(holding.of('bot0').model.mixer._writable())  # noqa: SLF001 the engine has no public list of the joints a mixer writes
         joints = holding.of('bot0').model.mixer.rig.n
 
         assert bare == 0, 'a figure holding nothing has no joint to write'
@@ -183,7 +183,7 @@ class TestTheCastIsPosedTogether:
 
 
 def _skin_of(figure):
-    return [mesh._skin_matrices for skin in figure.model.mixer.skins
+    return [mesh._skin_matrices for skin in figure.model.mixer.skins  # noqa: SLF001 the engine has no public read of a mesh's skin matrices
             for mesh in skin.meshes]
 
 
@@ -228,7 +228,7 @@ class TestFiguresAreDrawnLighterAtRange:
             cast.pose(1 / 60.0)
 
         for skin in cast.of('bot0').model.mixer.skins:
-            matrices = [mesh._skin_matrices for mesh in skin.meshes]
+            matrices = [mesh._skin_matrices for mesh in skin.meshes]  # noqa: SLF001 the engine has no public read of a mesh's skin matrices
             assert all(one is not None for one in matrices)
             assert np.allclose(matrices[0], matrices[1])
 

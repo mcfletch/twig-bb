@@ -98,6 +98,11 @@ class LiquidVolumes:
     def __len__(self) -> int:
         return len(self._volumes)
 
+    @property
+    def volumes(self) -> tuple[LiquidVolume, ...]:
+        """The volumes, in the order the map listed them."""
+        return tuple(self._volumes)
+
     def contains(self, point: Sequence[float]) -> bool:
         """Whether ``point`` is inside any volume.
 

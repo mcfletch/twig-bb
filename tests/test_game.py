@@ -1144,7 +1144,7 @@ class TestWhereABodyLooks:
 
     def test_an_aim_is_remembered(self):
         found, one = self._bot()
-        game._apply(None, found, one, bots.Command(id='bot1',
+        game._apply(None, found, one, bots.Command(id='bot1',  # noqa: SLF001 one bot command applied alone, without a whole tick
                                                    aim=np.array([1.0, 0.0, 0.0])),
                     None, 0.1, 0, None, None, None)
         assert np.allclose(one.facing, (1.0, 0.0, 0.0))
@@ -1153,7 +1153,7 @@ class TestWhereABodyLooks:
         """Otherwise a bot that saw somebody once walks sideways for ever."""
         found, one = self._bot()
         one.facing = np.array([1.0, 0.0, 0.0])
-        game._apply(None, found, one, bots.Command(id='bot1'),
+        game._apply(None, found, one, bots.Command(id='bot1'),  # noqa: SLF001 one bot command applied alone, without a whole tick
                     None, 0.1, 0, None, None, None)
         assert not np.any(one.facing)
 

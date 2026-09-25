@@ -35,7 +35,7 @@ def context():
     from omi_audio.engine import AudioEngine
 
     made = FakeContext()
-    audioscene._engines[made] = AudioEngine(device=NullDevice(sample_rate=8000),
+    audioscene._engines[made] = AudioEngine(device=NullDevice(sample_rate=8000),  # noqa: SLF001 the engine has no public way to give a context an audio engine
                                             voices=4)
     yield made
     audioscene.close(made)

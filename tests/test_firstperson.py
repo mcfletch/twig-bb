@@ -550,7 +550,7 @@ class TestTheHandShowsWhatIsHeld:
                 return True
             return any(contains(child, target)
                        for child in (getattr(node, 'children', []) or []))
-        return {name for name, model in hand._loaded.items()
+        return {name for name, model in hand._loaded.items()  # noqa: SLF001 which models the hand has loaded is internal state the test inspects
                 if contains(rig, model)}
 
     def test_every_weapon_in_the_table_reaches_the_hand(self):

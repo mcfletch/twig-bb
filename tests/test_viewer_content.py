@@ -34,19 +34,19 @@ def test_what_arrived_is_added_to_the_content_searched(tmp_path):
     context = a_context(tmp_path)
     job = types.SimpleNamespace(roots=[str(root)], failed=None,
                                 cancelled=False)
-    context._downloadFinished(job)
+    context._downloadFinished(job)  # noqa: SLF001 a viewer method driven on a headless context
     assert context.config.content == [str(root)]
     assert context.marks.said == [job]
 
 
 def test_the_offer_loses_what_arrived(tmp_path):
     context = a_context(tmp_path)
-    everything = context._missingPacks()
-    context._content = menu.download_screen(everything)
+    everything = context._missingPacks()  # noqa: SLF001 a viewer method driven on a headless context
+    context._content = menu.download_screen(everything)  # noqa: SLF001 the viewer's download screen, set on a headless context
     pack = everything[0]
     # On disk as a download leaves it: its marker, or anything at all.
     where = download.store(str(tmp_path)).directory_for(pack)
     os.makedirs(os.path.join(where, pack.marker or 'something'))
-    context._downloadFinished(types.SimpleNamespace(
+    context._downloadFinished(types.SimpleNamespace(  # noqa: SLF001 a viewer method driven on a headless context
         roots=[], failed=None, cancelled=False))
-    assert pack not in context._content.packs
+    assert pack not in context._content.packs  # noqa: SLF001 the viewer's download screen, set on a headless context

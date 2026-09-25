@@ -101,9 +101,9 @@ class TestTextureTransform:
         material = PBRMaterial()
         driver = animator.SurfaceAnimator()
         driver.add(style(animation=scrolling()), material)
-        before = material._ubo_version
+        before = material._ubo_version  # noqa: SLF001 the engine has no public count of a material's uniform uploads
         driver.update(1.0)
-        assert material._ubo_version > before
+        assert material._ubo_version > before  # noqa: SLF001 the engine has no public count of a material's uniform uploads
 
     def test_the_transform_is_a_row_major_three_by_three(self):
         material = PBRMaterial()
@@ -359,6 +359,6 @@ class TestIdempotence:
             anim.DeformWave(0.0, anim.Wave('sin', 0.0, 4.0, 0.25, 0.0)),))
         driver.add(style(animation=wave), PBRMaterial(), mesh=mesh)
         driver.update(0.5)
-        version = mesh._deform_version
+        version = mesh._deform_version  # noqa: SLF001 the engine has no public count of a mesh's deformations
         driver.update(0.5)
-        assert mesh._deform_version == version
+        assert mesh._deform_version == version  # noqa: SLF001 the engine has no public count of a mesh's deformations

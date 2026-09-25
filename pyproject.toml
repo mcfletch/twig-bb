@@ -137,6 +137,8 @@ select = [
     # A mutable class attribute is a ClassVar the engine reads from the class,
     # or it is made immutable.
     "RUF012",
+    # A private name is used only by its own module, or with a noqa saying why.
+    "SLF001",
     # The raw forms the engine has an API for (banned-api, below).
     "TID251",
 ]
@@ -167,6 +169,11 @@ ignore = ["E501"]
 # profile and backend, which must not happen for the suite that needs no window.
 "tests/test_items_gl.py" = ["F811"]
 "tests/test_characters_gl.py" = ["F811"]
+# The match as the player meets it is played out on a headless context: the
+# viewer's own match methods (shooting, aiming, dying, the scoreboard) are
+# bound onto a stand-in with no window and driven directly, so the module
+# reaches the viewer's private methods and state throughout.
+"tests/test_viewer_match.py" = ["SLF001"]
 # The programs run by name set the environment the engine reads before it is
 # imported, and a test sets the environment and clock of what it runs.
 "twig_bb/botreview.py" = ["TID251"]

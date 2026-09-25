@@ -93,7 +93,7 @@ def test_the_volume_is_in_scene_space(tmp_path):
     (`SPEC-BSP46 §3.2`), so a volume read in map units puts the swimmer in the
     wrong place by a factor of forty."""
     loaded = _v46_map(tmp_path, bspbuilder.v46_water(), WATER_SHADER)
-    volume = liquids.from_map(loaded)._volumes[0]
+    volume = liquids.from_map(loaded).volumes[0]
     extent = volume.maxs - volume.mins
     assert sorted(np.round(extent, 6)) == pytest.approx(
         sorted(np.round(np.array([64.0, 64.0, 32.0]) * SCENE_SCALE, 6)))
@@ -103,7 +103,7 @@ def test_the_volume_bounds_are_ordered_after_the_axis_swap(tmp_path):
     """The axis convention negates a coordinate, so a min can come out above a
     max and the box would contain nothing at all."""
     loaded = _v46_map(tmp_path, bspbuilder.v46_water(), WATER_SHADER)
-    volume = liquids.from_map(loaded)._volumes[0]
+    volume = liquids.from_map(loaded).volumes[0]
     assert (volume.maxs >= volume.mins).all()
 
 
@@ -186,7 +186,7 @@ def test_a_version_46_brush_says_which_liquid_it_holds(tmp_path, kind):
     """`SPEC-Q3SHADER §2.2`: the `surfaceparm` names it outright."""
     shader = WATER_SHADER.replace('surfaceparm water', 'surfaceparm %s' % kind)
     loaded = _v46_map(tmp_path, bspbuilder.v46_water(), shader)
-    assert liquids.from_map(loaded)._volumes[0].kind == kind
+    assert liquids.from_map(loaded).volumes[0].kind == kind
 
 
 def test_the_severity_order_puts_the_worst_liquid_first():
@@ -205,7 +205,7 @@ def test_a_version_46_brush_says_which_liquid_through_its_material(tmp_path):
     """`SPEC-Q3SHADER §2.2`: the surfaceparm is the only thing that knows."""
     loaded = _v46_map(tmp_path, bspbuilder.v46_water(), SLIME_SHADER)
     volumes = liquids.from_map(loaded)
-    assert volumes._volumes[0].kind == liquids.SLIME
+    assert volumes.volumes[0].kind == liquids.SLIME
 
 
 class TestTheVolumeIsTheLiquidRatherThanTheLeaf:
@@ -226,7 +226,7 @@ class TestTheVolumeIsTheLiquidRatherThanTheLeaf:
     def test_the_volume_stops_at_the_top_of_the_water(self, tmp_path):
         volumes = liquids.from_map(self.shallow(tmp_path))
         assert len(volumes) == 1
-        top = float(volumes._volumes[0].maxs[1])       # scene +Y is map +Z
+        top = float(volumes.volumes[0].maxs[1])       # scene +Y is map +Z
         assert top < 0.0
 
     def test_standing_in_it_with_your_head_out_is_not_submerged(self, tmp_path):
@@ -243,7 +243,7 @@ class TestTheVolumeIsTheLiquidRatherThanTheLeaf:
 
 def test_a_version_46_water_brush_reads_as_water(tmp_path):
     loaded = _v46_map(tmp_path, bspbuilder.v46_water(), WATER_SHADER)
-    assert liquids.from_map(loaded)._volumes[0].kind == liquids.WATER
+    assert liquids.from_map(loaded).volumes[0].kind == liquids.WATER
 
 
 class TestWhatStandingInItCosts:

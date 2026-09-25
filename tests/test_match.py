@@ -201,11 +201,11 @@ class TestWhereALevelsPictureLives:
 
     def test_the_shared_directory_still_works(self, tmp_path):
         self._picture(tmp_path / 'levelshots' / 'oa_dm1.jpg')
-        assert match._levelshots(str(tmp_path))['oa_dm1'].endswith('oa_dm1.jpg')
+        assert match._levelshots(str(tmp_path))['oa_dm1'].endswith('oa_dm1.jpg')  # noqa: SLF001 the pack walk is tested alone, without building levels
 
     def test_a_picture_in_a_metadata_directory_is_found(self, tmp_path):
         self._picture(tmp_path / 'meta' / 'plat23' / 'plat23.webp')
-        assert match._levelshots(str(tmp_path))['plat23'].endswith('plat23.webp')
+        assert match._levelshots(str(tmp_path))['plat23'].endswith('plat23.webp')  # noqa: SLF001 the pack walk is tested alone, without building levels
 
     def test_only_the_file_named_for_its_directory_counts(self, tmp_path):
         """A metadata directory holds other things, and they are not portraits.
@@ -216,13 +216,13 @@ class TestWhereALevelsPictureLives:
         """
         self._picture(tmp_path / 'meta' / 'plat23' / 'plat23.webp')
         self._picture(tmp_path / 'meta' / 'plat23' / 'loading_bar.png')
-        found = match._levelshots(str(tmp_path))
+        found = match._levelshots(str(tmp_path))  # noqa: SLF001 the pack walk is tested alone, without building levels
         assert set(found) == {'plat23'}
 
     def test_a_picture_loose_under_meta_is_not_a_levelshot(self, tmp_path):
         """One directory deep is the rule; `meta/x.png` names no map."""
         self._picture(tmp_path / 'meta' / 'banner.png')
-        assert match._levelshots(str(tmp_path)) == {}
+        assert match._levelshots(str(tmp_path)) == {}  # noqa: SLF001 the pack walk is tested alone, without building levels
 
     def test_the_shared_directory_wins_where_a_map_has_both(self, tmp_path):
         """The pack's own gallery beats whatever the map was shipped with.
@@ -233,7 +233,7 @@ class TestWhereALevelsPictureLives:
         """
         self._picture(tmp_path / 'levelshots' / 'plat23.jpg')
         self._picture(tmp_path / 'meta' / 'plat23' / 'plat23.webp')
-        assert match._levelshots(str(tmp_path))['plat23'].endswith('.jpg')
+        assert match._levelshots(str(tmp_path))['plat23'].endswith('.jpg')  # noqa: SLF001 the pack walk is tested alone, without building levels
 
     def test_the_formats_the_content_actually_ships_are_searched(self):
         """Two of the three Unvanquished maps ship Crunch, one ships WebP."""
@@ -246,15 +246,15 @@ class TestReadingThosePictures:
 
     def test_registering_teaches_the_picture_cache_crunch(self):
         from OpenGLContext.ui import pictures
-        saved = dict(pictures._decoders)
+        saved = dict(pictures._decoders)  # noqa: SLF001 the engine has no public way to remove a picture decoder
         try:
-            pictures._decoders.clear()
+            pictures._decoders.clear()  # noqa: SLF001 the engine has no public way to remove a picture decoder
             assert pictures.decoderFor('x.crn') is None
             match.register_picture_decoders()
             assert pictures.decoderFor('x.crn') is not None
         finally:
-            pictures._decoders.clear()
-            pictures._decoders.update(saved)
+            pictures._decoders.clear()  # noqa: SLF001 the engine has no public way to remove a picture decoder
+            pictures._decoders.update(saved)  # noqa: SLF001 the engine has no public way to remove a picture decoder
 
     def test_registering_twice_is_harmless(self):
         match.register_picture_decoders()

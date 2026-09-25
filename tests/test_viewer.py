@@ -101,7 +101,7 @@ def _forward(map_angle_degrees: float) -> np.ndarray:
     from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
     platform = PhysicsViewPlatform.__new__(PhysicsViewPlatform)
     platform.yaw = viewer.yaw_for_angle(map_angle_degrees)
-    return platform._world_dir(1.0, 0.0)
+    return platform._world_dir(1.0, 0.0)  # noqa: SLF001 the engine has no public direction for a walk input on its physics platform
 
 
 def test_a_map_yaw_of_zero_faces_along_the_maps_plus_x():
@@ -127,9 +127,9 @@ def test_turning_left_swings_the_gaze_anticlockwise_seen_from_above():
     from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
     platform = PhysicsViewPlatform.__new__(PhysicsViewPlatform)
     platform.yaw = viewer.yaw_for_angle(0.0)
-    before = platform._world_dir(1.0, 0.0)
+    before = platform._world_dir(1.0, 0.0)  # noqa: SLF001 the engine has no public direction for a walk input on its physics platform
     platform.yaw -= 0.4                             # what the turn-left key does
-    after = platform._world_dir(1.0, 0.0)
+    after = platform._world_dir(1.0, 0.0)  # noqa: SLF001 the engine has no public direction for a walk input on its physics platform
     # anticlockwise about +Y takes +X towards -Z ... in the map's frame, that is
     # +X towards +Y, which is what a left turn from yaw 0 means
     assert after[2] < before[2]
@@ -286,7 +286,7 @@ def test_the_gaze_rule_agrees_with_the_walk_direction(tmp_path):
     before relying on it.  With no pitch, the two must be the same direction."""
     nav = walking_platform(tmp_path)
     nav.yaw = viewer.yaw_for_angle(0.0)
-    assert viewer.gaze(nav) == pytest.approx(nav._world_dir(1.0, 0.0), abs=1e-6)
+    assert viewer.gaze(nav) == pytest.approx(nav._world_dir(1.0, 0.0), abs=1e-6)  # noqa: SLF001 the engine has no public direction for a walk input on its physics platform
 
 
 def test_looking_up_raises_the_gaze(tmp_path):
@@ -472,7 +472,7 @@ def test_no_map_on_the_command_line_is_a_start_screen_rather_than_an_error(
                         classmethod(lambda cls, **named: started.append(named)))
     viewer.main([])
     assert started
-    assert viewer.TwigContext._target in (None, '')
+    assert viewer.TwigContext.target in (None, '')
 
 
 def test_a_named_map_still_goes_straight_into_it(monkeypatch, tmp_path):
@@ -481,7 +481,7 @@ def test_a_named_map_still_goes_straight_into_it(monkeypatch, tmp_path):
     monkeypatch.setattr(viewer.TwigContext, 'ContextMainLoop',
                         classmethod(lambda cls, **named: started.append(named)))
     viewer.main(['some-map.bsp'])
-    assert viewer.TwigContext._target == 'some-map.bsp'
+    assert viewer.TwigContext.target == 'some-map.bsp'
 
 
 def test_naming_a_map_inside_a_pack_fetches_the_pack(tmp_path, monkeypatch):
@@ -813,7 +813,7 @@ def test_a_held_key_walks_the_character_through_the_declared_modes(tmp_path):
     nav = walking_platform(tmp_path)
     context = HeadlessContext(nav)
     start = np.array(nav.character.position, dtype='d')
-    context._recordInput(KeyEvent('w', 1))
+    context._recordInput(KeyEvent('w', 1))  # noqa: SLF001 a viewer method driven on a headless context
     for _ in range(10):
         context.updateNavigation(0.05)
         nav.update(0.05)
@@ -824,9 +824,9 @@ def test_a_held_key_walks_the_character_through_the_declared_modes(tmp_path):
 def test_releasing_the_key_stops_the_character(tmp_path):
     nav = walking_platform(tmp_path)
     context = HeadlessContext(nav)
-    context._recordInput(KeyEvent('w', 1))
+    context._recordInput(KeyEvent('w', 1))  # noqa: SLF001 a viewer method driven on a headless context
     context.updateNavigation(0.05)
-    context._recordInput(KeyEvent('w', 0))
+    context._recordInput(KeyEvent('w', 0))  # noqa: SLF001 a viewer method driven on a headless context
     context.updateNavigation(0.05)
     nav.update(0.05)
     here = np.array(nav.character.position, dtype='d')
@@ -843,8 +843,8 @@ def test_walking_and_jumping_happen_in_the_same_frame(tmp_path):
     nav = walking_platform(tmp_path)
     nav.character.grounded = True
     context = HeadlessContext(nav)
-    context._recordInput(KeyEvent('w', 1))
-    context._recordInput(KeyEvent(' ', 1))
+    context._recordInput(KeyEvent('w', 1))  # noqa: SLF001 a viewer method driven on a headless context
+    context._recordInput(KeyEvent(' ', 1))  # noqa: SLF001 a viewer method driven on a headless context
     start = np.array(nav.character.position, dtype='d')
     context.updateNavigation(0.05)
     assert nav.character.vy > 0                  # jumped
@@ -872,7 +872,7 @@ def test_the_physics_world_is_found_through_the_character(tmp_path):
 
 def test_no_physics_world_before_walking_begins(tmp_path):
     context = HeadlessContext(walking_platform(tmp_path))
-    context._nav = None
+    context._nav = None  # noqa: SLF001 the viewer's navigator, set on a headless context
     assert context.physicsWorld() is None
 
 

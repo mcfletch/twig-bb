@@ -134,7 +134,7 @@ class TestBeingShot:
         match.impact(point=(1, 0, 0), normal=(-1, 0, 0), target='bot1',
                      by=game.PLAYER_ID)
         self.show(presenter, match, now=5.0)
-        assert screen.crosshair._hit_at == 5.0
+        assert screen.crosshair._hit_at == 5.0  # noqa: SLF001 the crosshair's hit time is internal state the test pins
 
     def test_hitting_a_wall_does_not_mark_the_reticule(self, match, screen):
         """The mark means "you hit somebody"; a wall would make it a lie."""
@@ -142,7 +142,7 @@ class TestBeingShot:
         match.impact(point=(1, 0, 0), normal=(-1, 0, 0), surface='stone',
                      by=game.PLAYER_ID)
         self.show(presenter, match)
-        assert screen.crosshair._hit_at is None
+        assert screen.crosshair._hit_at is None  # noqa: SLF001 the crosshair's hit time is internal state the test pins
 
     def test_a_bot_hitting_another_bot_does_not_mark_our_reticule(self, match,
                                                                   screen):
@@ -150,7 +150,7 @@ class TestBeingShot:
         match.impact(point=(1, 0, 0), normal=(-1, 0, 0), target=game.PLAYER_ID,
                      by='bot1')
         self.show(presenter, match)
-        assert screen.crosshair._hit_at is None
+        assert screen.crosshair._hit_at is None  # noqa: SLF001 the crosshair's hit time is internal state the test pins
 
 
 class TestBeingKilled:

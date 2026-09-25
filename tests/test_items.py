@@ -517,13 +517,13 @@ class TestReachingForManyAtOnce:
 
     def test_it_agrees_with_asking_one_pair_at_a_time(self):
         placed, standing = self.spread(25, 7), self.spread(9, 11)
-        batch = items._touching(placed, standing)
+        batch = items._touching(placed, standing)  # noqa: SLF001 the vectorised touch test is checked against the scalar one
         for i, item in enumerate(placed):
             for j, feet in enumerate(standing):
-                assert bool(batch[i, j]) == items._reaches(feet, item), (i, j)
+                assert bool(batch[i, j]) == items._reaches(feet, item), (i, j)  # noqa: SLF001 the scalar touch test is the reference for the vectorised one
 
     def test_nothing_placed_is_an_empty_answer(self):
-        assert items._touching(np.zeros((0, 3)), self.spread(3)).shape == (0, 3)
+        assert items._touching(np.zeros((0, 3)), self.spread(3)).shape == (0, 3)  # noqa: SLF001 the vectorised touch test is checked against the scalar one
 
     def test_nobody_standing_is_an_empty_answer(self):
-        assert items._touching(self.spread(4), np.zeros((0, 3))).shape == (4, 0)
+        assert items._touching(self.spread(4), np.zeros((0, 3))).shape == (4, 0)  # noqa: SLF001 the vectorised touch test is checked against the scalar one

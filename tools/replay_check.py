@@ -143,7 +143,7 @@ def play(argv: list[str], scripted: bool = True) -> None:
     options = viewer.build_parser().parse_args(argv)
     viewer.apply_render_env(options)
     Scripted.config = options
-    Scripted._target = options.target
+    Scripted.target = options.target
     Scripted.ContextMainLoop(definition=viewer.context_definition(
         fullscreen=viewer.wants_fullscreen(options)))
 

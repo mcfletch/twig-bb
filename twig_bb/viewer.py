@@ -441,25 +441,31 @@ def watch_jumps(nav: Any, report: Optional[Callable[[str], None]] = None) -> Any
     Returns the navigator.  Wrapping is idempotent: asking twice leaves one
     report per press rather than two.
     """
-    if getattr(nav, '_jumpWatched', False):
-        return nav
-    inner = nav.jump
-    say = report if report is not None else _print_line
-
-    def watched() -> Any:
-        character = getattr(nav, 'character', None)
-        fired = inner()
-        say('jump %s: grounded=%s crouching=%s flying=%s vy=%.2f'
-            % ('jumped' if fired else 'refused',
-               getattr(character, 'grounded', '?'),
-               getattr(character, 'crouching', '?'),
-               getattr(character, 'flying', '?'),
-               float(getattr(character, 'vy', 0.0) or 0.0)))
-        return fired
-
-    nav.jump = watched
-    nav._jumpWatched = True
+    if not isinstance(nav.jump, _JumpReport):
+        nav.jump = _JumpReport(nav, nav.jump,
+                               report if report is not None else _print_line)
     return nav
+
+
+class _JumpReport:
+    """A navigator's ``jump``, reporting the character's state after each try."""
+
+    def __init__(self, nav: Any, jump: Callable[[], Any],
+                 say: Callable[[str], None]) -> None:
+        self.nav = nav
+        self.jump = jump
+        self.say = say
+
+    def __call__(self) -> Any:
+        character = getattr(self.nav, 'character', None)
+        fired = self.jump()
+        self.say('jump %s: grounded=%s crouching=%s flying=%s vy=%.2f'
+                 % ('jumped' if fired else 'refused',
+                    getattr(character, 'grounded', '?'),
+                    getattr(character, 'crouching', '?'),
+                    getattr(character, 'flying', '?'),
+                    float(getattr(character, 'vy', 0.0) or 0.0)))
+        return fired
 
 
 def _print_line(line: str) -> None:   # pragma: no cover - console output
@@ -609,7 +615,10 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
     #: without one -- which is how a match is played out under test -- can mark
     #: as freely as a running game does.
     marks: Any = gamemarks.GameMarks(None)
-    _target: Optional[str] = None
+    #: The map the command line named (a ``.bsp``, an archive, a URL or
+    #: ``pack:mapname``), then the level in play; None or empty for the start
+    #: screen.
+    target: Optional[str] = None
     #: The map in play, or None while the start screen is up.
     loaded: Any = None
     #: Who made the map in play and under what terms; see
@@ -655,7 +664,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         """
         disable_vsync(self)
         if self.config is None:
-            self.config = build_parser().parse_args([self._target or ''])
+            self.config = build_parser().parse_args([self.target or ''])
         # The handover for loading a level off the render thread (see
         # :meth:`_loadLevel`); set up before any level can be chosen.
         self.setupAsyncScene()
@@ -712,8 +721,8 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         self._startGame()
         self.addEventHandler('keypress', name='g', function=self._toggle_walk)
         self.bindScreenKeys(self)
-        if self._target:
-            self._loadLevel(self._target)
+        if self.target:
+            self._loadLevel(self.target)
         else:
             self.showMenu()
 
@@ -728,7 +737,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         loop to keep alive and needs the very frame it is about to grab, so it
         loads in step instead.
         """
-        self._target = target
+        self.target = target
         self.marks.loading(target)
         if self.config.capture:
             self._applyLevel(load_level(self.config, self.weapons, target))
@@ -742,8 +751,8 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
 
     def applyFailedLoad(self, error: Optional[BaseException]) -> None:  # pragma: no cover - GL
         """Render thread: a level would not load.  Say so and stay on the menu."""
-        log.error('could not load the level %s: %s', self._target, error)
-        self.marks.failed(self._target or '', error)
+        log.error('could not load the level %s: %s', self.target, error)
+        self.marks.failed(self.target or '', error)
         self.showMenu()
 
     def _applyLevel(self, bundle: LevelBundle) -> None:  # pragma: no cover - needs a window
@@ -1046,7 +1055,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
                 continue
             self.config.content = (list(self.config.content)
                                    + download.content_roots(root))
-        self.loaded = load_map(self.config, self._target)
+        self.loaded = load_map(self.config, self.target)
         # Built before the scene, because a surface has to be told it deforms
         # before its vertex buffers exist -- that is what decides whether its
         # texture-coordinate buffer is dynamic.
@@ -2090,7 +2099,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     # not read on its own.
     match.register_picture_decoders()
     TwigContext.config = options
-    TwigContext._target = options.target
+    TwigContext.target = options.target
     TwigContext.ContextMainLoop(
         definition=context_definition(fullscreen=wants_fullscreen(options)))
 

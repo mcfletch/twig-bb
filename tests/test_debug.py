@@ -302,7 +302,7 @@ class TestPlayerSection:
     def test_it_says_whether_the_camera_is_walking_or_flying(self, viewer):
         twigdebug.install(viewer)
         assert rows(viewer, 'Player')['navigation'] == 'walking'
-        viewer._walking = False
+        viewer._walking = False  # noqa: SLF001 the viewer's walk mode, set on a headless context
         assert rows(viewer, 'Player')['navigation'] == 'free-fly'
 
     def test_it_reports_the_position_in_map_units(self, viewer):
@@ -327,18 +327,18 @@ class TestPlayerSection:
     def test_it_says_when_the_player_is_under_a_liquid(self, viewer):
         twigdebug.install(viewer)
         assert rows(viewer, 'Player')['submerged'] == 'no'
-        viewer._nav.submerged = True
+        viewer._nav.submerged = True  # noqa: SLF001 the viewer's navigator, set on a headless context
         assert rows(viewer, 'Player')['submerged'] == 'yes'
 
     def test_a_free_flying_camera_has_no_submerged_row(self, viewer):
-        viewer._nav = None
+        viewer._nav = None  # noqa: SLF001 the viewer's navigator, set on a headless context
         twigdebug.install(viewer)
         assert 'submerged' not in rows(viewer, 'Player')
 
     def test_it_reports_the_timestep_the_simulation_is_being_given(self, viewer):
-        viewer._clock = FrameClock()
-        viewer._clock.reset(0.0)
-        viewer._clock.tick(0.016)
+        viewer._clock = FrameClock()  # noqa: SLF001 the viewer's frame clock, set on a headless context
+        viewer._clock.reset(0.0)  # noqa: SLF001 the viewer's frame clock, set on a headless context
+        viewer._clock.tick(0.016)  # noqa: SLF001 the viewer's frame clock, set on a headless context
         twigdebug.install(viewer)
         found = rows(viewer, 'Player')
         assert found['dt ms'] == '16'
@@ -351,9 +351,9 @@ class TestPlayerSection:
         no other number on the overlay says so -- the frame rate reports the
         renderer, and the renderer is fine.
         """
-        viewer._clock = FrameClock()
-        viewer._clock.reset(0.0)
-        viewer._clock.tick(1.0)
+        viewer._clock = FrameClock()  # noqa: SLF001 the viewer's frame clock, set on a headless context
+        viewer._clock.reset(0.0)  # noqa: SLF001 the viewer's frame clock, set on a headless context
+        viewer._clock.tick(1.0)  # noqa: SLF001 the viewer's frame clock, set on a headless context
         twigdebug.install(viewer)
         found = rows(viewer, 'Player')
         assert found['real ms'] == '1000'
@@ -376,7 +376,7 @@ class TestPhysicsSection:
             bodies = (object(), object(), object())
             contacts = ()
 
-        viewer._world = World()
+        viewer._world = World()  # noqa: SLF001 the viewer's physics world, set on a headless context
         twigdebug.install(viewer)
         assert rows(viewer, 'Physics')['bodies'] == '3'
 

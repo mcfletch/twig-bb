@@ -162,7 +162,7 @@ def test_the_sample_map_reads_with_the_counts_its_bytes_imply(quake3_map):
     """
     bsp = q3bsp.load(quake3_map)
     assert bsp.version == 46
-    for name, index, dtype in q3bsp._RECORD_LUMPS:
+    for name, index, dtype in q3bsp._RECORD_LUMPS:  # noqa: SLF001 the test builds one of each lump the reader decodes
         length = int(bsp.directory[index][1])
         assert length % dtype.itemsize == 0, (
             '%s: %d bytes is not a whole number of %d-byte records'

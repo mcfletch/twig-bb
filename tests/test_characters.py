@@ -446,11 +446,11 @@ class TestACastThatIsArmed:
         cast.update('a', moving(weapon='rifle'), 0.1)
         assert figure.holding == 'rifle'
         grip = figure.model.point('grip')
-        assert figure._held in list(grip.children)
+        assert figure._held in list(grip.children)  # noqa: SLF001 the node a figure holds is internal; the test checks where it hangs
         # And keeps hold of it when it dies: a weapon that vanishes on the
         # frame somebody is shot is the one thing a player would call a bug.
         cast.update('a', moving(weapon='rifle', dead=True), 0.1)
-        assert figure.holding == 'rifle' and figure._held in list(grip.children)
+        assert figure.holding == 'rifle' and figure._held in list(grip.children)  # noqa: SLF001 the node a figure holds is internal; the test checks where it hangs
 
 
 class TestWhichWayItFalls:

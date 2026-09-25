@@ -100,7 +100,7 @@ def test_a_deluxemapped_map_never_reads_its_direction_pages(tmp_path):
     pages = externallightmaps.for_map(path, bsp, TEXTURE_EXTENSIONS)
     assert pages is not None
     pages.page(0)
-    assert 1 not in pages._pages, 'the direction page was read and should not be'
+    assert 1 not in pages._pages, 'the direction page was read and should not be'  # noqa: SLF001 which lightmap pages were read is internal state the test inspects
 
 
 def test_pages_stand_in_for_the_lump_when_the_map_is_loaded(tmp_path):
