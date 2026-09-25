@@ -679,11 +679,12 @@ from the archive it built, and publishes it:
 ```bash
 ./release-assets.py                 # build the archive, write the entry
 ./release-assets.py --install       # ...and install it in this machine's store
+./release-assets.py --reinstall     # ...over whatever that store already holds
 ./release-assets.py --push          # ...and attach it to the release tag
 ```
 
 `--install` is how the pack is played against before there is a release to
-fetch it from. The other eighteen entries are other people's packages on other
+fetch it from; it leaves a pack already in the store where it is, and `--reinstall` does the same over whatever the store already holds, which is what a rebuilt world needs to be the one that opens. The other eighteen entries are other people's packages on other
 people's servers, and nothing here rewrites them.
 
 The OpenArena release is split, so what one map needs spans several packs:
