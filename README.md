@@ -577,7 +577,8 @@ Set `TWIG_BB_DEBUG_JUMP=1` to have every jump press say what the capsule thought
 at the time — whether it fired, and if not whether it was airborne, crouching or
 flying. A press that does nothing can fail in four places (the event queue, the
 mode that owns the binding, the character, its footing) and they look identical
-from the outside; this says which.
+from the outside; this says which The switch is read once, when the first map loads,
+and takes `1`, `true`, `yes` or `on`; another value is logged and ignored.
 | `--shadows` | real-time shadows; off by default, as the maps bake their own |
 | `--subdivisions N` | samples per Bezier patch edge on Quake 3 maps |
 | `--capture PATH` | render, save a PNG, and exit |

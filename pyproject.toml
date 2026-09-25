@@ -96,7 +96,22 @@ twig_bb = [
 # The OGC rules (openglcontext-checks) this project is clean of, held by
 # the workspace preflight. The others join as the project reaches zero of
 # each; the counts are in openglcontext/plans/DEFECT-PREVENTION.md.
-select = ["OGC141", "OGC223"]
+select = ["OGC101", "OGC102", "OGC111", "OGC121", "OGC141", "OGC223"]
+
+[tool.openglcontext-checks.scopes]
+# The readers of a map's raw form -- the BSP container and its lumps, shader
+# scripts, packages, Crunch textures and external lightmaps -- which OGC101,
+# OGC102 and OGC111 hold to checked values, sizes and paths. The modules that
+# build geometry and visibility from the decoded lumps read typed record
+# fields, whose ranges they check where they index with them.
+loader = [
+    "twig_bb/bspfile.py",
+    "twig_bb/q3bsp.py",
+    "twig_bb/q3shader.py",
+    "twig_bb/dpk.py",
+    "twig_bb/crnfile.py",
+    "twig_bb/externallightmaps.py",
+]
 
 [tool.ruff]
 line-length = 100
@@ -122,8 +137,27 @@ select = [
     # A mutable class attribute is a ClassVar the engine reads from the class,
     # or it is made immutable.
     "RUF012",
+    # The raw forms the engine has an API for (banned-api, below).
+    "TID251",
 ]
 ignore = ["E501"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# The workspace's banned-api list (openglcontext/plans/DEFECT-PREVENTION.md):
+# the raw form, and the engine API that replaces it. The modules that
+# implement a replacement, and the programs and tests that set the process
+# environment, are exempted in per-file-ignores.
+"urllib.request.urlopen".msg = "fetch through OpenGLContext.loaders.resolver: Resolver.fetch, fetch_url, or AllowedHosts.open_url for a service's own hosts"
+"urllib.request.urlretrieve".msg = "fetch through OpenGLContext.loaders.resolver: fetch_to_cache, or AllowedHosts.open_url for a service's own hosts"
+"tarfile.TarFile.extractall".msg = "unpack through OpenGLContext.contentpacks.archive.extract, which refuses a member that leaves the directory and caps the size"
+"zipfile.ZipFile.extractall".msg = "unpack through OpenGLContext.contentpacks.archive.extract, which refuses a member that leaves the directory and caps the size"
+"shutil.rmtree".msg = "replace or remove a directory through OpenGLContext.atomicfiles: staged_directory, replace_directory or remove_directory"
+"shutil.move".msg = "move a finished file or directory into place through OpenGLContext.atomicfiles: staged_file, staged_directory or replace_directory"
+"os.rename".msg = "os.rename refuses an existing target on Windows; use os.replace, or OpenGLContext.atomicfiles"
+"os.environ".msg = "read a switch once, through OpenGLContext.renderoptions.env_flag_once / env_number_once, or in the program's start-up"
+"os.getenv".msg = "read a switch once, through OpenGLContext.renderoptions.env_flag_once / env_number_once, or in the program's start-up"
+"os._exit".msg = "exit through OpenGLContext.testing.process_exit.flush_and_exit, which flushes what was written first"
+"time.time".msg = "ask OpenGLContext.events.systemtime.systemTime(), which a capture's fixed-step clock drives"
 
 [tool.ruff.lint.per-file-ignores]
 # A pytest fixture shared between two test modules is imported into the second
@@ -133,6 +167,12 @@ ignore = ["E501"]
 # profile and backend, which must not happen for the suite that needs no window.
 "tests/test_items_gl.py" = ["F811"]
 "tests/test_characters_gl.py" = ["F811"]
+# The programs run by name set the environment the engine reads before it is
+# imported, and a test sets the environment and clock of what it runs.
+"twig_bb/botreview.py" = ["TID251"]
+"twig_bb/hudsample.py" = ["TID251"]
+"tools/*" = ["TID251"]
+"tests/*" = ["TID251"]
 
 [tool.mypy]
 # The numpy stubs in this environment use `type` statements, which mypy only

@@ -59,6 +59,7 @@ from OpenGLContext.scenegraph.light import (
     DirectionalLight, PointLight,
 )
 from OpenGLContext.scenegraph.scenegraph import SceneGraph
+from OpenGLContext.testing.process_exit import flush_and_exit
 from OpenGLContext.ui import bindings, settings
 from OpenGLContext.ui.overlay import OverlayMixin
 
@@ -312,7 +313,7 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
             self.setCurrent()
             sys.stdout.write('captured %s\n' % (self.config.capture,))
             sys.stdout.flush()
-            os._exit(0)
+            flush_and_exit(0)
             return result
         return super(HUDSampleContext, self).presentFrame()
 

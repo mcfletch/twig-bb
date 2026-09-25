@@ -20,11 +20,11 @@ import fnmatch
 import hashlib
 import logging
 import os
-import shutil
 import zipfile
 from typing import Optional
 from collections.abc import Sequence
 
+from OpenGLContext import atomicfiles
 from OpenGLContext.contentpacks import ContentStore, archive as engine_archive
 from OpenGLContext.contentpacks import catalog as engine_catalog
 from OpenGLContext.contentpacks.archive import UnsafeArchive as UnsafeArchive
@@ -114,7 +114,7 @@ def adopt_legacy_content(store: ContentStore) -> list[str]:
             continue
         os.makedirs(os.path.dirname(now), exist_ok=True)
         try:
-            shutil.move(was, now)
+            atomicfiles.replace_directory(was, now)
         except OSError as error:                # pragma: no cover - needs a
             log.warning('cannot adopt %s: %s', was, error)   # read-only tree
             continue
@@ -457,14 +457,14 @@ def purge(cache_dir: Optional[str] = None) -> None:
     """
     if cache_dir:
         if os.path.isdir(cache_dir):
-            shutil.rmtree(cache_dir)
+            atomicfiles.remove_directory(cache_dir)
             log.info('removed %s', cache_dir)
         return
     base = _default_cache()
     for directory in (os.path.join(base, CACHE_SUBDIR),
                       os.path.join(base, LEGACY_CONTENT)):
         if os.path.isdir(directory):
-            shutil.rmtree(directory)
+            atomicfiles.remove_directory(directory)
             log.info('removed %s', directory)
     where = store()
     for pack in ASSET_PACKS:

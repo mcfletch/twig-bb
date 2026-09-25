@@ -52,16 +52,16 @@ from dataclasses import dataclass
 from typing import Any, Optional
 from collections.abc import Callable
 
-os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
-os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
+os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')  # noqa: TID251 the program's start-up sets the environment the engine reads
+os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')  # noqa: TID251 the program's start-up sets the environment the engine reads
 # A map's own baked lighting is the point; a full-strength analytic sky washes
 # it out, so the environment probe is dimmed rather than switched off (metals
 # still need something to reflect).
-os.environ.setdefault('OPENGLCONTEXT_IBL_INTENSITY', '0.15')
+os.environ.setdefault('OPENGLCONTEXT_IBL_INTENSITY', '0.15')  # noqa: TID251 the program's start-up sets the environment the engine reads
 
 import numpy as np
 
-from OpenGLContext import testingcontext
+from OpenGLContext import renderoptions, testingcontext
 from OpenGLContext.capture import SettleCapture
 from OpenGLContext.contextdefinition import ContextDefinition
 from OpenGLContext.move import modes as movemodes
@@ -71,6 +71,7 @@ from OpenGLContext.scenegraph.light import (
     DirectionalLight, PointLight,
 )
 from OpenGLContext.scenegraph.scenegraph import SceneGraph
+from OpenGLContext.testing.process_exit import flush_and_exit
 from omi_physics.character import CharacterCapabilities
 
 from OpenGLContext.events import systemtime
@@ -301,11 +302,11 @@ def resolve_map_target(options: argparse.Namespace,
 
 def apply_render_env(options: argparse.Namespace) -> None:
     """Translate the render-affecting options into the env vars the pass reads."""
-    os.environ['OPENGLCONTEXT_SHADOWS'] = '1' if options.shadows else '0'
+    os.environ['OPENGLCONTEXT_SHADOWS'] = '1' if options.shadows else '0'  # noqa: TID251 the program's start-up sets the environment the engine reads
     if options.capture:
         # A capture wants a clean, reproducible frame.
-        os.environ['OPENGLCONTEXT_DISABLE_FPS_DISPLAY'] = '1'
-        os.environ.setdefault('OPENGLCONTEXT_SHADOW_CASCADES', '3')
+        os.environ['OPENGLCONTEXT_DISABLE_FPS_DISPLAY'] = '1'  # noqa: TID251 the program's start-up sets the environment the engine reads
+        os.environ.setdefault('OPENGLCONTEXT_SHADOW_CASCADES', '3')  # noqa: TID251 the program's start-up sets the environment the engine reads
 
 
 def yaw_for_angle(degrees: float) -> float:
@@ -1701,7 +1702,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         self.rules.harm = liquids.LiquidHarm(self._liquids)
         self.rules.floor = falling.KillFloor.under(self.loaded)
         self.rules.gravity = gravity
-        if os.environ.get(DEBUG_JUMP_ENV):
+        if renderoptions.env_flag_once(DEBUG_JUMP_ENV, False):
             watch_jumps(self._nav)
         self._nav.apply(self)
         # A map load is seconds the player did not experience as a stall, so
@@ -1870,7 +1871,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             self.setCurrent()
             sys.stdout.write('captured %s\n' % (self.config.capture,))
             sys.stdout.flush()
-            os._exit(0)
+            flush_and_exit(0)
             return result
         return super(TwigContext, self).presentFrame()
 
