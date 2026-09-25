@@ -18,7 +18,7 @@ import pytest
 from OpenGLContext.ui import pictures
 from PIL import Image
 
-from twig_bb import download, match
+from twig_bb import crnfile, download, match
 
 
 class TestTheDefaults:
@@ -241,15 +241,15 @@ class TestReadingThosePictures:
     """The toolkit decodes through the imaging library, which has no Crunch."""
 
     def test_registering_teaches_the_picture_cache_crunch(self):
-        saved = dict(pictures._decoders)  # noqa: SLF001 the engine has no public way to remove a picture decoder
+        before = pictures.unregisterDecoder(crnfile.EXTENSION)
         try:
-            pictures._decoders.clear()  # noqa: SLF001 the engine has no public way to remove a picture decoder
             assert pictures.decoderFor('x.crn') is None
             match.register_picture_decoders()
             assert pictures.decoderFor('x.crn') is not None
         finally:
-            pictures._decoders.clear()  # noqa: SLF001 the engine has no public way to remove a picture decoder
-            pictures._decoders.update(saved)  # noqa: SLF001 the engine has no public way to remove a picture decoder
+            pictures.unregisterDecoder(crnfile.EXTENSION)
+            if before is not None:
+                pictures.registerDecoder(crnfile.EXTENSION, before)
 
     def test_registering_twice_is_harmless(self):
         match.register_picture_decoders()

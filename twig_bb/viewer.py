@@ -75,7 +75,7 @@ from OpenGLContext.scenegraph.light import (
     PointLight,
 )
 from OpenGLContext.scenegraph.scenegraph import SceneGraph
-from OpenGLContext.testing.process_exit import flush_and_exit
+from OpenGLContext.processexit import flush_and_exit
 from OpenGLContext.ui import bindings, dialogs, settings
 from OpenGLContext.ui.overlay import OverlayMixin
 from OpenGLContext.ui.panel import Panel
@@ -1243,8 +1243,9 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         player turns, which reads as the world spinning around a fixed gun:
         turn left and the impact pans right, look down and the shot goes up.
 
-        The gaze rule is :func:`gaze`, whose agreement with ``_world_dir`` and
-        so with the map-angle convention is a test.
+        The gaze rule is :func:`gaze`, whose agreement with
+        ``PhysicsViewPlatform.world_direction`` and so with the map-angle
+        convention is a test.
 
         Before walking has begun there is no navigator and so no camera to aim
         from: the answer is the scene origin, looking straight ahead.  Nothing

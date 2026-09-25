@@ -35,8 +35,8 @@ class FakeContext:
 def context():
     """A context with a real audio engine attached the way one really is."""
     made = FakeContext()
-    audioscene._engines[made] = AudioEngine(device=NullDevice(sample_rate=8000),  # noqa: SLF001 the engine has no public way to give a context an audio engine
-                                            voices=4)
+    audioscene.attach(made, AudioEngine(device=NullDevice(sample_rate=8000),
+                                        voices=4))
     yield made
     audioscene.close(made)
 

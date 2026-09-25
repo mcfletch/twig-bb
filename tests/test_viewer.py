@@ -116,7 +116,7 @@ def _forward(map_angle_degrees: float) -> np.ndarray:
     """The world-space direction 'forward' walks for a map's `angle` key."""
     platform = PhysicsViewPlatform.__new__(PhysicsViewPlatform)
     platform.yaw = viewer.yaw_for_angle(map_angle_degrees)
-    return platform._world_dir(1.0, 0.0)  # noqa: SLF001 the engine has no public direction for a walk input on its physics platform
+    return platform.world_direction(1.0, 0.0)
 
 
 def test_a_map_yaw_of_zero_faces_along_the_maps_plus_x():
@@ -141,9 +141,9 @@ def test_turning_left_swings_the_gaze_anticlockwise_seen_from_above():
     """A rising platform yaw turns the camera *right*, so turn-left subtracts."""
     platform = PhysicsViewPlatform.__new__(PhysicsViewPlatform)
     platform.yaw = viewer.yaw_for_angle(0.0)
-    before = platform._world_dir(1.0, 0.0)  # noqa: SLF001 the engine has no public direction for a walk input on its physics platform
+    before = platform.world_direction(1.0, 0.0)
     platform.yaw -= 0.4                             # what the turn-left key does
-    after = platform._world_dir(1.0, 0.0)  # noqa: SLF001 the engine has no public direction for a walk input on its physics platform
+    after = platform.world_direction(1.0, 0.0)
     # anticlockwise about +Y takes +X towards -Z ... in the map's frame, that is
     # +X towards +Y, which is what a left turn from yaw 0 means
     assert after[2] < before[2]
@@ -295,11 +295,11 @@ def test_the_download_choice_is_a_command_line_option():
 
 
 def test_the_gaze_rule_agrees_with_the_walk_direction(tmp_path):
-    """The plan's instruction: validate the gaze rule against `_world_dir`
+    """The plan's instruction: validate the gaze rule against `world_direction`
     before relying on it.  With no pitch, the two must be the same direction."""
     nav = walking_platform(tmp_path)
     nav.yaw = viewer.yaw_for_angle(0.0)
-    assert viewer.gaze(nav) == pytest.approx(nav._world_dir(1.0, 0.0), abs=1e-6)  # noqa: SLF001 the engine has no public direction for a walk input on its physics platform
+    assert viewer.gaze(nav) == pytest.approx(nav.world_direction(1.0, 0.0), abs=1e-6)
 
 
 def test_looking_up_raises_the_gaze(tmp_path):

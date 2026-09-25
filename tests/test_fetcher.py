@@ -81,7 +81,7 @@ class TestAJobThatSucceeds:
         """
         job = fetcher.FetchJob([pack()], fetch=lambda p, prog, can: '/content')
         job.start()
-        job._thread.join(5.0)  # noqa: SLF001 the engine has no public wait on a fetch job
+        assert job.wait(5.0)
         assert not job.finished
         job.poll()
         assert job.finished

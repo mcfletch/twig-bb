@@ -650,7 +650,7 @@ class TestAShotGoesWhereTheCameraLooks:
     checks first, straight ahead.
 
     `viewer.gaze` is the verified one: `test_the_gaze_rule_agrees_with_the_walk_direction`
-    checks it against `_world_dir`, which is checked against the map-angle
+    checks it against `world_direction`, which is checked against the map-angle
     spec. So a shot must agree with `gaze`.
     """
 
@@ -739,7 +739,7 @@ class TestTheShotIsUnderTheCrosshair:
     """The one test above this that could not be argued with.
 
     Everything else here checks the aim against `viewer.gaze`, and `gaze`
-    against `_world_dir`: three rules that agree with each other and could all
+    against `world_direction`: three rules that agree with each other and could all
     be wrong the same way, which is what a shot that pans the wrong way *is*.
 
     So this checks the aim against something that is not a rule at all — the

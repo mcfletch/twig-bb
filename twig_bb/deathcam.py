@@ -152,7 +152,7 @@ class DeathCamera:
         flat = math.hypot(float(to[0]), float(to[2]))
         if flat < 1e-6 and abs(float(to[1])) < 1e-6:
             return (self._yaw, 0.0)
-        # The same basis `PhysicsViewPlatform._world_dir` derives its forward
+        # The same basis `PhysicsViewPlatform.world_direction` derives its forward
         # from: at a yaw of zero the camera looks down -Z.  The pitch is
         # *negated* because that is what the platform's own composition means
         # by one -- a positive pitch looks down -- and the two have to agree,

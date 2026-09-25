@@ -64,7 +64,7 @@ from OpenGLContext.scenegraph.light import (
     PointLight,
 )
 from OpenGLContext.scenegraph.scenegraph import SceneGraph
-from OpenGLContext.testing.process_exit import flush_and_exit
+from OpenGLContext.processexit import flush_and_exit
 from OpenGLContext.ui import bindings, settings
 from OpenGLContext.ui.overlay import OverlayMixin
 
