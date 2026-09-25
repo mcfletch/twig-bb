@@ -13,9 +13,10 @@ re-parsing text.
 
 from __future__ import annotations
 
-from typing import Dict, Iterator, List, Mapping, Optional, Tuple, Union
+from typing import Optional
+from collections.abc import Iterator, Mapping
 
-Vector3 = Tuple[float, float, float]
+Vector3 = tuple[float, float, float]
 
 # SPEC-BSP38 §10.5: a brush-model reference is an asterisk then a decimal index
 # into the models lump, and the index is always 1 or greater -- model 0 is the
@@ -34,7 +35,7 @@ class Entity(Mapping[str, str]):
     __slots__ = ('_keys', '_hash')
 
     def __init__(self, keys: Mapping[str, str]) -> None:
-        self._keys: Dict[str, str] = dict(keys)
+        self._keys: dict[str, str] = dict(keys)
         self._hash: Optional[int] = None
 
     # -- mapping protocol ------------------------------------------------
@@ -108,7 +109,7 @@ class Entity(Mapping[str, str]):
         return index if index >= FIRST_BRUSH_MODEL else None
 
 
-def parse_entities(source: Union[str, bytes]) -> List[Entity]:
+def parse_entities(source: str | bytes) -> list[Entity]:
     """Parse an entity lump into its blocks, in file order.
 
     ``SPEC-BSP38 §10.1``: the lump is text, conventionally ASCII and
@@ -121,8 +122,8 @@ def parse_entities(source: Union[str, bytes]) -> List[Entity]:
     dropped, and text outside a block is ignored.
     """
     text = source.decode('latin-1') if isinstance(source, bytes) else source
-    entities: List[Entity] = []
-    keys: Dict[str, str] = {}
+    entities: list[Entity] = []
+    keys: dict[str, str] = {}
     pending: Optional[str] = None
     in_block = False
     for token in _tokenize(text):

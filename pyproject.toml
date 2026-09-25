@@ -111,6 +111,9 @@ select = [
     "DTZ",
     # No exec, eval, pickle, unchecked tar extraction or opening of arbitrary URL schemes.
     "S102", "S202", "S301", "S307", "S310",
+    # Annotations use the builtin generics and `X | Y`, and abstract types come
+    # from collections.abc.
+    "UP006", "UP007", "UP035",
 ]
 ignore = ["E501"]
 

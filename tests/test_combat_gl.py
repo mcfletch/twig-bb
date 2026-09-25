@@ -26,8 +26,8 @@ os.environ['OPENGLCONTEXT_SHADOWS'] = '0'
 # under the default pass and were dropped under this one.
 os.environ['OPENGLCONTEXT_RENDERER'] = 'pbr'
 
-import numpy as np                                              # noqa: E402
-import pytest                                                   # noqa: E402
+import numpy as np
+import pytest
 
 glfw = pytest.importorskip('glfw')
 

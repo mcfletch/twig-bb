@@ -22,7 +22,8 @@ they do.
 from __future__ import annotations
 
 from gettext import gettext as _
-from typing import Any, List, NamedTuple, Optional, Sequence, Tuple
+from typing import Any, NamedTuple, Optional
+from collections.abc import Sequence
 
 from vrml import field, node
 
@@ -131,7 +132,7 @@ class WeaponBindings(node.Node):
                 return found
         return None
 
-    def keys_for(self, command: str) -> List[str]:
+    def keys_for(self, command: str) -> list[str]:
         found = self.binding(command)
         return [str(key) for key in found.keys] if found is not None else []
 
@@ -152,7 +153,7 @@ class WeaponBindings(node.Node):
         keys = self.keys_for(command)
         return bool(keys) and bool(state.held(*keys))
 
-    def triggered(self, state: Any) -> List[str]:
+    def triggered(self, state: Any) -> list[str]:
         """The one-shot commands pressed since this was last asked.
 
         In declared order, and each consumed by the reading, so a key held
@@ -184,12 +185,12 @@ class Controls(object):
         self.navigation = navigation
         self.weapons = weapons
 
-    def modes(self) -> List[Any]:
+    def modes(self) -> list[Any]:
         found = list(self.navigation.modes()) if self.navigation else []
         found.append(self.weapons)
         return found
 
-    def binding_table(self) -> List[Tuple[str, KeyBinding]]:
+    def binding_table(self) -> list[tuple[str, KeyBinding]]:
         """``(group name, binding)`` for every command, movement first."""
         return [(str(mode.name), binding)
                 for mode in self.modes() for binding in mode.bindings]
@@ -222,7 +223,7 @@ class Event(NamedTuple):
 
 
 def apply_commands(commands: Sequence[str], firing: bool, player: Any,
-                   table: Any, now: float) -> List[Event]:
+                   table: Any, now: float) -> list[Event]:
     """Run this frame's commands against the player, and say what happened.
 
     **The accounting only.**  Which weapon is in hand, ammunition going down,
@@ -235,7 +236,7 @@ def apply_commands(commands: Sequence[str], firing: bool, player: Any,
     Nothing here draws or plays anything.  It returns events and the caller
     decides what to do with them.
     """
-    events: List[Event] = []
+    events: list[Event] = []
     for command in commands:
         events.extend(_select(command, player, table))
     if firing:
@@ -243,7 +244,7 @@ def apply_commands(commands: Sequence[str], firing: bool, player: Any,
     return events
 
 
-def _select(command: str, player: Any, table: Any) -> List[Event]:
+def _select(command: str, player: Any, table: Any) -> list[Event]:
     """One selection command: a number key, or a step through what is held."""
     before = player.selected
     slot = slot_of(command)
@@ -270,7 +271,7 @@ def _select(command: str, player: Any, table: Any) -> List[Event]:
     return [Event('select', str(weapon.title) if weapon is not None else '')]
 
 
-def _fire(player: Any, table: Any, now: float) -> List[Event]:
+def _fire(player: Any, table: Any, now: float) -> list[Event]:
     """One frame of holding the fire command down."""
     weapon = table.by_key(player.selected)
     if weapon is None or not player.ready(weapon, now):
@@ -293,7 +294,7 @@ def _fire(player: Any, table: Any, now: float) -> List[Event]:
     return events
 
 
-def _fell_back(player: Any, table: Any) -> List[Event]:
+def _fell_back(player: Any, table: Any) -> list[Event]:
     """Switch to the highest weapon still loaded, and name it if it changed.
 
     The same ``select`` event a number key raises, so the HUD announces an

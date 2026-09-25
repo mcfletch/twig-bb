@@ -26,7 +26,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Iterable, Sequence
 
 import numpy as np
 from vrml import field as vfield, node
@@ -85,7 +86,7 @@ ROCKET_PICKUP = dict(model='items/javelin-rocket-pickup.glb',
 #: a bubble colour, so a player learns one colour per weapon rather than one
 #: per pickup: green is the shotgun, cyan the grenade launcher, lime the
 #: sniper, orange the handgun, red the rocket launcher.
-def _pickup(name: str) -> Dict[str, Any]:
+def _pickup(name: str) -> dict[str, Any]:
     return dict(model='items/%s.glb' % (name,), modelScale=0.5, tinted=False)
 
 
@@ -393,7 +394,7 @@ class Taken:
 
 
 def from_entities(entities: Iterable[Any],
-                  table: Optional[ItemTable] = None) -> List[Pickup]:
+                  table: Optional[ItemTable] = None) -> list[Pickup]:
     """Every pickup a map places that this game has something to give for.
 
     An entity whose classname nothing declares is skipped and *counted* rather
@@ -405,7 +406,7 @@ def from_entities(entities: Iterable[Any],
     carries one (``SPEC-Q3ENTITIES §3.5``).
     """
     known = table if table is not None else default_table()
-    found: List[Pickup] = []
+    found: list[Pickup] = []
     for entity in entities:
         kind = known.for_classname(entity.classname)
         if kind is None:
@@ -419,7 +420,7 @@ def from_entities(entities: Iterable[Any],
 
 
 def unknown_classnames(entities: Iterable[Any],
-                       table: Optional[ItemTable] = None) -> Dict[str, int]:
+                       table: Optional[ItemTable] = None) -> dict[str, int]:
     """Pickup classnames this game has nothing for, and how many of each.
 
     Reported because the alternative is silence: a map whose weapons are all
@@ -427,7 +428,7 @@ def unknown_classnames(entities: Iterable[Any],
     and nothing distinguishes that from a reader that failed.
     """
     known = table if table is not None else default_table()
-    missing: Dict[str, int] = {}
+    missing: dict[str, int] = {}
     for entity in entities:
         name = entity.classname
         if name.startswith(PREFIXES) and known.for_classname(name) is None:
@@ -443,17 +444,17 @@ class Pickups:
     """
 
     def __init__(self, items: Sequence[Pickup]) -> None:
-        self.items: List[Pickup] = list(items)
+        self.items: list[Pickup] = list(items)
 
     def __len__(self) -> int:
         return len(self.items)
 
-    def available(self) -> List[Pickup]:
+    def available(self) -> list[Pickup]:
         """The ones on the floor right now."""
         return [item for item in self.items if item.available]
 
     def advance(self, arena: Any, dt: float,
-                table: Any = None) -> List[Taken]:
+                table: Any = None) -> list[Taken]:
         """Bring items back, hand out the ones walked into; returns what was taken.
 
         The order matters: an item whose wait ends this tick is available to
@@ -488,9 +489,9 @@ class Pickups:
                 if self.items else np.zeros((0, 3), dtype='d'))
         return found
 
-    def _collect(self, arena: Any, table: Any = None) -> List[Taken]:
+    def _collect(self, arena: Any, table: Any = None) -> list[Taken]:
         """Hand each available item to the first living body standing in it."""
-        took: List[Taken] = []
+        took: list[Taken] = []
         standing = [(id, np.asarray(one.position, dtype='d'))
                     for id, one in ((id, arena.combatant(id))
                                     for id in arena.ids())
@@ -530,7 +531,7 @@ class Pickups:
                 break
         return took
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         """What this is holding, as rows for the developer overlay."""
         return {'items': len(self.items),
                 'items waiting': sum(1 for one in self.items

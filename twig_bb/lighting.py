@@ -22,7 +22,8 @@ places, which reads as a bug in the lighting rather than as an absence of it.
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, Sequence, Tuple
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -39,13 +40,13 @@ __all__ = ['DEFAULT_GRID_SIZE', 'grid_spacing', 'grid_placement', 'light_grid']
 #: (``SPEC-BSP46 §4.14.2``).  Wider vertically than horizontally because a
 #: level is mostly floors: the light over a room changes far less between one
 #: storey's height and the next than it does across the room.
-DEFAULT_GRID_SIZE: Tuple[float, float, float] = (64.0, 64.0, 128.0)
+DEFAULT_GRID_SIZE: tuple[float, float, float] = (64.0, 64.0, 128.0)
 
 #: What one angle byte is worth in radians (``SPEC-BSP46 §4.14.5``).
 ANGLE_STEP = 2.0 * np.pi / 255.0
 
 
-def grid_spacing(bsp: Any) -> Tuple[float, float, float]:
+def grid_spacing(bsp: Any) -> tuple[float, float, float]:
     """How far apart this map's samples are, in map units.
 
     The ``worldspawn`` entity's ``gridsize`` where it has one, and
@@ -65,7 +66,7 @@ def grid_spacing(bsp: Any) -> Tuple[float, float, float]:
 
 
 def grid_placement(mins: Sequence[float], maxs: Sequence[float],
-                   spacing: Sequence[float]) -> Tuple[np.ndarray, np.ndarray]:
+                   spacing: Sequence[float]) -> tuple[np.ndarray, np.ndarray]:
     """Where the samples are, as (origin, counts) in map units.
 
     ``SPEC-BSP46 §4.14.2``: they lie on the points whose coordinates are whole
@@ -141,7 +142,7 @@ def _towards_light(angles: np.ndarray) -> np.ndarray:
 
 
 def _scene_origin(origin: np.ndarray, spacing: Sequence[float],
-                  counts: np.ndarray) -> Tuple[float, float, float]:
+                  counts: np.ndarray) -> tuple[float, float, float]:
     """The scene-space corner of the grid: the sample the node indexes first.
 
     Scene +Z is map -Y, so the corner the node starts from is the map's *last*

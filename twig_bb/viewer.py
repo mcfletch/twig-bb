@@ -49,7 +49,8 @@ import math
 import os
 import sys
 from dataclasses import dataclass
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Optional
+from collections.abc import Callable
 
 os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
@@ -58,51 +59,51 @@ os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
 # still need something to reflect).
 os.environ.setdefault('OPENGLCONTEXT_IBL_INTENSITY', '0.15')
 
-import numpy as np                                              # noqa: E402
+import numpy as np
 
-from OpenGLContext import testingcontext                        # noqa: E402
-from OpenGLContext.capture import SettleCapture                 # noqa: E402
-from OpenGLContext.contextdefinition import ContextDefinition   # noqa: E402
-from OpenGLContext.move import modes as movemodes                # noqa: E402
-from OpenGLContext.move.physicsplatform import PhysicsViewPlatform  # noqa: E402
-from OpenGLContext.scenegraph.background import Background      # noqa: E402
-from OpenGLContext.scenegraph.light import (                     # noqa: E402
+from OpenGLContext import testingcontext
+from OpenGLContext.capture import SettleCapture
+from OpenGLContext.contextdefinition import ContextDefinition
+from OpenGLContext.move import modes as movemodes
+from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
+from OpenGLContext.scenegraph.background import Background
+from OpenGLContext.scenegraph.light import (
     DirectionalLight, PointLight,
 )
-from OpenGLContext.scenegraph.scenegraph import SceneGraph      # noqa: E402
-from omi_physics.character import CharacterCapabilities         # noqa: E402
+from OpenGLContext.scenegraph.scenegraph import SceneGraph
+from omi_physics.character import CharacterCapabilities
 
-from OpenGLContext.events import systemtime                     # noqa: E402
-from OpenGLContext.events.mouseevents import WHEEL_DOWN, WHEEL_UP  # noqa: E402
-from OpenGLContext.ui import bindings, dialogs, settings         # noqa: E402
-from OpenGLContext.ui.overlay import OverlayMixin                # noqa: E402
-from OpenGLContext.viewer.asyncscene import AsyncSceneMixin      # noqa: E402
-from OpenGLContext.ui.panel import Panel                         # noqa: E402
+from OpenGLContext.events import systemtime
+from OpenGLContext.events.mouseevents import WHEEL_DOWN, WHEEL_UP
+from OpenGLContext.ui import bindings, dialogs, settings
+from OpenGLContext.ui.overlay import OverlayMixin
+from OpenGLContext.viewer.asyncscene import AsyncSceneMixin
+from OpenGLContext.ui.panel import Panel
 
-from . import art                                               # noqa: E402
-from . import avatar                                            # noqa: E402
-from . import blast, collision, combat, combatsound             # noqa: E402
-from . import controls                                          # noqa: E402
-from . import projectiles                                       # noqa: E402
-from . import download                                          # noqa: E402
-from . import effects, falling, feedback, fetcher, game         # noqa: E402
-from . import arena                                             # noqa: E402
-from . import characters                                        # noqa: E402
-from . import deathcam                                          # noqa: E402
-from . import items as itemsmod                                 # noqa: E402
-from . import jumppads, liquids, mapnotice, maploader, menu, notices  # noqa: E402
-from . import match                                             # noqa: E402
-from . import rules                                             # noqa: E402
-from . import underwater                                        # noqa: E402
-from . import debug as twigdebug                              # noqa: E402
-from . import telemetry as gamemarks                            # noqa: E402
-from . import weapons as weapontable                            # noqa: E402
-from .firstperson import WeaponHand, aim_at_camera, view_rig    # noqa: E402
-from .frameclock import FrameClock                              # noqa: E402
-from .hud import GameHUD, now as hudclock                       # noqa: E402
-from .player import PlayerState                                 # noqa: E402
-from .animator import SurfaceAnimator                           # noqa: E402
-from .worldgeometry import SCENE_SCALE                          # noqa: E402
+from . import art
+from . import avatar
+from . import blast, collision, combat, combatsound
+from . import controls
+from . import projectiles
+from . import download
+from . import effects, falling, feedback, fetcher, game
+from . import arena
+from . import characters
+from . import deathcam
+from . import items as itemsmod
+from . import jumppads, liquids, mapnotice, maploader, menu, notices
+from . import match
+from . import rules
+from . import underwater
+from . import debug as twigdebug
+from . import telemetry as gamemarks
+from . import weapons as weapontable
+from .firstperson import WeaponHand, aim_at_camera, view_rig
+from .frameclock import FrameClock
+from .hud import GameHUD, now as hudclock
+from .player import PlayerState
+from .animator import SurfaceAnimator
+from .worldgeometry import SCENE_SCALE
 
 log = logging.getLogger(__name__)
 
@@ -277,7 +278,7 @@ def resolve_map_target(options: argparse.Namespace,
             '%s holds no map named %r; it holds %s'
             % (pack.key, name, ', '.join(download.list_maps(root)) or 'nothing'))
     roots = list(download.content_roots(root))
-    missing: List[str] = []
+    missing: list[str] = []
     for key in pack.needs:
         companion = download.pack_for_key(key)
         if companion is None:
@@ -333,7 +334,7 @@ def gaze(nav: Any) -> np.ndarray:
     return matrix @ np.array([0.0, 0.0, -1.0])
 
 
-def movement_modes() -> List[Any]:
+def movement_modes() -> list[Any]:
     """The ways of moving this viewer offers, as declared nodes.
 
     Declared rather than hand-rolled: a settings screen can enumerate them and
@@ -504,7 +505,7 @@ def character_capabilities() -> CharacterCapabilities:
 
 
 def choose_spawn(loaded: maploader.LoadedMap,
-                 index: int = 0) -> Tuple[np.ndarray, float]:
+                 index: int = 0) -> tuple[np.ndarray, float]:
     """``(eye position, platform yaw)`` for a map's spawn point.
 
     A map with no spawn entity still has to be enterable, so the fallback is
@@ -682,7 +683,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         self._clock.reset(systemtime.systemTime())
         # The event system holds its callbacks weakly, so the wheel handlers
         # are kept here rather than being collected as soon as they are bound.
-        self._wheelHandlers: List[Any] = []
+        self._wheelHandlers: list[Any] = []
         self._capture = None
         if self.config.capture:
             self._capture = SettleCapture(self.config.capture,
@@ -785,8 +786,8 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         self.triggerRedraw(1)
 
     # -- scene -----------------------------------------------------------
-    def _scene_children(self) -> List[Any]:     # pragma: no cover - needs a window
-        children: List[Any] = [_backdrop()]
+    def _scene_children(self) -> list[Any]:     # pragma: no cover - needs a window
+        children: list[Any] = [_backdrop()]
         if self.loaded is None:
             # No level yet: the backdrop and nothing else, which is what the
             # start screen is drawn over.  A menu over an empty world is a
@@ -1207,7 +1208,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         self.marks.commands(events, weapon=str(self.player.selected))
         self.triggerRedraw(1)
 
-    def _aim(self) -> Tuple[np.ndarray, np.ndarray]:
+    def _aim(self) -> tuple[np.ndarray, np.ndarray]:
         """Where a shot leaves from, and along what.
 
         **From the navigator**, because that is the only thing that knows
@@ -1923,7 +1924,7 @@ MISSING_TEXTURES_LISTED = 4
 
 
 def texture_pack_offer(loaded: Any, options: argparse.Namespace
-                       ) -> List[download.AssetPack]:
+                       ) -> list[download.AssetPack]:
     """The packs worth offering for a map's missing textures.
 
     Empty when nothing is missing, when the user has said ``never``, or when
@@ -1967,7 +1968,7 @@ def build_texture_prompt(loaded: Any, options: argparse.Namespace,
 
 
 def available_textures(loaded: Any,
-                       options: argparse.Namespace) -> List[str]:
+                       options: argparse.Namespace) -> list[str]:
     """The pack roots that can be used without asking.
 
     Packs already unpacked on disk — which is what makes the download once per
@@ -1992,7 +1993,7 @@ def available_textures(loaded: Any,
     return roots
 
 
-def _missing_summary(missing: List[str]) -> str:
+def _missing_summary(missing: list[str]) -> str:
     """A one-line account of what a map could not find."""
     shown = ', '.join(missing[:MISSING_TEXTURES_LISTED])
     if len(missing) > MISSING_TEXTURES_LISTED:
@@ -2063,7 +2064,7 @@ def disable_vsync(context: Any) -> bool:
     return bool(context.setVSync(False))
 
 
-def main(argv: Optional[List[str]] = None) -> None:
+def main(argv: Optional[list[str]] = None) -> None:
     """Run the viewer."""
     options = build_parser().parse_args(argv)
     if options.list_packs:

@@ -34,7 +34,7 @@ import argparse
 import io
 import os
 import sys
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 #: What an imported model's maps are resampled to unless told otherwise.  Big
 #: enough that a weapon held at the camera still reads, small enough to commit.
@@ -58,7 +58,7 @@ STRIPPED_ROUGHNESS = 0.55
 DEFAULT_FILL = 0.07
 
 
-def _image_bytes(gltf: Any, index: int) -> Tuple[bytes, Any]:
+def _image_bytes(gltf: Any, index: int) -> tuple[bytes, Any]:
     """The raw bytes of one embedded image, and the buffer view it came from."""
     image = gltf.images[index]
     view = gltf.bufferViews[image.bufferView]
@@ -161,10 +161,10 @@ def rebuild(gltf: Any, replacements: dict) -> None:
     image_view = {image.bufferView: index
                   for index, image in enumerate(gltf.images or [])}
 
-    pieces: List[bytes] = []
+    pieces: list[bytes] = []
     offset = 0
-    kept: List[Any] = []
-    renumbered: Dict[int, int] = {}
+    kept: list[Any] = []
+    renumbered: dict[int, int] = {}
     for view_index in order:
         view = gltf.bufferViews[view_index]
         start = view.byteOffset or 0
@@ -226,7 +226,7 @@ def prepare(source: str, target: str, limit: int = DEFAULT_TEXTURE_SIZE,
                                            before / 1e6, after / 1e6)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('source', help='the .glb to read')
     parser.add_argument('target', help='the .glb to write')

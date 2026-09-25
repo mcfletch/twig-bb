@@ -23,7 +23,8 @@ import glob
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Set, Tuple
+from typing import Optional
+from collections.abc import Sequence
 
 from . import surfaceanim
 from .surfaces import SurfaceStyle
@@ -100,7 +101,7 @@ class Material:
     #: lightmapping conventions the content was authored under, which is what
     #: :func:`apply_implicit_lightmaps` decides.
     lightmap_stage: bool = False
-    surfaceparms: Set[str] = field(default_factory=set)
+    surfaceparms: set[str] = field(default_factory=set)
     #: What this material does over time (``SPEC-Q3SHADER §2.4``).
     animation: surfaceanim.SurfaceAnimation = field(
         default_factory=surfaceanim.SurfaceAnimation)
@@ -143,7 +144,7 @@ class Material:
 COMMON_PREFIX = 'textures/common/'
 
 
-def style_for(materials: Dict[str, Material], texture_name: str) -> SurfaceStyle:
+def style_for(materials: dict[str, Material], texture_name: str) -> SurfaceStyle:
     """The style of a named texture, defined or not.
 
     ``SPEC-Q3SHADER §3.2``: a name with no definition in any script is not an
@@ -169,9 +170,9 @@ def style_for(materials: Dict[str, Material], texture_name: str) -> SurfaceStyle
     return SurfaceStyle(name=texture_name, scripted=False)
 
 
-def load_scripts(roots: Sequence[str]) -> Dict[str, Material]:
+def load_scripts(roots: Sequence[str]) -> dict[str, Material]:
     """Read every `.shader` under ``roots``; later definitions win (``§3.1``)."""
-    materials: Dict[str, Material] = {}
+    materials: dict[str, Material] = {}
     for root in roots:
         pattern = os.path.join(root, SCRIPT_DIR, '*' + SCRIPT_EXTENSION)
         for path in sorted(glob.glob(pattern)):
@@ -186,7 +187,7 @@ def load_scripts(roots: Sequence[str]) -> Dict[str, Material]:
     return materials
 
 
-def apply_implicit_lightmaps(materials: Dict[str, Material]) -> bool:
+def apply_implicit_lightmaps(materials: dict[str, Material]) -> bool:
     """Light the surfaces of content that never names a lightmap stage.
 
     ``SPEC-Q3SHADER §2.3.2`` has a shader ask for the baked lightmap by naming
@@ -220,10 +221,10 @@ def apply_implicit_lightmaps(materials: Dict[str, Material]) -> bool:
     return True
 
 
-def parse(text: str) -> Dict[str, Material]:
+def parse(text: str) -> dict[str, Material]:
     """Parse one `.shader` file into ``{lower-case name: material}``."""
     tokens = _tokenize(text)
-    materials: Dict[str, Material] = {}
+    materials: dict[str, Material] = {}
     index = 0
     while index < len(tokens):
         name, line = tokens[index]
@@ -237,7 +238,7 @@ def parse(text: str) -> Dict[str, Material]:
     return materials
 
 
-def _tokenize(text: str) -> List[Tuple[str, int]]:
+def _tokenize(text: str) -> list[tuple[str, int]]:
     """``(token, line number)`` pairs, with comments stripped.
 
     ``SPEC-Q3SHADER §1.3``: `//` comments to the end of the line and needs no
@@ -245,7 +246,7 @@ def _tokenize(text: str) -> List[Tuple[str, int]]:
     tokens even when glued to their neighbours.  The line number is kept
     because ``§2.1.1`` skips an unrecognised directive by its line.
     """
-    tokens: List[Tuple[str, int]] = []
+    tokens: list[tuple[str, int]] = []
     for number, raw in enumerate(text.splitlines()):
         comment = raw.find('//')
         if comment >= 0:
@@ -260,24 +261,24 @@ class _Body:
 
     def __init__(self, name: str) -> None:
         self.material = Material(name=name.lower())
-        self.stage_images: List[str] = []
+        self.stage_images: list[str] = []
         #: Base-colour images named by ``DIFFUSE_KEYWORD``, kept apart from
         #: ``stage_images`` because they outrank them (``§4.5.6``).
-        self.diffuse_images: List[str] = []
+        self.diffuse_images: list[str] = []
         self.editor_image = ''
         #: Each stage's blend, by stage index.  **By index and not as a
         #: list**, because which stage blends is the whole question: a
         #: material draws its stages in order, one over another, so whether
         #: the *surface* is see-through is decided by the first of them and
         #: not by any of them.
-        self.blends: Dict[int, Tuple[str, str]] = {}
+        self.blends: dict[int, tuple[str, str]] = {}
         self.samples_lightmap = False
         #: Animation directives, gathered as they are met.  Stage directives
         #: are taken from the *first drawable* stage only: one PBR material
         #: draws one stage, so a second stage's ``tcMod`` describes a layer
         #: that is not being drawn (``SPEC-Q3SHADER E.1``, ``E.3``).
-        self.deforms: List[surfaceanim.Deform] = []
-        self.tcmods: List[surfaceanim.TCMod] = []
+        self.deforms: list[surfaceanim.Deform] = []
+        self.tcmods: list[surfaceanim.TCMod] = []
         self.rgbgen: Optional[surfaceanim.ColorGen] = None
         self.alphagen: Optional[surfaceanim.AlphaGen] = None
         self.animmap: Optional[surfaceanim.AnimMap] = None
@@ -290,8 +291,8 @@ class _Body:
         self.first_stage = 0
 
 
-def _parse_body(name: str, tokens: List[Tuple[str, int]],
-                index: int) -> Tuple[Material, int]:
+def _parse_body(name: str, tokens: list[tuple[str, int]],
+                index: int) -> tuple[Material, int]:
     """Parse a material body from ``index`` until its closing brace."""
     body = _Body(name)
     depth = 1
@@ -329,8 +330,8 @@ _ARITY = {
 _BLEND_SHORTHANDS = frozenset(('add', 'filter', 'blend'))
 
 
-def _arguments(tokens: List[Tuple[str, int]], index: int, line: int,
-               keyword: str) -> Tuple[List[str], int]:
+def _arguments(tokens: list[tuple[str, int]], index: int, line: int,
+               keyword: str) -> tuple[list[str], int]:
     """A directive's arguments (``SPEC-Q3SHADER §2.1.1``).
 
     Arguments never span a line and never cross a brace, so the line bounds
@@ -338,7 +339,7 @@ def _arguments(tokens: List[Tuple[str, int]], index: int, line: int,
     a line carrying several directives still parses; an unknown keyword takes
     the rest of its line, which cannot desynchronise anything.
     """
-    available: List[str] = []
+    available: list[str] = []
     while index < len(tokens):
         token, token_line = tokens[index]
         if token_line != line or token in ('{', '}'):
@@ -351,14 +352,14 @@ def _arguments(tokens: List[Tuple[str, int]], index: int, line: int,
     return available[:wanted], index - (len(available) - wanted)
 
 
-def _wanted(keyword: str, available: List[str]) -> Optional[int]:
+def _wanted(keyword: str, available: list[str]) -> Optional[int]:
     """How many tokens ``keyword`` consumes, or None for "the rest of the line"."""
     if keyword == 'blendfunc':
         return 1 if available and available[0].lower() in _BLEND_SHORTHANDS else 2
     return _ARITY.get(keyword)
 
 
-def _general_directive(body: _Body, keyword: str, arguments: List[str]) -> None:
+def _general_directive(body: _Body, keyword: str, arguments: list[str]) -> None:
     """Apply one body-level directive (``SPEC-Q3SHADER §2.1``)."""
     material = body.material
     if keyword == 'surfaceparm' and arguments:
@@ -402,7 +403,7 @@ def _surfaceparm(material: Material, value: str) -> None:
         material.lightmapped = False
 
 
-def _stage_directive(body: _Body, keyword: str, arguments: List[str]) -> None:
+def _stage_directive(body: _Body, keyword: str, arguments: list[str]) -> None:
     """Apply one stage directive (``SPEC-Q3SHADER §2.3``, ``§2.4``)."""
     if keyword in ANIMATION_KEYWORDS:
         _animation_directive(body, keyword, arguments)
@@ -469,7 +470,7 @@ def _claim_stage(body: _Body) -> bool:
     return body.stage_index == body.image_stage
 
 
-def _animation_directive(body: _Body, keyword: str, arguments: List[str]) -> None:
+def _animation_directive(body: _Body, keyword: str, arguments: list[str]) -> None:
     """Apply one animation directive from a stage (``SPEC-Q3SHADER §2.4``)."""
     if not _claim_stage(body):
         return
@@ -487,7 +488,7 @@ def _animation_directive(body: _Body, keyword: str, arguments: List[str]) -> Non
             body.alphagen = opacity
 
 
-def _blend(arguments: List[str]) -> Tuple[str, str]:
+def _blend(arguments: list[str]) -> tuple[str, str]:
     """A blend function as a pair of factor names (``SPEC-Q3SHADER §2.3``).
 
     The one-token shorthands `add`, `filter` and `blend` all describe blends

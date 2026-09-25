@@ -26,7 +26,8 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Optional, Sequence, Tuple
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 from OpenGLContext import quaternion
@@ -145,7 +146,7 @@ class DeathCamera:
         return WASH * min(1.0, self.elapsed / self.drop)
 
     # -- pointing at whoever did it ---------------------------------------
-    def _look_at(self, target: np.ndarray) -> Tuple[float, float]:
+    def _look_at(self, target: np.ndarray) -> tuple[float, float]:
         """The yaw and pitch that face ``target`` from where this settles."""
         to = target - self._to
         flat = math.hypot(float(to[0]), float(to[2]))

@@ -23,7 +23,7 @@ See :mod:`OpenGLContext.looptrace` for where that second went.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 __all__ = ['FrameClock']
 
@@ -96,14 +96,14 @@ class FrameClock:
             return 1.0
         return self.dt / self.real
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         """Rows for the developer overlay, quiet when there is nothing wrong.
 
         ``behind`` appears only on a frame the clamp actually bit, because on a
         healthy frame it says the same thing as ``dt ms`` and a panel has
         better uses for the line.
         """
-        found: Dict[str, Any] = {'dt ms': self.dt * 1000.0}
+        found: dict[str, Any] = {'dt ms': self.dt * 1000.0}
         if self.lost > 0.0:
             found['real ms'] = self.real * 1000.0
             found['behind'] = '%d%% speed, %.1fs lost' % (

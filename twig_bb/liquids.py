@@ -27,7 +27,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Optional
+from collections.abc import Iterable, Sequence
 
 import numpy as np
 
@@ -86,7 +87,7 @@ class LiquidVolumes:
     """
 
     def __init__(self, volumes: Iterable[LiquidVolume]) -> None:
-        self._volumes: List[LiquidVolume] = list(volumes)
+        self._volumes: list[LiquidVolume] = list(volumes)
         if self._volumes:
             self._mins = np.array([v.mins for v in self._volumes], dtype='d')
             self._maxs = np.array([v.maxs for v in self._volumes], dtype='d')
@@ -201,7 +202,7 @@ def _volume(mins: Sequence[float], maxs: Sequence[float],
                         maxs=corners.max(axis=0).astype('d'), kind=kind)
 
 
-def _v46_liquid_leaves(loaded: Any) -> Iterable[Tuple[Any, Any, str]]:
+def _v46_liquid_leaves(loaded: Any) -> Iterable[tuple[Any, Any, str]]:
     """Bounds and kind of every version 46 **brush** of liquid.
 
     Nothing is liquid without the material scripts: a brush names a texture and
@@ -245,7 +246,7 @@ def _v46_liquid_leaves(loaded: Any) -> Iterable[Tuple[Any, Any, str]]:
             yield (bounds[0], bounds[1], brush_kind[index])
 
 
-def _brush_bounds(bsp: Any, brush: Any) -> Optional[Tuple[Any, Any]]:
+def _brush_bounds(bsp: Any, brush: Any) -> Optional[tuple[Any, Any]]:
     """A brush's own box, from its axis-aligned planes, or None.
 
     ``SPEC-BSP46 §4.8``: a brush is the intersection of the half-spaces its
@@ -257,8 +258,8 @@ def _brush_bounds(bsp: Any, brush: Any) -> Optional[Tuple[Any, Any]]:
     planes, sides = bsp.planes, bsp.brushsides
     if not len(planes) or not len(sides):
         return None
-    low: List[Optional[float]] = [None, None, None]
-    high: List[Optional[float]] = [None, None, None]
+    low: list[Optional[float]] = [None, None, None]
+    high: list[Optional[float]] = [None, None, None]
     first = int(brush['brushside'])
     count = int(brush['num_brushsides'])
     for offset in range(count):

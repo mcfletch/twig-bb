@@ -70,7 +70,7 @@ import argparse
 import os
 import sys
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -97,14 +97,14 @@ class Counts:
         return note
 
 
-def _mesh_objects() -> List[Any]:
+def _mesh_objects() -> list[Any]:
     """Every mesh in the open file, in a stable order."""
     import bpy
     return sorted((one for one in bpy.data.objects if one.type == 'MESH'),
                   key=lambda one: one.name)
 
 
-def _components(bm: Any) -> List[List[Any]]:
+def _components(bm: Any) -> list[list[Any]]:
     """The faces of one mesh, grouped by what is connected to what.
 
     Largest first, so the caller's "keep the first" is "keep the body of the
@@ -113,11 +113,11 @@ def _components(bm: Any) -> List[List[Any]]:
     looking at them, and splitting them there would be a surprise.
     """
     seen: set = set()
-    found: List[List[Any]] = []
+    found: list[list[Any]] = []
     for start in bm.faces:
         if start.index in seen:
             continue
-        group: List[Any] = []
+        group: list[Any] = []
         pending = [start]
         seen.add(start.index)
         while pending:
@@ -226,7 +226,7 @@ def _shift_location_keys(obj: Any, delta: Any) -> None:
         curve.update()
 
 
-def make_concentric(report: List[str]) -> None:
+def make_concentric(report: list[str]) -> None:
     """Centre every mesh on its origin, and every origin on the largest mesh.
 
     "Largest" is by the volume its bounding box encloses rather than by vertex
@@ -268,7 +268,7 @@ def make_concentric(report: List[str]) -> None:
 
 def clean(blend: Optional[str] = None, save: Optional[str] = None,
           export: Optional[str] = None, fill_holes: bool = False,
-          concentric: bool = False) -> List[str]:
+          concentric: bool = False) -> list[str]:
     """Open, tidy, and write; returns a line per mesh plus a line per file.
 
     ``fill_holes`` is asked for rather than assumed, because a hole is not
@@ -288,7 +288,7 @@ def clean(blend: Optional[str] = None, save: Optional[str] = None,
         bpy.ops.wm.open_mainfile(filepath=os.path.abspath(blend))
 
     leave_edit_mode()
-    report: List[str] = []
+    report: list[str] = []
     for obj in _mesh_objects():
         report.append(clean_mesh(obj, fill_holes=fill_holes).line(obj.name))
     if concentric:
@@ -306,7 +306,7 @@ def clean(blend: Optional[str] = None, save: Optional[str] = None,
     return report
 
 
-def _script_arguments(argv: List[str]) -> List[str]:
+def _script_arguments(argv: list[str]) -> list[str]:
     """What the user meant, whether Blender or Python was the one launched.
 
     ``blender file.blend --python this.py -- --export x`` hands the whole
@@ -315,7 +315,7 @@ def _script_arguments(argv: List[str]) -> List[str]:
     return argv[argv.index('--') + 1:] if '--' in argv else argv[1:]
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('blend', nargs='?',
                         help='the .blend to open; omit when Blender already '

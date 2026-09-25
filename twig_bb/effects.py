@@ -31,7 +31,8 @@ offer and safe for two players to set differently.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -90,14 +91,14 @@ FULL, REDUCED, OFF = 'full', 'reduced', 'off'
 #: What each setting multiplies a burst's particle count by.  ``REDUCED`` is a
 #: third rather than a half because the point of it is a machine that cannot
 #: afford the full thing, and halving is not much of a saving.
-INTENSITIES: Dict[str, float] = {FULL: 1.0, REDUCED: 0.34, OFF: 0.0}
+INTENSITIES: dict[str, float] = {FULL: 1.0, REDUCED: 0.34, OFF: 0.0}
 
 #: Words in a texture path that say what a surface is made of, and the effect
 #: that follows.  **Ours, not a format fact**: a map states a texture path and
 #: nothing else about its material, so this is a reading rather than a lookup,
 #: and it is a table so that a content pack full of unusual names can be
 #: accommodated by editing data.
-SURFACE_WORDS: Dict[str, str] = {
+SURFACE_WORDS: dict[str, str] = {
     'metal': SPARKS,
     'steel': SPARKS,
     'grate': SPARKS,
@@ -141,7 +142,7 @@ def surface_kind(surface: str) -> str:
     return DEFAULT_SURFACE_KIND
 
 
-def default_emitters() -> Dict[str, ParticleEmitter]:
+def default_emitters() -> dict[str, ParticleEmitter]:
     """One emitter per kind, styled for what it says.
 
     Started from §8's shipped presets and then tuned, because what these have
@@ -212,7 +213,7 @@ class Effects:
     :meth:`show`, and the emitters are never moved or replaced.
     """
 
-    def __init__(self, match: Any, emitters: Optional[Dict[str, Any]] = None,
+    def __init__(self, match: Any, emitters: Optional[dict[str, Any]] = None,
                  intensity: str = FULL) -> None:
         self.match = match
         #: The emitters, by kind.  Readable so a settings screen can present

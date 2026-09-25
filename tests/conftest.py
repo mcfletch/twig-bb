@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import glob
 import os
-from typing import Callable, Dict, Optional
+from typing import Optional
+from collections.abc import Callable
 
 import pytest
 
@@ -29,7 +30,7 @@ except Exception:
 @pytest.fixture
 def write_map(tmp_path) -> Callable[..., str]:
     """Write a synthetic map and return its path."""
-    def write(version: int, lumps: Dict[str, bytes], name: str = 'test.bsp') -> str:
+    def write(version: int, lumps: dict[str, bytes], name: str = 'test.bsp') -> str:
         maps = tmp_path / 'maps'
         maps.mkdir(exist_ok=True)
         path = maps / name

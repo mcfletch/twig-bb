@@ -17,7 +17,8 @@ layer answers from the map's ``.shader`` scripts.
 from __future__ import annotations
 
 import logging
-from typing import Callable, Dict, Optional, Tuple
+from typing import Optional
+from collections.abc import Callable
 
 import numpy as np
 
@@ -56,7 +57,7 @@ def bezier_basis(samples: int) -> np.ndarray:
 
 def tessellate_patch(control: np.ndarray,
                      subdivisions: int = DEFAULT_SUBDIVISIONS
-                     ) -> Tuple[np.ndarray, np.ndarray]:
+                     ) -> tuple[np.ndarray, np.ndarray]:
     """Evaluate a control grid into a sample grid and its triangle indices.
 
     ``SPEC-BSP46 §6.4``: control points ``[2i..2i+2] x [2j..2j+2]`` form one
@@ -85,7 +86,7 @@ def tessellate_patch(control: np.ndarray,
 
 def build(bsp: Q3BSP, style_for: Optional[StyleFor] = None, model: int = 0,
           subdivisions: int = DEFAULT_SUBDIVISIONS
-          ) -> Tuple[WorldGeometry, LightmapAtlas]:
+          ) -> tuple[WorldGeometry, LightmapAtlas]:
     """Build one model's geometry and the lightmap atlas its faces address.
 
     ``model`` 0 is the world; 1 and above are brush models
@@ -97,7 +98,7 @@ def build(bsp: Q3BSP, style_for: Optional[StyleFor] = None, model: int = 0,
     styles = style_for or (lambda name: SurfaceStyle(name=name))
     atlas, page_of = _pack_lightmaps(bsp, faces)
     builder = GeometryBuilder()
-    style_cache: Dict[int, SurfaceStyle] = {}
+    style_cache: dict[int, SurfaceStyle] = {}
     for face_index in faces:
         face = bsp.faces[face_index]
         texture = int(face['texture'])
@@ -127,7 +128,7 @@ def _model_faces(bsp: Q3BSP, model: int) -> np.ndarray:
 
 
 def _pack_lightmaps(bsp: Q3BSP, faces: np.ndarray
-                    ) -> Tuple[LightmapAtlas, Callable[[int], int]]:
+                    ) -> tuple[LightmapAtlas, Callable[[int], int]]:
     """Pack the lightmap images the given faces reference.
 
     ``SPEC-BSP46 §4.12.2``: an index of -1, or one outside the lump, means the
@@ -173,7 +174,7 @@ def _add_face(builder: GeometryBuilder, bsp: Q3BSP, face: np.ndarray,
 
 def _indexed_face(
     bsp: Q3BSP, face: np.ndarray
-) -> Tuple[Optional[Tuple[np.ndarray, ...]], np.ndarray]:
+) -> tuple[Optional[tuple[np.ndarray, ...]], np.ndarray]:
     """A polygon or mesh face's vertices and triangles (``SPEC-BSP46 §4.12.1``)."""
     first, count = int(face['vertex']), int(face['num_vertexes'])
     mesh_first, mesh_count = int(face['meshvert']), int(face['num_meshverts'])
@@ -197,7 +198,7 @@ def _indexed_face(
 
 def _patch_face(
     bsp: Q3BSP, face: np.ndarray, subdivisions: int
-) -> Tuple[Optional[Tuple[np.ndarray, ...]], np.ndarray]:
+) -> tuple[Optional[tuple[np.ndarray, ...]], np.ndarray]:
     """A Bezier patch face's tessellated vertices (``SPEC-BSP46 §6.3``–``§6.5``)."""
     first = int(face['vertex'])
     width, height = (int(v) for v in face['size'])

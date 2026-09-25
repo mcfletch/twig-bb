@@ -19,7 +19,8 @@ from __future__ import annotations
 import logging
 import os
 import zipfile
-from typing import Dict, List, NamedTuple, Optional, Sequence, Tuple
+from typing import NamedTuple, Optional
+from collections.abc import Sequence
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class Requirement(NamedTuple):
     version: Optional[str] = None
 
 
-def split_name(filename: str) -> Tuple[str, str]:
+def split_name(filename: str) -> tuple[str, str]:
     """A package file's ``(name, version)`` (``SPEC-DPK §2.1``).
 
     ``SPEC-DPK §2.3``: no observed name or version contains the separator, so
@@ -65,7 +66,7 @@ def split_name(filename: str) -> Tuple[str, str]:
     return (name, version)
 
 
-def version_key(version: str) -> Optional[Tuple[int, ...]]:
+def version_key(version: str) -> Optional[tuple[int, ...]]:
     """A version as a tuple of integers, or None if it is not purely numeric.
 
     ``SPEC-DPK §3.4``: compare component-wise on `.`, a shorter prefix being
@@ -96,8 +97,8 @@ def newest(paths: Sequence[str]) -> Optional[str]:
     does not depend on the order the caller happened to list them in.
     """
     best: Optional[str] = None
-    best_key: Optional[Tuple[int, ...]] = None
-    unparseable: List[str] = []
+    best_key: Optional[tuple[int, ...]] = None
+    unparseable: list[str] = []
     for path in paths:
         key = version_key(split_name(path)[1])
         if key is None:
@@ -109,7 +110,7 @@ def newest(paths: Sequence[str]) -> Optional[str]:
     return sorted(unparseable)[0] if unparseable else None
 
 
-def parse_deps(text: str) -> List[Requirement]:
+def parse_deps(text: str) -> list[Requirement]:
     """The requirements a `DEPS` file states, in the file's own order.
 
     ``SPEC-DPK §4.5``: each line is a package name, optionally followed by a
@@ -121,7 +122,7 @@ def parse_deps(text: str) -> List[Requirement]:
     invented -- the observed grammar makes a line beginning with `#` a package
     name, and it is read as one.
     """
-    requirements: List[Requirement] = []
+    requirements: list[Requirement] = []
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped:
@@ -132,7 +133,7 @@ def parse_deps(text: str) -> List[Requirement]:
     return requirements
 
 
-def read_deps(package: str) -> List[Requirement]:
+def read_deps(package: str) -> list[Requirement]:
     """The requirements of a package, archived or already unpacked.
 
     ``SPEC-DPK §4.2``: a package with no `DEPS` depends on nothing, which is
@@ -156,7 +157,7 @@ def read_deps(package: str) -> List[Requirement]:
         return []
 
 
-def available(directory: str) -> Dict[str, List[str]]:
+def available(directory: str) -> dict[str, list[str]]:
     """Every package in ``directory``, as ``{name: [paths]}``.
 
     Both archives and unpacked directories count, since a package may have
@@ -164,7 +165,7 @@ def available(directory: str) -> Dict[str, List[str]]:
     keeps its version only in the name of the directory it went into, which is
     why unpacking under the package's own file name matters.
     """
-    found: Dict[str, List[str]] = {}
+    found: dict[str, list[str]] = {}
     try:
         entries = sorted(os.scandir(directory), key=lambda entry: entry.name)
     except OSError:
@@ -177,7 +178,7 @@ def available(directory: str) -> Dict[str, List[str]]:
     return found
 
 
-def resolve(package: str, search: Dict[str, List[str]]) -> Tuple[List[str], List[str]]:
+def resolve(package: str, search: dict[str, list[str]]) -> tuple[list[str], list[str]]:
     """``package`` and everything it needs, in load order, plus what is absent.
 
     ``SPEC-DPK §4.15``, ``§4.16``: the dependency graph is neither a tree nor
@@ -196,8 +197,8 @@ def resolve(package: str, search: Dict[str, List[str]]) -> Tuple[List[str], List
     in ``search`` satisfies, which a caller reports rather than fails on, since
     a map with some of its art draws better than no map at all.
     """
-    order: List[str] = []
-    missing: List[str] = []
+    order: list[str] = []
+    missing: list[str] = []
     seen = {split_name(package)[0]}
     queue = [(package, read_deps(package))]
     order.append(package)

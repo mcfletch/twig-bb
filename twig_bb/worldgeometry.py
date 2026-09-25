@@ -15,7 +15,7 @@ scenegraph is Y-up and metric, so the whole pool is rotated and scaled once at
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import numpy as np
 
@@ -120,7 +120,7 @@ class SurfaceIndex:
     #: is the length of the whole mesh.
     ends: np.ndarray
     #: The style of each run, in the same order.
-    styles: Tuple[SurfaceStyle, ...]
+    styles: tuple[SurfaceStyle, ...]
 
     def __len__(self) -> int:
         """How many triangles the index covers."""
@@ -143,15 +143,15 @@ class SurfaceIndex:
 class WorldGeometry:
     """Every batch of a map, plus what the rest of the viewer asks of them."""
 
-    batches: List[Batch] = field(default_factory=list)
-    bounds: Tuple[np.ndarray, np.ndarray] = field(
+    batches: list[Batch] = field(default_factory=list)
+    bounds: tuple[np.ndarray, np.ndarray] = field(
         default_factory=lambda: (np.zeros(3, 'f'), np.zeros(3, 'f')))
 
     @property
     def triangle_count(self) -> int:
         return sum(batch.triangle_count for batch in self.batches)
 
-    def collision_batches(self) -> List[Batch]:
+    def collision_batches(self) -> list[Batch]:
         """The batches the collision mesh is built from, in the order it uses.
 
         One list, read by both :meth:`collision_mesh` and
@@ -162,7 +162,7 @@ class WorldGeometry:
         return [batch for batch in self.batches
                 if batch.style.solid and not batch.style.liquid]
 
-    def collision_mesh(self) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    def collision_mesh(self) -> Optional[tuple[np.ndarray, np.ndarray]]:
         """``(points, triangles)`` for the solid surfaces, or None if there are none.
 
         One static trimesh for the whole map is what the character controller
@@ -170,8 +170,8 @@ class WorldGeometry:
         rather than a floor (``SPEC-BSP38 §9.4``) -- so the avatar falls into
         water and :mod:`twig_bb.liquids` decides when it is submerged.
         """
-        points: List[np.ndarray] = []
-        triangles: List[np.ndarray] = []
+        points: list[np.ndarray] = []
+        triangles: list[np.ndarray] = []
         offset = 0
         for batch in self.collision_batches():
             points.append(batch.positions)
@@ -202,20 +202,20 @@ class _Group:
     def __init__(self, style: SurfaceStyle, lightmap_page: int) -> None:
         self.style = style
         self.lightmap_page = lightmap_page
-        self.positions: List[np.ndarray] = []
-        self.normals: List[np.ndarray] = []
-        self.texcoords: List[np.ndarray] = []
-        self.texcoords1: List[np.ndarray] = []
-        self.indices: List[np.ndarray] = []
-        self.tangents: List[Optional[np.ndarray]] = []
-        self.counts: List[int] = []
+        self.positions: list[np.ndarray] = []
+        self.normals: list[np.ndarray] = []
+        self.texcoords: list[np.ndarray] = []
+        self.texcoords1: list[np.ndarray] = []
+        self.indices: list[np.ndarray] = []
+        self.tangents: list[Optional[np.ndarray]] = []
+        self.counts: list[int] = []
 
 
 class GeometryBuilder:
     """Accumulate surfaces in map space; emit merged, scene-space batches."""
 
     def __init__(self) -> None:
-        self._groups: Dict[Any, _Group] = {}
+        self._groups: dict[Any, _Group] = {}
 
     def add_surface(self, style: SurfaceStyle, lightmap_page: int,
                     positions: Any, normals: Any, texcoords: Any,
@@ -291,7 +291,7 @@ class GeometryBuilder:
         return estimate_tangents(positions, normals, texcoords, indices)
 
 
-def _bounds(batches: List[Batch]) -> Tuple[np.ndarray, np.ndarray]:
+def _bounds(batches: list[Batch]) -> tuple[np.ndarray, np.ndarray]:
     """Axis-aligned bounds over every batch, in scene space."""
     if not batches:
         return (np.zeros(3, 'f'), np.zeros(3, 'f'))

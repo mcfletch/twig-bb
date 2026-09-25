@@ -14,7 +14,7 @@ interprets none.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import Any, Tuple
+from typing import Any
 
 from .surfaceanim import SurfaceAnimation
 
@@ -115,7 +115,7 @@ class SurfaceStyle:
         """
         return replace(self, **changes)
 
-    def batch_key(self) -> Tuple[Any, ...]:
+    def batch_key(self) -> tuple[Any, ...]:
         """Grouping key: surfaces with an equal key may share one draw call."""
         return (self.name, self.draw, self.sky, self.opacity, self.masked,
                 self.double_sided, self.scrolling, self.warping,

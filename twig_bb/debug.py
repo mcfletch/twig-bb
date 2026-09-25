@@ -20,7 +20,7 @@ dozen things it never showed.
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Tuple
+from typing import Any, Optional
 
 from OpenGLContext.ui.debugoverlay import physics_provider
 
@@ -47,11 +47,11 @@ def install(context: Any) -> None:
 
 def map_provider(context: Any) -> Any:
     """What is loaded, and how much of it there is."""
-    def rows() -> List[Tuple[str, Any]]:
+    def rows() -> list[tuple[str, Any]]:
         loaded = getattr(context, 'loaded', None)
         if loaded is None:
             return []
-        found: List[Tuple[str, Any]] = [
+        found: list[tuple[str, Any]] = [
             ('name', loaded.name),
             ('family', loaded.family),
         ]
@@ -122,8 +122,8 @@ def player_provider(context: Any) -> Any:
     here as well would be two rows saying the same thing on a panel that is
     short of room.
     """
-    def rows() -> List[Tuple[str, Any]]:
-        found: List[Tuple[str, Any]] = []
+    def rows() -> list[tuple[str, Any]]:
+        found: list[tuple[str, Any]] = []
         # A NULL SFNode is falsy, and is what a context with no declared
         # modes carries; an empty row would be a mode called nothing.
         mode = getattr(getattr(context, 'contextDefinition', None),
@@ -172,8 +172,8 @@ def combat_provider(context: Any) -> Any:
     A rocket that never arrives and a budget that is full look identical from
     inside the game.
     """
-    def rows() -> List[Tuple[str, Any]]:
-        found: List[Tuple[str, Any]] = []
+    def rows() -> list[tuple[str, Any]]:
+        found: list[tuple[str, Any]] = []
         match = getattr(context, 'arena', None)
         if match is not None:
             found.extend(sorted(match.describe().items()))
@@ -215,7 +215,7 @@ def _submerged(context: Any, nav: Any) -> Any:
     return kind or True
 
 
-def _camera_position(context: Any) -> Optional[Tuple[float, float, float]]:
+def _camera_position(context: Any) -> Optional[tuple[float, float, float]]:
     """The camera in scene metres, or None when there is no platform yet."""
     getter = getattr(context, 'getViewPlatform', None)
     platform = getter() if getter is not None else None
@@ -226,7 +226,7 @@ def _camera_position(context: Any) -> Optional[Tuple[float, float, float]]:
     return (x, y, z)
 
 
-def _to_map(scene: Tuple[float, float, float]) -> Tuple[float, float, float]:
+def _to_map(scene: tuple[float, float, float]) -> tuple[float, float, float]:
     """Scene metres back to map units, the inverse of ``to_scene_points``.
 
     Scene space is +Y up in metres and map space is +Z up in units, so this

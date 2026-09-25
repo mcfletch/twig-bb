@@ -66,8 +66,8 @@ says whether it played out the same way the second time.  See
 from __future__ import annotations
 
 import logging
-from typing import (Any, Callable, Dict, List, Mapping, Optional, Sequence,
-                    Set, Tuple)
+from typing import (Any, Optional)
+from collections.abc import Callable, Mapping, Sequence
 
 from . import arena as arenamod
 
@@ -98,10 +98,10 @@ class GameMarks:
     def __init__(self, session: Any) -> None:
         self.session = session
         #: Who each bot was last seen fighting, so only the changes are marked.
-        self._fighting: Dict[str, str] = {}
+        self._fighting: dict[str, str] = {}
         #: Who is waiting to come back and has already said so; see
         #: :meth:`asked_to_respawn`.
-        self._asking: Set[str] = set()
+        self._asking: set[str] = set()
 
     @property
     def listening(self) -> bool:
@@ -272,7 +272,7 @@ class GameMarks:
 
 # -- one event, described ----------------------------------------------------
 
-Described = Optional[Tuple[str, Dict[str, Any]]]
+Described = Optional[tuple[str, dict[str, Any]]]
 
 
 def _fired(event: Any) -> Described:
@@ -323,7 +323,7 @@ def _match_over(event: Any) -> Described:
 
 #: Which events are worth a mark, and what each says.  A stream carries more
 #: than this; what is left out is what a reader can derive from what is here.
-_DESCRIBE: Dict[type, Callable[[Any], Described]] = {
+_DESCRIBE: dict[type, Callable[[Any], Described]] = {
     arenamod.Fired: _fired,
     arenamod.Impact: _impact,
     arenamod.Damaged: _damaged,
@@ -334,9 +334,9 @@ _DESCRIBE: Dict[type, Callable[[Any], Described]] = {
 }
 
 
-def _level(loaded: Any) -> Dict[str, Any]:
+def _level(loaded: Any) -> dict[str, Any]:
     """What a map is, in the few numbers a reader wants first."""
-    found: Dict[str, Any] = {'map': str(getattr(loaded, 'name', '')),
+    found: dict[str, Any] = {'map': str(getattr(loaded, 'name', '')),
                              'family': str(getattr(loaded, 'family', ''))}
     for name, what in (('pickups', 'pickups'), ('spawns', 'spawn_points')):
         counter = getattr(loaded, what, None)
@@ -352,7 +352,7 @@ def _level(loaded: Any) -> Dict[str, Any]:
     return found
 
 
-def _place(point: Any) -> List[float]:
+def _place(point: Any) -> list[float]:
     """A position as the few numbers a journal holds for it, or an empty list."""
     if point is None:
         return []

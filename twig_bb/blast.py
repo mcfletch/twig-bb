@@ -34,7 +34,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, List, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -87,7 +88,7 @@ def falloff(distance: float, radius: float, exponent: float = 1.0) -> float:
 
 
 def burst(world: Any, arena: Any, point: Sequence[float], kind: Any,
-          by: str = '', direct: str = '') -> List[Splash]:
+          by: str = '', direct: str = '') -> list[Splash]:
     """Detonate at ``point``; hurt and shove everybody who can see it.
 
     ``direct`` is whoever the projectile hit head-on, and is **left out of the
@@ -103,7 +104,7 @@ def burst(world: Any, arena: Any, point: Sequence[float], kind: Any,
     if radius <= 0.0:
         return []
     centre = np.asarray(point, dtype='d')
-    done: List[Splash] = []
+    done: list[Splash] = []
     for id, chest, distance in _candidates(arena, centre, radius, direct):
         if not raycast.line_of_sight(world, centre, chest):
             continue
@@ -112,7 +113,7 @@ def burst(world: Any, arena: Any, point: Sequence[float], kind: Any,
 
 
 def _candidates(arena: Any, centre: np.ndarray, radius: float,
-                direct: str) -> List[Any]:
+                direct: str) -> list[Any]:
     """Everybody alive, in range, and not the direct hit -- with their chest.
 
     Distance first and geometry afterwards, because a subtraction is free and
@@ -169,7 +170,7 @@ def _away(centre: np.ndarray, chest: np.ndarray) -> np.ndarray:
 
 
 def answer(world: Any, arena: Any, table: Any,
-           detonations: Sequence[Any]) -> List[Splash]:
+           detonations: Sequence[Any]) -> list[Splash]:
     """Burst for each of ``detonations``; returns everything they did.
 
     The seam between a projectile's flight and its consequences.  They are
@@ -181,7 +182,7 @@ def answer(world: Any, arena: Any, table: Any,
     raising: a variant that retunes the loadout mid-match should cost a bang,
     not a frame.
     """
-    done: List[Splash] = []
+    done: list[Splash] = []
     for gone in detonations:
         kind = table.by_key(gone.kind)
         if kind is None:

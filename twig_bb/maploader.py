@@ -17,7 +17,8 @@ import logging
 import os
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Optional
+from collections.abc import Callable, Sequence
 
 import numpy as np
 
@@ -72,7 +73,7 @@ class LoadedMap:
     world: WorldGeometry
     atlas: LightmapAtlas
     library: MaterialLibrary
-    roots: List[str]
+    roots: list[str]
     #: What a texture name means as a surface, as its material script says
     #: (``SPEC-Q3SHADER``).
     style_for: Optional[Callable[[str], SurfaceStyle]] = None
@@ -127,12 +128,12 @@ class LoadedMap:
         """
         return build_scene(self.world, self.atlas, self.library, animator)
 
-    def texture_names(self) -> List[str]:
+    def texture_names(self) -> list[str]:
         """Every texture this map's drawn surfaces name, once each."""
         return sorted({batch.style.name for batch in self.world.batches
                        if batch.style.draw and not batch.style.sky})
 
-    def unscripted_surfaces(self) -> List[str]:
+    def unscripted_surfaces(self) -> list[str]:
         """Drawn surfaces this map names that no material script defines.
 
         Not an error (``SPEC-Q3SHADER §3.2``): the name is used as a texture
@@ -146,7 +147,7 @@ class LoadedMap:
                        and not batch.style.scripted})
 
     @cached_property
-    def _missing_textures(self) -> List[str]:
+    def _missing_textures(self) -> list[str]:
         """The texture names whose image could not be found.
 
         Most maps name only the textures they add and take the rest from the
@@ -162,16 +163,16 @@ class LoadedMap:
         return [name for name in self.texture_names()
                 if self.library.resolve(name) is None]
 
-    def missing_textures(self) -> List[str]:
+    def missing_textures(self) -> list[str]:
         """The texture names whose image could not be found."""
         return self._missing_textures
 
-    def collision_mesh(self) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    def collision_mesh(self) -> Optional[tuple[np.ndarray, np.ndarray]]:
         """One static trimesh of the map's solid surfaces, in scene space."""
         return self.world.collision_mesh()
 
     def model_bounds(self, index: Optional[int]
-                     ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+                     ) -> Optional[tuple[np.ndarray, np.ndarray]]:
         """A brush model's map-space bounds, or None (``SPEC-BSP46 §4.6``)."""
         if index is None:
             return None
@@ -214,13 +215,13 @@ class LoadedMap:
         return speakers.from_map(self)
 
     def push_volumes(self, scene_gravity: Optional[float] = None
-                     ) -> List[jumppads.PushVolume]:
+                     ) -> list[jumppads.PushVolume]:
         """This map's push volumes (``SPEC-TRIGGER-PUSH §1``, ``§9.4``)."""
         return jumppads.push_volumes(self, scene_gravity)
 
-    def spawn_points(self) -> List[SpawnPoint]:
+    def spawn_points(self) -> list[SpawnPoint]:
         """Every player start the map defines, in scene space."""
-        spawns: List[SpawnPoint] = []
+        spawns: list[SpawnPoint] = []
         for entity in self.bsp.entities:
             if entity.classname.lower() not in SPAWN_CLASSNAMES:
                 continue
@@ -258,7 +259,7 @@ def load(path: str, lightmap_strength: Optional[float] = None,
         % (version, q3bsp.BSP_VERSION))
 
 
-def _content_roots(path: str, extra: Sequence[str]) -> List[str]:
+def _content_roots(path: str, extra: Sequence[str]) -> list[str]:
     """The directories a map's textures and scripts are resolved against."""
     directory = os.path.dirname(os.path.abspath(path))
     root = (os.path.dirname(directory)
@@ -270,7 +271,7 @@ def _content_roots(path: str, extra: Sequence[str]) -> List[str]:
     return roots
 
 
-def _load_quake3(path: str, name: str, roots: List[str],
+def _load_quake3(path: str, name: str, roots: list[str],
                  strength: Optional[float],
                  subdivisions: Optional[int]) -> LoadedMap:
     """Read a version 46 map and the material scripts that describe it."""
@@ -283,7 +284,7 @@ def _load_quake3(path: str, name: str, roots: List[str],
     def style_for(texture_name: str) -> SurfaceStyle:
         return q3shader.style_for(materials, texture_name)
 
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     if subdivisions is not None:
         kwargs['subdivisions'] = subdivisions
     world, atlas = q3geometry.build(bsp, style_for=style_for, **kwargs)

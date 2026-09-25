@@ -42,30 +42,31 @@ import logging
 import math
 import os
 import sys
-from typing import Any, List, Sequence, Tuple
+from typing import Any
+from collections.abc import Sequence
 
 os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
 
-from OpenGLContext import testingcontext                        # noqa: E402
-from OpenGLContext.capture import SettleCapture                 # noqa: E402
-from OpenGLContext.contextdefinition import ContextDefinition   # noqa: E402
-from OpenGLContext.scenegraph.appearance import Appearance      # noqa: E402
-from OpenGLContext.scenegraph.basenodes import (                # noqa: E402
+from OpenGLContext import testingcontext
+from OpenGLContext.capture import SettleCapture
+from OpenGLContext.contextdefinition import ContextDefinition
+from OpenGLContext.scenegraph.appearance import Appearance
+from OpenGLContext.scenegraph.basenodes import (
     Box, Material, Shape, Transform,
 )
-from OpenGLContext.scenegraph.light import (                     # noqa: E402
+from OpenGLContext.scenegraph.light import (
     DirectionalLight, PointLight,
 )
-from OpenGLContext.scenegraph.scenegraph import SceneGraph      # noqa: E402
-from OpenGLContext.ui import bindings, settings                 # noqa: E402
-from OpenGLContext.ui.overlay import OverlayMixin               # noqa: E402
+from OpenGLContext.scenegraph.scenegraph import SceneGraph
+from OpenGLContext.ui import bindings, settings
+from OpenGLContext.ui.overlay import OverlayMixin
 
-from . import controls, weapons as weapontable                  # noqa: E402
-from . import debug as twigdebug                              # noqa: E402
-from .firstperson import WeaponHand, aim_at_camera               # noqa: E402
-from .hud import GameHUD, now as hudclock                       # noqa: E402
-from .player import PlayerState                                 # noqa: E402
+from . import controls, weapons as weapontable
+from . import debug as twigdebug
+from .firstperson import WeaponHand, aim_at_camera
+from .hud import GameHUD, now as hudclock
+from .player import PlayerState
 
 log = logging.getLogger(__name__)
 
@@ -92,7 +93,7 @@ FAR_PLANE = 200.0
 
 
 # -- the scene -------------------------------------------------------------
-def build_room() -> List[Any]:
+def build_room() -> list[Any]:
     """A floor, four walls and a few blocks, so the HUD has a world behind it.
 
     Blocks rather than an empty room: a crosshair over a flat wall says nothing
@@ -105,7 +106,7 @@ def build_room() -> List[Any]:
                                         shininess=0.2))
     cool = Appearance(material=Material(diffuseColor=(0.24, 0.42, 0.55),
                                         shininess=0.4))
-    children: List[Any] = [
+    children: list[Any] = [
         Transform(translation=(0, -0.1, 0),
                   children=[Shape(geometry=Box(size=(ROOM * 2, 0.2, ROOM * 2)),
                                   appearance=grey)]),
@@ -186,7 +187,7 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
         self.debugOverlay.register('Demo', self._demoRows, order=45)
         if self.config is not None and self.config.debug_overlay:
             self.debugOverlay.visible = True
-        self._handlers: List[Any] = []
+        self._handlers: list[Any] = []
         self._bindKeys()
         self.hud.post('WELCOME -- the mouse fires, p picks up, 1-5 chooses')
         self._report()
@@ -316,7 +317,7 @@ class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
         return super(HUDSampleContext, self).presentFrame()
 
     # -- reporting --------------------------------------------------------
-    def _demoRows(self) -> List[Tuple[str, Any]]:
+    def _demoRows(self) -> list[tuple[str, Any]]:
         weapon = self.weapons.by_key(self.player.selected)
         return [
             ('model', str(weapon.model) if weapon is not None else '-'),

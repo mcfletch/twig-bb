@@ -26,7 +26,8 @@ draws no HUD and must still be able to play a match out.
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 

@@ -19,7 +19,7 @@ same way in each, because it is the same weapon.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from OpenGLContext.scenegraph.basenodes import Transform
 
@@ -117,7 +117,7 @@ class WeaponHand(object):
     def __init__(self, table: Any) -> None:
         self.table = table
         self.group = Transform(children=[])
-        self._loaded: Dict[str, Any] = {}
+        self._loaded: dict[str, Any] = {}
         #: The key of the weapon held; empty for none, which is what a hand
         #: starts out holding.
         self._current: str = ''

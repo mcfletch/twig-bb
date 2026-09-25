@@ -20,7 +20,7 @@ a body vibrating under the level for the rest of the match.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 log = logging.getLogger(__name__)
 
@@ -86,6 +86,6 @@ class KillFloor:
             killed += int(arena.kill(id, cause=FELL))
         return killed
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         """What this is watching, as rows for the developer overlay."""
         return {'kill floor (m)': self.height}

@@ -23,7 +23,8 @@ things writing one position. What this owns is everybody the rules move.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Iterator, Optional
+from typing import Any, Optional
+from collections.abc import Iterator
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -56,7 +57,7 @@ class Walkers:
         #: reads as broken rather than as different.
         self.capabilities = capabilities
         self.gravity = float(gravity)
-        self._walkers: Dict[str, CharacterController] = {}
+        self._walkers: dict[str, CharacterController] = {}
 
     def __len__(self) -> int:
         return len(self._walkers)
@@ -141,7 +142,7 @@ class Walkers:
         walker.apply_impulse(np.asarray(velocity, dtype='d'))
         return True
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         """What this is holding, as rows for the developer overlay."""
         stuck = sum(1 for walker in self._walkers.values() if walker.stuck)
         return {'walkers': len(self._walkers), 'stuck': stuck}

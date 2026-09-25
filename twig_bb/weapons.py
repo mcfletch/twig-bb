@@ -24,7 +24,7 @@ BSD; how each is built is in
 from __future__ import annotations
 
 import math
-from typing import List, Optional
+from typing import Optional
 
 from vrml import field, node
 
@@ -214,7 +214,7 @@ class WeaponTable(node.Node):
                 return weapon
         return None
 
-    def keys(self) -> List[str]:
+    def keys(self) -> list[str]:
         """Every weapon's key, in table order."""
         return [str(weapon.key) for weapon in self.weapons]
 

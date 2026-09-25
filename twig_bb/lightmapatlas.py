@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, List, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -53,7 +54,7 @@ class Placement:
 class LightmapAtlas:
     """The packed pages, and the mapping from block coordinates onto them."""
 
-    def __init__(self, pages: List[np.ndarray], placements: List[Optional[Placement]],
+    def __init__(self, pages: list[np.ndarray], placements: list[Optional[Placement]],
                  page_size: int) -> None:
         self.pages = pages
         self.placements = placements
@@ -154,11 +155,11 @@ def _page_size_for(sizes: Sequence[Any], page_size: int, padding: int) -> int:
 
 
 def _shelf_pack(sizes: Sequence[Any], page_size: int,
-                padding: int) -> List[Optional[Placement]]:
+                padding: int) -> list[Optional[Placement]]:
     """Height-sorted shelf packing: one pass, integer arithmetic only."""
     order = sorted((i for i, (w, h) in enumerate(sizes) if w > 0 and h > 0),
                    key=lambda i: -int(sizes[i][1]))
-    placements: List[Optional[Placement]] = [None] * len(sizes)
+    placements: list[Optional[Placement]] = [None] * len(sizes)
     page, shelf_y, shelf_height, cursor_x = 0, 0, 0, 0
     for index in order:
         width, height = int(sizes[index][0]), int(sizes[index][1])
@@ -177,7 +178,7 @@ def _shelf_pack(sizes: Sequence[Any], page_size: int,
 
 def _blit(blocks: Sequence[Optional[np.ndarray]],
           placements: Sequence[Optional[Placement]],
-          page_size: int) -> List[np.ndarray]:
+          page_size: int) -> list[np.ndarray]:
     """Copy each block into its page."""
     count = max((place.page for place in placements if place is not None),
                 default=-1) + 1

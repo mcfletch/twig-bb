@@ -31,7 +31,7 @@ import logging
 import math
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 import numpy as np
 
@@ -106,7 +106,7 @@ LAND_TIME = 0.35
 #: Which weapon's clips each weapon key plays. A weapon with no stance of its
 #: own borrows the nearest one that has the same number of hands in it, which
 #: is why grenades are thrown from the rocket launcher's stance.
-WEAPON_FAMILY: Dict[str, str] = {
+WEAPON_FAMILY: dict[str, str] = {
     'pistol': 'pistol',
     'shotgun': 'shotgun',
     'rifle': 'rifle',
@@ -118,7 +118,7 @@ WEAPON_FAMILY: Dict[str, str] = {
 #: asked for. A model authored before the directional cycles existed still
 #: walks -- forwards, which is wrong, but a body that freezes because a clip is
 #: missing is worse and the contract says a missing clip is not an error.
-MOVEMENT_FALLBACK: Dict[str, str] = {
+MOVEMENT_FALLBACK: dict[str, str] = {
     'walk_back': 'walk', 'strafe_left': 'walk', 'strafe_right': 'walk',
     'run': 'walk', 'die_forward': 'die',
 }
@@ -126,7 +126,7 @@ MOVEMENT_FALLBACK: Dict[str, str] = {
 #: How fast each movement clip is authored to travel, in metres a second, so a
 #: cycle can be played at the rate the body is actually going and its feet stay
 #: on the ground instead of sliding over it.
-CLIP_SPEED: Dict[str, float] = {
+CLIP_SPEED: dict[str, float] = {
     'walk': WALK_SPEED, 'run': RUN_SPEED,
     'walk_back': WALK_SPEED, 'strafe_left': WALK_SPEED,
     'strafe_right': WALK_SPEED,
@@ -179,7 +179,7 @@ class Motion:
     #: This is what tells a walk from a backward walk from a sidestep. Without
     #: it a figure backing away from you runs at you while travelling
     #: backwards, which is the single most obvious thing wrong with a bot.
-    direction: Tuple[float, float] = (0.0, 1.0)
+    direction: tuple[float, float] = (0.0, 1.0)
 
 
 def motion_of(walker: Any, weapon: str = '', facing: Any = None,
@@ -216,8 +216,8 @@ def _flat(direction: Any) -> Any:
     return None if length < 1e-9 else flat / length
 
 
-def heading_in(velocity: Tuple[float, float], facing: Any,
-               speed: float) -> Tuple[float, float]:
+def heading_in(velocity: tuple[float, float], facing: Any,
+               speed: float) -> tuple[float, float]:
     """Movement in the body's own frame, as ``(across, along)``.
 
     ``across`` is positive to the body's right. A body with nowhere to be, or
@@ -349,7 +349,7 @@ class Armoury:
         #: The :class:`~twig_bb.weapons.WeaponTable` that says which file each
         #: weapon is, so what a bot is seen holding is a table edit.
         self.table = table
-        self.models: Dict[str, Any] = {}
+        self.models: dict[str, Any] = {}
 
     def of(self, key: str) -> Any:
         """The subtree for the weapon with that key, or None if there is none.
@@ -463,7 +463,7 @@ class Character:
             self.model.detach('grip', self._held)
         self.holding, self._held = None, None
 
-    def face(self, wanted: Any, dt: float) -> Tuple[Any, float]:
+    def face(self, wanted: Any, dt: float) -> tuple[Any, float]:
         """Turn towards ``wanted``, at most :data:`FACE_RATE`; where it got to.
 
         Answers ``(facing, turning)`` -- the direction to draw the body along
@@ -694,12 +694,12 @@ class Cast:
         #: One armoury for the whole cast, so a weapon is loaded once for the
         #: match however many people are carrying one.
         self.armoury = armoury
-        self.figures: Dict[str, Character] = {}
+        self.figures: dict[str, Character] = {}
         #: One crowd per build: a crowd holds figures of one document, so that
         #: a joint means the same joint in all of them.
-        self.crowds: Dict[str, Any] = {}
-        documents: Dict[str, Any] = {}      # build name -> its parse, done once
-        levels: Dict[str, Any] = {}         # and the same for its lighter mesh
+        self.crowds: dict[str, Any] = {}
+        documents: dict[str, Any] = {}      # build name -> its parse, done once
+        levels: dict[str, Any] = {}         # and the same for its lighter mesh
         for index, id in enumerate(ids):
             name = chosen[index % len(chosen)]
             if name not in documents:
@@ -752,14 +752,14 @@ class Cast:
         figure = self.figures.get(id)
         return ('', None) if figure is None else figure.update(motion, dt)
 
-    def face(self, id: str, wanted: Any, dt: float) -> Tuple[Any, float]:
+    def face(self, id: str, wanted: Any, dt: float) -> tuple[Any, float]:
         """Turn one figure towards ``wanted`` -- see :meth:`Character.face`."""
         figure = self.figures.get(id)
         return (None, 0.0) if figure is None else figure.face(wanted, dt)
 
     def pose(self, dt: float, mode: Any = None,
              budget: Optional[int] = None,
-             distances: Optional[Dict[str, float]] = None) -> None:
+             distances: Optional[dict[str, float]] = None) -> None:
         """Pose the whole cast, once, after every figure has chosen its clips.
 
         ``mode`` is the rendering context, which is what lets the skeletons and

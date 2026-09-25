@@ -26,7 +26,8 @@ it is exercised with no window at all.  Building a panel touches no GL.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Callable, Sequence
 
 from OpenGLContext.ui import generate
 from OpenGLContext.ui.contentscreen import ContentScreen
@@ -89,7 +90,7 @@ def main_menu(on_play: Optional[Callable[[], None]] = None,
         ('credits', 'Acknowledgements', on_credits, False),
         ('quit', 'Quit', on_quit, False),
     ]
-    children: List[Any] = [Label(text=GAME_TITLE, name='title')]
+    children: list[Any] = [Label(text=GAME_TITLE, name='title')]
     if subtitle:
         children.append(Label(text=subtitle, wrap=True, name='subtitle'))
     children.append(Separator(top=6))
@@ -145,7 +146,7 @@ def play_screen(setup: match.MatchSetup, levels: Sequence[match.Level],
                           name='buttons'),
                   ])])
 
-    answered: List[bool] = []
+    answered: list[bool] = []
 
     def finish(started: bool) -> None:
         if answered:
@@ -250,7 +251,7 @@ def first_run_screen(packs: Sequence[AssetPack],
 
 
 def wanted_from(packs: Sequence[AssetPack]
-                ) -> Callable[[AssetPack], List[AssetPack]]:
+                ) -> Callable[[AssetPack], list[AssetPack]]:
     """Given the packs on offer, the set choosing one of them fetches.
 
     The pack and those of ``packs`` it names in ``needs``. A need not among
@@ -258,7 +259,7 @@ def wanted_from(packs: Sequence[AssetPack]
     """
     offered = list(packs)
 
-    def wanted(pack: AssetPack) -> List[AssetPack]:
+    def wanted(pack: AssetPack) -> list[AssetPack]:
         return [pack] + [other for other in offered
                          if other.key in pack.needs]
     return wanted

@@ -25,7 +25,8 @@ from __future__ import annotations
 
 import logging
 import struct
-from typing import Any, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 

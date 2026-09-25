@@ -24,7 +24,7 @@ import logging
 import os
 import tempfile
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from vrml import field, node
 
@@ -59,7 +59,7 @@ class MatchSetup(node.Node):
     #: Minutes that end the match; 0 for no time limit.
     timeLimit = field.newField('timeLimit', 'SFFloat', 1, 10.0)
 
-    UI_HINTS: Dict[str, Dict[str, Any]] = {
+    UI_HINTS: dict[str, dict[str, Any]] = {
         'level': {'skip': True},        # chosen from a list, not typed
         'bots': {'label': 'Opponents', 'minimum': 0, 'maximum': 15, 'step': 1},
         'difficulty': {'label': 'Difficulty', 'options': DIFFICULTIES,
@@ -222,7 +222,7 @@ class Level:
 
 
 def levels_available(cache_dir: Optional[str] = None,
-                     packs: Optional[Any] = None) -> List[Level]:
+                     packs: Optional[Any] = None) -> list[Level]:
     """Every level already on disk, in pack order and then by name.
 
     Only what is fetched: a chooser that listed levels a player cannot start
@@ -231,7 +231,7 @@ def levels_available(cache_dir: Optional[str] = None,
     question and belongs on a different screen.
     """
     from . import download
-    found: List[Level] = []
+    found: list[Level] = []
     for pack in (download.ASSET_PACKS if packs is None else packs):
         root = download.pack_root(pack, cache_dir)
         if root is None:
@@ -256,7 +256,7 @@ def level_target(pack: Any, name: str) -> str:
                       name)
 
 
-def _levelshots(root: str) -> Dict[str, str]:
+def _levelshots(root: str) -> dict[str, str]:
     """``{map name: picture}`` for one unpacked pack.
 
     The tree is walked once per pack rather than searched once per map: a
@@ -271,8 +271,8 @@ def _levelshots(root: str) -> Dict[str, str]:
     filesystem hands back -- so "first" is a different picture on a different
     machine.
     """
-    shared_pictures: Dict[str, str] = {}
-    metadata_pictures: Dict[str, str] = {}
+    shared_pictures: dict[str, str] = {}
+    metadata_pictures: dict[str, str] = {}
     for base, dirs, files in os.walk(root):
         dirs.sort()             # so two paks are read in the same order anywhere
         directory = os.path.basename(base).lower()
@@ -296,7 +296,7 @@ def _levelshots(root: str) -> Dict[str, str]:
     return {**metadata_pictures, **shared_pictures}
 
 
-def describe(setup: MatchSetup) -> Dict[str, Any]:
+def describe(setup: MatchSetup) -> dict[str, Any]:
     """This match as rows for the developer overlay."""
     return {
         'level': setup.level or '-',

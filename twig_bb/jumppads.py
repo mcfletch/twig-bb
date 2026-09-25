@@ -28,7 +28,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -117,7 +118,7 @@ class PushVolume:
         """The velocity in scene units: metres per second, +Y up."""
         return to_scene_directions(self.velocity.reshape((1, 3)))[0] * SCENE_SCALE
 
-    def scene_box(self) -> Tuple[np.ndarray, np.ndarray]:
+    def scene_box(self) -> tuple[np.ndarray, np.ndarray]:
         """The volume's bounds in scene space, as ``(low, high)`` corners."""
         corners = to_scene_points(np.array([self.mins, self.maxs]))
         return (corners.min(axis=0), corners.max(axis=0))
@@ -136,7 +137,7 @@ def map_gravity(entities: Sequence[Entity]) -> float:
     return DEFAULT_GRAVITY
 
 
-def orientation_triple(entity: Entity) -> Tuple[float, float, float]:
+def orientation_triple(entity: Entity) -> tuple[float, float, float]:
     """The entity's (pitch, yaw, roll) triple (``§3.1``–``§3.3``).
 
     ``angle`` is a yaw-only shorthand equivalent to the triple (0, a, 0), and
@@ -153,7 +154,7 @@ def push_direction(entity: Entity) -> np.ndarray:
     return direction_from_triple(orientation_triple(entity))
 
 
-def direction_from_triple(triple: Tuple[float, float, float]) -> np.ndarray:
+def direction_from_triple(triple: tuple[float, float, float]) -> np.ndarray:
     """The direction one orientation triple selects (``§3.4``–``§3.6``, ``§6.3``)."""
     if triple == STRAIGHT_UP_TRIPLE:
         return np.array([0.0, 0.0, 1.0])
@@ -256,14 +257,14 @@ def aimed_velocity(source: Any, destination: Any, gravity: float) -> np.ndarray:
     return velocity
 
 
-def _destinations(entities: Sequence[Entity]) -> Dict[str, np.ndarray]:
+def _destinations(entities: Sequence[Entity]) -> dict[str, np.ndarray]:
     """Every ``targetname`` a pad may be aimed at, and where it is.
 
     ``SPEC-Q3PUSH §1.3``: the match is on the name, not on the classname --
     three different classnames carry one in the shipped maps and nothing
     distinguishes them for this purpose.
     """
-    found: Dict[str, np.ndarray] = {}
+    found: dict[str, np.ndarray] = {}
     for entity in entities:
         name = entity.get('targetname')
         if name and entity.get('origin'):
@@ -273,7 +274,7 @@ def _destinations(entities: Sequence[Entity]) -> Dict[str, np.ndarray]:
 
 
 def push_volumes(source: Any, scene_gravity: Optional[float] = None
-                 ) -> List[PushVolume]:
+                 ) -> list[PushVolume]:
     """Every push volume of a map.
 
     ``source`` supplies ``entities`` and ``model_bounds(index)``.  ``§5.1``:
@@ -283,7 +284,7 @@ def push_volumes(source: Any, scene_gravity: Optional[float] = None
     gravity = map_gravity(source.entities)
     scene_g = gravity if scene_gravity is None else scene_gravity
     destinations = _destinations(source.entities)
-    volumes: List[PushVolume] = []
+    volumes: list[PushVolume] = []
     for entity in source.entities:
         classname = entity.classname
         if classname not in (PUSH_CLASSNAME, MONSTERJUMP_CLASSNAME):
@@ -336,15 +337,15 @@ class PushSystem:
     """
 
     def __init__(self, volumes: Sequence[PushVolume],
-                 player_size: Tuple[float, float, float] = PLAYER_BOX) -> None:
+                 player_size: tuple[float, float, float] = PLAYER_BOX) -> None:
         self.volumes = list(volumes)
-        self._events: Dict[int, str] = {}
-        self._fired: Dict[int, float] = {}
+        self._events: dict[int, str] = {}
+        self._fired: dict[int, float] = {}
         self._removed: set = set()
         self._time = 0.0
         self.world = PhysicsWorld(gravity=model.Gravity(gravity=0.0),
                                   sleep_enabled=False)
-        self._body_volume: Dict[int, int] = {}
+        self._body_volume: dict[int, int] = {}
         for index, volume in enumerate(self.volumes):
             low, high = volume.scene_box()
             shape = self.world.add_shape(model.Shape.box(tuple(high - low)))

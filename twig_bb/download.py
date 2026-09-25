@@ -22,7 +22,8 @@ import logging
 import os
 import shutil
 import zipfile
-from typing import List, Optional, Sequence, Tuple
+from typing import Optional
+from collections.abc import Sequence
 
 from OpenGLContext.contentpacks import ContentStore, archive as engine_archive
 from OpenGLContext.contentpacks import catalog as engine_catalog
@@ -73,7 +74,7 @@ def store(cache_dir: Optional[str] = None) -> ContentStore:
     return ContentStore('twig-bb', root=cache_dir or _default_store_root())
 
 
-def adopt_on_start() -> List[str]:
+def adopt_on_start() -> list[str]:
     """Adopt what an earlier layout left into the per-user store; what moved.
 
     Called by the game's commands as they start, before anything looks for
@@ -87,7 +88,7 @@ def adopt_on_start() -> List[str]:
     return adopt_legacy_content(where)
 
 
-def adopt_legacy_content(store: ContentStore) -> List[str]:
+def adopt_legacy_content(store: ContentStore) -> list[str]:
     """Move content an earlier layout unpacked into the store; what moved.
 
     A player who has fetched 450 MB of textures should not fetch them twice
@@ -142,7 +143,7 @@ def pack_for_key(key: str) -> Optional[AssetPack]:
     return None
 
 
-def packs_for(family: str) -> List[AssetPack]:
+def packs_for(family: str) -> list[AssetPack]:
     """Every pack that could help a map of ``family``."""
     return [pack for pack in ASSET_PACKS
             if pack.family in (family, None)]
@@ -157,7 +158,7 @@ def human_size(count: int) -> str:
 PACK_ALIASES = {'openarena': 'openarena-maps', 'oa': 'openarena-maps'}
 
 
-def parse_pack_target(target: str) -> Optional[Tuple[AssetPack, str]]:
+def parse_pack_target(target: str) -> Optional[tuple[AssetPack, str]]:
     """Read ``pack:mapname`` and return the pack and the map name.
 
     ``pack`` is one of this game's packs by its short name or an alias, or
@@ -226,7 +227,7 @@ CONTENT_MARKERS = ('textures', 'maps', 'scripts', 'models', 'env', 'gfx')
 CONTENT_DEPTH = 2
 
 
-def content_roots(root: str) -> List[str]:
+def content_roots(root: str) -> list[str]:
     """The directories inside an unpacked pack that content resolves against.
 
     A release wraps its content in a version directory and one directory per
@@ -237,7 +238,7 @@ def content_roots(root: str) -> List[str]:
     The pack's own top is returned when nothing is recognised, so an unusual
     layout resolves nothing rather than breaking the caller.
     """
-    found: List[str] = []
+    found: list[str] = []
 
     def _scan(directory: str, depth: int) -> None:
         children = []
@@ -260,7 +261,7 @@ def content_roots(root: str) -> List[str]:
     return found or [root]
 
 
-def list_maps(root: str) -> List[str]:
+def list_maps(root: str) -> list[str]:
     """The names of every map an unpacked pack offers, loose or archived."""
     names = set()
     for directory, _, files in os.walk(root):
@@ -274,7 +275,7 @@ def list_maps(root: str) -> List[str]:
     return sorted(names)
 
 
-def _maps_in_archive(archive: str) -> List[str]:
+def _maps_in_archive(archive: str) -> list[str]:
     """The `.bsp` entries an archive holds; empty if it cannot be read."""
     try:
         with zipfile.ZipFile(archive) as zip_file:
@@ -357,7 +358,7 @@ def unpack(archive: str, directory: str, map_name: Optional[str] = None,
     return directory
 
 
-def _safe_names(zip_file: zipfile.ZipFile, directory: str) -> List[str]:
+def _safe_names(zip_file: zipfile.ZipFile, directory: str) -> list[str]:
     """Every entry name, after refusing any that escapes ``directory``."""
     root = os.path.abspath(directory)
     names = []

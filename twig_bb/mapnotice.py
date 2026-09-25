@@ -32,7 +32,8 @@ import os
 import re
 import textwrap
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Optional, Sequence, Tuple
+from typing import Any, Optional
+from collections.abc import Callable, Sequence
 
 __all__ = ['CREDIT_WIDTH', 'LICENCE_NAMES', 'Locator', 'MapNotice', 'for_map',
            'licence_documents', 'title_and_author']
@@ -81,13 +82,13 @@ class MapNotice:
     #: That pack's stated terms.
     licence: str = ''
     #: Paths of the licence and credit documents shipped with the content.
-    documents: Tuple[str, ...] = field(default_factory=tuple)
+    documents: tuple[str, ...] = field(default_factory=tuple)
     #: ``(title, terms)`` for each other pack whose content this map is drawn
     #: with -- base textures, replacement art.  Separate from :attr:`licence`
     #: because those terms can be stricter than the map's own: the Quake 3
     #: replacement textures are CC BY-NC-ND, and somebody recording a level
     #: drawn with them needs to know that from the level they are in.
-    drawn_with: Tuple[Tuple[str, str], ...] = field(default_factory=tuple)
+    drawn_with: tuple[tuple[str, str], ...] = field(default_factory=tuple)
 
     @property
     def summary(self) -> str:
@@ -100,7 +101,7 @@ class MapNotice:
         shown = self.title or self.name
         return '%s, by %s' % (shown, self.author) if self.author else shown
 
-    def credit_lines(self, width: int = 0) -> List[str]:
+    def credit_lines(self, width: int = 0) -> list[str]:
         """The credit as short lines: the map, then its terms in full.
 
         The HUD's message queue draws each line as it is given and never
@@ -138,7 +139,7 @@ class MapNotice:
         return '\n'.join(lines)
 
 
-def title_and_author(message: str) -> Tuple[str, str]:
+def title_and_author(message: str) -> tuple[str, str]:
     """Split an embedded ``message`` into its title and its author.
 
     Mappers write the credit into the title by convention rather than by any
@@ -156,7 +157,7 @@ def title_and_author(message: str) -> Tuple[str, str]:
     return text, ''
 
 
-def licence_documents(roots: Sequence[str]) -> List[str]:
+def licence_documents(roots: Sequence[str]) -> list[str]:
     """Every licence or credit document shipped under these content roots.
 
     Searched one level down as well as at the top, because a release commonly
@@ -165,7 +166,7 @@ def licence_documents(roots: Sequence[str]) -> List[str]:
     release live at its root, and descending further finds the licences of
     things bundled *into* it, which is a different question.
     """
-    found: List[str] = []
+    found: list[str] = []
     seen = set()
     for root in roots:
         for directory in _search_roots(root):
@@ -205,13 +206,13 @@ def for_map(loaded: Any, packs: Optional[Sequence[Any]] = None,
 
 
 def _borrowed(content: Sequence[str], root: str,
-              packs: Sequence[Tuple[Any, str]]) -> Tuple[Tuple[str, str], ...]:
+              packs: Sequence[tuple[Any, str]]) -> tuple[tuple[str, str], ...]:
     """``(title, terms)`` for the other packs this map's content roots reach.
 
     Each once, in the order the map resolves against them, which is the order
     a reader can check them in.
     """
-    found: List[Tuple[str, str]] = []
+    found: list[tuple[str, str]] = []
     for own in content:
         for pack, other in packs:
             if other == root or not _is_within(own, other):
@@ -223,7 +224,7 @@ def _borrowed(content: Sequence[str], root: str,
 
 
 def _own_roots(content: Sequence[str], root: str,
-               packs: Sequence[Tuple[Any, str]]) -> List[str]:
+               packs: Sequence[tuple[Any, str]]) -> list[str]:
     """The roots whose licence documents are *this map's*.
 
     A map resolves its textures against packs it did not come from -- base
@@ -256,7 +257,7 @@ def _embedded_message(loaded: Any) -> str:
 
 
 def _pack_roots(packs: Optional[Sequence[Any]],
-                directory_of: Optional[Locator]) -> List[Tuple[Any, str]]:
+                directory_of: Optional[Locator]) -> list[tuple[Any, str]]:
     """Every catalogued pack paired with where it unpacks.
 
     Resolved once: both which pack a map came from and which roots belong to
@@ -266,7 +267,7 @@ def _pack_roots(packs: Optional[Sequence[Any]],
         from . import download
         packs = download.ASSET_PACKS if packs is None else packs
         directory_of = directory_of or download.pack_directory
-    found: List[Tuple[Any, str]] = []
+    found: list[tuple[Any, str]] = []
     for pack in packs:
         try:
             found.append((pack, os.path.abspath(directory_of(pack))))
@@ -276,7 +277,7 @@ def _pack_roots(packs: Optional[Sequence[Any]],
 
 
 def _pack_for(path: str,
-              packs: Sequence[Tuple[Any, str]]) -> Tuple[Any, str]:
+              packs: Sequence[tuple[Any, str]]) -> tuple[Any, str]:
     """The catalogued pack this file sits under, and where that pack unpacks.
 
     ``(None, '')`` for a map of somebody's own, which claims no pack's terms.
@@ -299,7 +300,7 @@ def _is_within(path: str, root: str) -> bool:
     return os.path.commonpath([path, root]) == root if root else False
 
 
-def _search_roots(root: str) -> List[str]:
+def _search_roots(root: str) -> list[str]:
     """``root`` and its immediate subdirectories, skipping what is not there."""
     if not root or not os.path.isdir(root):
         return []
@@ -311,7 +312,7 @@ def _search_roots(root: str) -> List[str]:
     return found
 
 
-def _sorted_entries(directory: str) -> List[str]:
+def _sorted_entries(directory: str) -> list[str]:
     """A directory's names in a stable order, or none when it cannot be read."""
     try:
         return sorted(os.listdir(directory))

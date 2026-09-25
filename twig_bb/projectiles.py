@@ -31,7 +31,8 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass
-from typing import Any, List, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -327,8 +328,8 @@ class Projectiles:
         #: would have to be compacted in step with the arrays anyway.
         self.kind = np.zeros(size, dtype='i4')
         self.owner = np.zeros(size, dtype='i4')
-        self._kinds: List[Projectile] = []
-        self._owners: List[str] = []
+        self._kinds: list[Projectile] = []
+        self._owners: list[str] = []
 
     def __len__(self) -> int:
         return self.live
@@ -372,7 +373,7 @@ class Projectiles:
         return self._kinds[int(self.kind[int(slot)])]
 
     @staticmethod
-    def _index(registry: List[Any], value: Any) -> int:
+    def _index(registry: list[Any], value: Any) -> int:
         """``value``'s place in a registry, added if it is not there yet."""
         for at, held in enumerate(registry):
             if held is value or held == value:
@@ -385,7 +386,7 @@ class Projectiles:
         self.live = 0
 
     # -- flying -----------------------------------------------------------
-    def step(self, world: Any, arena: Any, dt: float) -> List[Detonation]:
+    def step(self, world: Any, arena: Any, dt: float) -> list[Detonation]:
         """Advance every projectile by ``dt``; returns what went off.
 
         Combatants are staged into the world once for the whole batch rather
@@ -401,7 +402,7 @@ class Projectiles:
             combat.unstage(world, bodies)
 
     def _advance(self, world: Any, arena: Any, dt: float,
-                 bodies: dict) -> List[Detonation]:
+                 bodies: dict) -> list[Detonation]:
         """One tick's flight, with the world already staged."""
         self._fall(dt)
         self.age[:self.live] += dt
@@ -411,8 +412,8 @@ class Projectiles:
         staged: dict = {}
         for body, id in bodies.items():
             staged.setdefault(id, []).append(body)
-        gone: List[Detonation] = []
-        spent: List[int] = []
+        gone: list[Detonation] = []
+        spent: list[int] = []
         for index in range(self.live):
             if self._fly(world, arena, index, dt, staged, bodies, gone):
                 spent.append(index)
@@ -460,7 +461,7 @@ class Projectiles:
         self.velocity[rows] *= (gained / speed[powered])[:, None]
 
     def _fly(self, world: Any, arena: Any, index: int, dt: float, staged: dict,
-             bodies: dict, gone: List[Detonation]) -> bool:
+             bodies: dict, gone: list[Detonation]) -> bool:
         """Move one projectile; returns whether it is finished with.
 
         The whole of the swept step: cast from here to where it wants to be,
@@ -510,7 +511,7 @@ class Projectiles:
             self.armed[index] = True
 
     def _expired(self, index: int, kind: Projectile, arena: Any,
-                 gone: List[Detonation]) -> bool:
+                 gone: list[Detonation]) -> bool:
         """Whether a fuse or a lifetime has finished this one off.
 
         A fuse **detonates** and a lifetime does not: a grenade going off in
@@ -526,7 +527,7 @@ class Projectiles:
 
     def _detonate(self, arena: Any, index: int, kind: Projectile,
                   point: np.ndarray, normal: Optional[np.ndarray],
-                  target: str, gone: List[Detonation]) -> None:
+                  target: str, gone: list[Detonation]) -> None:
         """Apply a direct hit, announce the burst, and record it."""
         owner = self._owners[int(self.owner[index])]
         if target:
@@ -561,7 +562,7 @@ class Projectiles:
                                 + normal * (float(kind.radius)
                                             + BOUNCE_CLEARANCE))
 
-    def _bury(self, spent: List[int]) -> None:
+    def _bury(self, spent: list[int]) -> None:
         """Compact the survivors down over the gaps, keeping them packed.
 
         Back to front, so an index taken from the end has not itself been

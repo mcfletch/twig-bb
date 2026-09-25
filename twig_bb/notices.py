@@ -28,7 +28,8 @@ import os
 import re
 import sys
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Sequence, Set
+from typing import Optional
+from collections.abc import Callable, Sequence
 
 from OpenGLContext.ui.dialogs import notice
 from OpenGLContext.ui.panel import Panel
@@ -73,9 +74,9 @@ class Acknowledgement:
     optional: bool
 
 
-def acknowledged(path: Optional[str] = None) -> List[Acknowledgement]:
+def acknowledged(path: Optional[str] = None) -> list[Acknowledgement]:
     """Every library ``NOTICES.md`` lists."""
-    found: List[Acknowledgement] = []
+    found: list[Acknowledgement] = []
     try:
         with open(path or NOTICES_PATH, 'r', encoding='utf-8') as handle:
             lines = handle.readlines()
@@ -96,7 +97,7 @@ def acknowledged(path: Optional[str] = None) -> List[Acknowledgement]:
     return found
 
 
-def declared_dependencies(path: Optional[str] = None) -> Set[str]:
+def declared_dependencies(path: Optional[str] = None) -> set[str]:
     """Every package `pyproject.toml` says this program ships with.
 
     Both the required list and the optional extras, minus the extras that are
@@ -112,7 +113,7 @@ def declared_dependencies(path: Optional[str] = None) -> Set[str]:
             text = handle.read()
     except OSError:
         return set()
-    found: Set[str] = set()
+    found: set[str] = set()
     for name, block in _lists(text):
         if name in UNSHIPPED_EXTRAS:
             continue
@@ -123,9 +124,9 @@ def declared_dependencies(path: Optional[str] = None) -> Set[str]:
     return found
 
 
-def _lists(text: str) -> List[tuple]:
+def _lists(text: str) -> list[tuple]:
     """``(name, block)`` for the dependency list and each optional extra."""
-    blocks: List[tuple] = []
+    blocks: list[tuple] = []
     for match in re.finditer(r'^dependencies\s*=\s*\[(.*?)\]', text,
                              re.MULTILINE | re.DOTALL):
         blocks.append(('', match.group(1)))
@@ -139,7 +140,7 @@ def _lists(text: str) -> List[tuple]:
 
 
 def unacknowledged(project: Optional[str] = None,
-                   path: Optional[str] = None) -> List[str]:
+                   path: Optional[str] = None) -> list[str]:
     """Declared dependencies that ``NOTICES.md`` does not list.
 
     The check that makes an unattributed dependency a failing build.
@@ -173,7 +174,7 @@ def content_notices(packs: Optional[Sequence[AssetPack]] = None) -> str:
     return '\n'.join(lines)
 
 
-def _shipped_art() -> List[str]:
+def _shipped_art() -> list[str]:
     """The art that ships *with* the program, credited whether or not asked.
 
     Our own work requires nothing.  Crediting it anyway is the rule for every
@@ -246,7 +247,7 @@ def screen(on_close: Optional[Callable[[Panel], None]] = None,
     return notice('Acknowledgements', full_text(current), on_close=on_close)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
     """Print the acknowledgements, for anyone packaging this."""
     parser = argparse.ArgumentParser(
         prog='python -m twig_bb.notices',

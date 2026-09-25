@@ -28,8 +28,9 @@ import math
 import os
 import sys
 from typing import (
-    Any, Callable, Dict, List, Optional, Sequence, Tuple,
+    Any, Optional,
 )
+from collections.abc import Callable, Sequence
 
 os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
@@ -37,11 +38,11 @@ os.environ.setdefault('OPENGLCONTEXT_SHADOWS', '0')
 os.environ.setdefault('OPENGLCONTEXT_DISABLE_FPS_DISPLAY', '1')
 os.environ.setdefault('OPENGLCONTEXT_HIDDEN', '1')
 
-import numpy as np                                              # noqa: E402
+import numpy as np
 
-from twig_bb import arena as arenamod                           # noqa: E402
-from twig_bb import characters, game                            # noqa: E402
-from twig_bb import weapons as weapontable                      # noqa: E402
+from twig_bb import arena as arenamod
+from twig_bb import characters, game
+from twig_bb import weapons as weapontable
 
 __all__ = ['TAKES', 'VIEWS', 'Take', 'Script', 'Review', 'main']
 
@@ -55,7 +56,7 @@ CAMERA = (0.0, 1.05, 2.9)
 CELL = (200, 300)
 
 #: The ways round a figure worth watching it from, as a camera yaw in degrees.
-VIEWS: Tuple[Tuple[str, float], ...] = (
+VIEWS: tuple[tuple[str, float], ...] = (
     ('front', 0.0),
     ('three-quarter', 35.0),
     ('side', 90.0),
@@ -82,7 +83,7 @@ class Take:
         self.weapon = weapon
         self.note = note
 
-    def at(self, when: float) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
+    def at(self, when: float) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
         velocity, facing, state = self.motion(when)
         return (np.asarray(velocity, dtype='d'),
                 np.asarray(facing, dtype='d'), dict(state))
@@ -93,7 +94,7 @@ class Take:
 #: vectors are whatever holds three numbers -- a tuple written here, a numpy
 #: row worked out from a heading -- since `Take.at` puts both through
 #: `np.asarray`.
-Moment = Tuple[Any, Any, Dict[str, Any]]
+Moment = tuple[Any, Any, dict[str, Any]]
 Motion = Callable[[float], Moment]
 
 
@@ -102,7 +103,7 @@ def _still(velocity: Any = (0, 0, 0), facing: Any = (0, 0, 1),
     """A take that says the same thing at every moment of itself."""
     def motion(_when: float, velocity: Any = velocity,
                facing: Any = facing,
-               state: Dict[str, Any] = state) -> Moment:
+               state: dict[str, Any] = state) -> Moment:
         return (velocity, facing, state)
     return motion
 
@@ -140,7 +141,7 @@ def _turning_to_shoot(when: float) -> Moment:
 
 
 #: What is worth watching, and why each one is here.
-TAKES: Tuple[Take, ...] = (
+TAKES: tuple[Take, ...] = (
     Take('idle', _still(), note='standing, breathing, weapon carried'),
     Take('walk-forward', _walking(2.4, heading=(0, 0, 1)), note='walking at the camera'),
     Take('run-forward', _walking(6.0, heading=(0, 0, 1)), note='running at the camera'),
@@ -195,7 +196,7 @@ class Review:
 
     def __init__(self, out: str, build: str = characters.BUILDS[0],
                  weapon: str = 'rifle', takes: Sequence[Take] = TAKES,
-                 views: Sequence[Tuple[str, float]] = VIEWS,
+                 views: Sequence[tuple[str, float]] = VIEWS,
                  frames: int = 8, fps: float = 30.0) -> None:
         self.out = out
         self.build = build
@@ -209,7 +210,7 @@ class Review:
         #: is run at a game's rate and only *sampled* at the frames.
         self.fps = float(fps)
 
-    def steps(self, take: Take) -> List[Tuple[float, bool]]:
+    def steps(self, take: Take) -> list[tuple[float, bool]]:
         """``(dt, keep)`` for each tick of one take, in order."""
         ticks = max(self.frames, int(round(take.seconds * self.fps)))
         dt = take.seconds / ticks
@@ -381,7 +382,7 @@ class ReviewContext:
         self.context.OnDraw(force=1)
         return read_back_buffer(0)[0]
 
-    def run(self) -> List[str]:
+    def run(self) -> list[str]:
         """Draw every take and write the sheets; returns what it wrote."""
         from OpenGLContext import contactsheet
         review, stage = self.review, self.stage

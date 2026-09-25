@@ -29,7 +29,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -55,7 +56,7 @@ RESPAWN_DELAY = 1.5
 NOBODY = ''
 
 
-def _point(value: Any) -> Tuple[float, float, float]:
+def _point(value: Any) -> tuple[float, float, float]:
     """Three numbers as a plain tuple.
 
     Events are written down and — §11 — sent, so nothing in one is an array
@@ -65,7 +66,7 @@ def _point(value: Any) -> Tuple[float, float, float]:
     return (float(value[0]), float(value[1]), float(value[2]))
 
 
-def _heading(value: Any) -> Tuple[float, float, float]:
+def _heading(value: Any) -> tuple[float, float, float]:
     """A direction as a plain unit tuple, or straight up if it has no length.
 
     Normalised here, once, so that every listener may assume it: a sound
@@ -88,7 +89,7 @@ class Damaged:
     target: str
     amount: int
     by: str
-    point: Optional[Tuple[float, float, float]] = None
+    point: Optional[tuple[float, float, float]] = None
     #: What did it, when that is not a weapon: ``lava``, ``slime``.  Empty for
     #: an ordinary shot.  A **cause** rather than an invented killer, because
     #: a pool of lava is not a combatant and putting one on the scoreboard to
@@ -111,10 +112,10 @@ class Fired:
     shooter: str
     weapon: str
     #: Where the shot left from, in world coordinates.
-    origin: Tuple[float, float, float]
+    origin: tuple[float, float, float]
     #: Which way it went, as a **unit** heading, so a listener can place a
     #: sound along it without normalising first.
-    direction: Tuple[float, float, float]
+    direction: tuple[float, float, float]
 
 
 @dataclass(frozen=True)
@@ -130,8 +131,8 @@ class Impact:
     #: Where, in world coordinates, and the surface normal there, facing back
     #: along the trace.  An effect is placed by the first and oriented by the
     #: second.
-    point: Tuple[float, float, float]
-    normal: Tuple[float, float, float]
+    point: tuple[float, float, float]
+    normal: tuple[float, float, float]
     #: The texture path of the level surface met, or empty for a hit on a
     #: person and for geometry whose surface could not be named.  A **name**
     #: rather than a style object because this record is meant to be written
@@ -168,7 +169,7 @@ class Detonated:
     """
 
     #: Where it went off, and which kind of projectile it was.
-    point: Tuple[float, float, float]
+    point: tuple[float, float, float]
     kind: str
     #: Who fired it, and who it hit directly, if anybody.
     by: str = ''
@@ -205,7 +206,7 @@ class PickedUp:
     #: What to call it on screen.
     title: str = ''
     #: Where it was, in world coordinates, so a sound comes from the thing.
-    point: Optional[Tuple[float, float, float]] = None
+    point: Optional[tuple[float, float, float]] = None
 
 
 @dataclass(frozen=True)
@@ -303,9 +304,9 @@ class Arena:
         self.fragLimit = int(fragLimit)
         #: Minutes, as the setup states it and as a player thinks of it.
         self.timeLimit = float(timeLimit)
-        self._combatants: Dict[str, Combatant] = {}
+        self._combatants: dict[str, Combatant] = {}
         #: What has happened and not yet been shown.  Presentation drains it.
-        self.events: List[Any] = []
+        self.events: list[Any] = []
         #: Seconds of match played, advanced by the caller and never read from
         #: a clock.
         self.elapsed = 0.0
@@ -332,7 +333,7 @@ class Arena:
         self._combatants[id] = made
         return made
 
-    def ids(self) -> List[str]:
+    def ids(self) -> list[str]:
         return list(self._combatants)
 
     def combatant(self, id: str) -> Optional[Combatant]:
@@ -343,7 +344,7 @@ class Arena:
         """
         return self._combatants.get(id)
 
-    def bots(self) -> List[Combatant]:
+    def bots(self) -> list[Combatant]:
         return [one for one in self._combatants.values() if one.bot]
 
     # -- what happens to them --------------------------------------------
@@ -489,7 +490,7 @@ class Arena:
         back.push = np.zeros(3)
         return back
 
-    def due_to_respawn(self) -> List[str]:
+    def due_to_respawn(self) -> list[str]:
         """Everyone who has been dead long enough to come back."""
         return [one.id for one in self._combatants.values()
                 if one.dead_for is not None and one.dead_for >= RESPAWN_DELAY]
@@ -513,7 +514,7 @@ class Arena:
         one = self._combatants.get(id)
         return one.frags if one is not None else 0
 
-    def scoreboard(self) -> List[ScoreRow]:
+    def scoreboard(self) -> list[ScoreRow]:
         """Every combatant, best first; ties broken by fewest deaths then name.
 
         The dead are on it: a scoreboard that dropped them would flicker every
@@ -548,7 +549,7 @@ class Arena:
                                      reason=reason))
 
     # -- what to show ----------------------------------------------------
-    def drain(self) -> List[Any]:
+    def drain(self) -> list[Any]:
         """Take everything that has happened since the last time this was asked.
 
         Draining rather than reading, because an event shown twice is a hit
@@ -557,7 +558,7 @@ class Arena:
         taken, self.events = self.events, []
         return taken
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         """The match, as rows for the developer overlay."""
         return {
             'combatants': len(self._combatants),

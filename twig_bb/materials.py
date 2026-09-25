@@ -17,7 +17,8 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -110,10 +111,10 @@ class MaterialLibrary:
         self.roots = [os.path.abspath(root) for root in roots]
         self.family = family
         self.lightmap_strength = float(lightmap_strength)
-        self._images: Dict[str, Any] = {}
-        self._textures: Dict[Tuple[str, bool], PBRTexture] = {}
-        self._materials: Dict[Tuple[Any, ...], PBRMaterial] = {}
-        self._lightmaps: Dict[int, PBRTexture] = {}
+        self._images: dict[str, Any] = {}
+        self._textures: dict[tuple[str, bool], PBRTexture] = {}
+        self._materials: dict[tuple[Any, ...], PBRMaterial] = {}
+        self._lightmaps: dict[int, PBRTexture] = {}
         self._files = ContentSearch(self.roots)
 
     # -- name resolution -------------------------------------------------
@@ -176,7 +177,7 @@ class MaterialLibrary:
             self._images[name] = open_image(path) if path else None
         return self._images[name]
 
-    def texture_size(self, name: str) -> Tuple[int, int]:
+    def texture_size(self, name: str) -> tuple[int, int]:
         """``(width, height)`` of a texture's image (``SPEC-BSP46 §6.2``)."""
         image = self.image(name)
         if image is None:
@@ -221,7 +222,7 @@ class MaterialLibrary:
 
     def _build(self, style: SurfaceStyle, lightmap: Optional[np.ndarray],
                lightmap_key: Optional[int]) -> PBRMaterial:
-        textures: Dict[str, PBRTexture] = {}
+        textures: dict[str, PBRTexture] = {}
         base_path = self.resolve(style.name)
         if base_path:
             # A diffuse map is authored in sRGB; the lightmap below is not.

@@ -28,7 +28,8 @@ import logging
 import math
 import random
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 from vrml import field, node
@@ -146,7 +147,7 @@ class Difficulty(node.Node):
     }
 
 
-def _presets() -> Dict[str, Difficulty]:
+def _presets() -> dict[str, Difficulty]:
     """The ladder, easiest first.
 
     Near-passive walks about and does not shoot; nightmare answers a sighting
@@ -180,7 +181,7 @@ def _presets() -> Dict[str, Difficulty]:
 
 
 #: The ladder, built once.
-PRESETS: Dict[str, Difficulty] = _presets()
+PRESETS: dict[str, Difficulty] = _presets()
 
 #: What an unrecognised difficulty gets.  A saved setting from a version that
 #: declared more must still play rather than refusing to start.
@@ -295,7 +296,7 @@ class Bot:
         #: Who it could see when it last looked, and how long ago that was.
         #: Forgotten by a reset, so a bot that has just respawned somewhere
         #: else looks afresh rather than acting on a view from across the map.
-        self._seen: List[str] = []
+        self._seen: list[str] = []
         #: Enough that the very next :meth:`look` takes one: a bot with
         #: nothing remembered has no answer to give.
         self._since_look = PERCEPTION_INTERVAL
@@ -307,7 +308,7 @@ class Bot:
     # -- the senses, identical at every difficulty -----------------------
     def perceive(self, world: Any, arena: Any,
                  seen: Optional[dict] = None,
-                 rooms: Any = None) -> List[str]:
+                 rooms: Any = None) -> list[str]:
         """Everyone this bot can *actually* see, nearest first.
 
         Line of sight through the physics world, plus a field of view.  There
@@ -329,7 +330,7 @@ class Bot:
                                       rooms=rooms)
 
     def look(self, world: Any, arena: Any, dt: float,
-             seen: Optional[dict] = None, rooms: Any = None) -> List[str]:
+             seen: Optional[dict] = None, rooms: Any = None) -> list[str]:
         """Everyone this bot can see, looked up again only now and then.
 
         :meth:`perceive` is the *sense* and is unchanged; this is how often it

@@ -21,7 +21,7 @@ off, and how far the current weapon's cone has opened.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 __all__ = ['PlayerState']
 
@@ -56,9 +56,9 @@ class PlayerState:
     armour: int = 0
     max_armour: int = 100
     #: Ammunition by type name, matching ``Weapon.ammoType``.
-    ammo: Dict[str, int] = field(default_factory=dict)
+    ammo: dict[str, int] = field(default_factory=dict)
     #: Weapon keys held, in the order they were picked up.
-    weapons: List[str] = field(default_factory=list)
+    weapons: list[str] = field(default_factory=list)
     #: The key of the weapon in hand.
     selected: str = ''
     #: Frags and deaths, for §6's scoreboard.

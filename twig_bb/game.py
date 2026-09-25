@@ -17,7 +17,8 @@ from __future__ import annotations
 import logging
 import math
 import random
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -129,7 +130,7 @@ def start_match(loaded: Any, setup: Any, weapons: Any,
     return match
 
 
-def _spawns(loaded: Any) -> List[np.ndarray]:
+def _spawns(loaded: Any) -> list[np.ndarray]:
     """Every spawn point of a map as a place to *stand*.
 
     A map's spawn entity does not mark the floor, and everything in the arena
@@ -192,7 +193,7 @@ def spawn_for(spawns: Sequence[np.ndarray], match: arenamod.Arena,
 
 
 def place_bots(match: arenamod.Arena, seed: Optional[int] = None,
-               projectiles: Optional[Any] = None) -> Dict[str, botsmod.Bot]:
+               projectiles: Optional[Any] = None) -> dict[str, botsmod.Bot]:
     """One mind per bot in the match, by id.
 
     Each is given the match's own weapon table, so a bot chooses from exactly
@@ -216,7 +217,7 @@ def place_bots(match: arenamod.Arena, seed: Optional[int] = None,
 
 
 def step_bots(world: Any, match: arenamod.Arena,
-              minds: Dict[str, botsmod.Bot], dt: float,
+              minds: dict[str, botsmod.Bot], dt: float,
               weapon: Any, seed: Optional[int] = None,
               surfaces: Optional[Any] = None,
               flight: Optional[Any] = None,
@@ -243,7 +244,7 @@ def step_bots(world: Any, match: arenamod.Arena,
     # a tick where several of them look around, each pair would otherwise be
     # cast twice -- once from each end of the same segment.  The memo lives for
     # this tick only: anybody may have moved by the next one.
-    seen: Dict[tuple, bool] = {}
+    seen: dict[tuple, bool] = {}
     rooms = (CombatantRooms(visibility, match) if rooms is None else rooms)
     for id, mind in minds.items():
         one = match.combatant(id)
@@ -337,7 +338,7 @@ def shoot(world: Any, match: arenamod.Arena, shooter: str, weapon: Any,
 
 
 def step_projectiles(world: Any, match: arenamod.Arena, flight: Any,
-                     dt: float) -> List[Any]:
+                     dt: float) -> list[Any]:
     """Fly everything in the air one tick, and let what lands go off.
 
     The two halves in the order they have to happen: a projectile finds out
@@ -371,7 +372,7 @@ def _shoved(match: arenamod.Arena, one: Any, walking: Any) -> None:
 
 
 def bot_bodies(match: arenamod.Arena,
-               cast: Optional[Any] = None) -> Tuple[Group, Dict[str, Transform]]:
+               cast: Optional[Any] = None) -> tuple[Group, dict[str, Transform]]:
     """A group holding a body for each bot, and the transforms to move them.
 
     Returned together because the caller needs both: the group goes in the
@@ -384,7 +385,7 @@ def bot_bodies(match: arenamod.Arena,
     not resolve.
     """
     group = Group(children=[])
-    bodies: Dict[str, Transform] = {}
+    bodies: dict[str, Transform] = {}
     for one in match.bots():
         drawn = None if cast is None else cast.subtree(one.id)
         body = Transform(translation=tuple(one.position),
@@ -394,7 +395,7 @@ def bot_bodies(match: arenamod.Arena,
     return (group, bodies)
 
 
-def capsule() -> List[Any]:
+def capsule() -> list[Any]:
     """The parts of a stand-in body, standing on its feet."""
     look = Appearance(material=Material(diffuseColor=BODY_COLOUR,
                                         shininess=0.2))
@@ -445,7 +446,7 @@ def _spark() -> Shape:
 
 
 def projectile_bodies(table: Any = None
-                      ) -> Tuple[Group, Dict[str, InstancedModel]]:
+                      ) -> tuple[Group, dict[str, InstancedModel]]:
     """Bodies for things in flight, keyed by which kind of thing they are.
 
     One :class:`~OpenGLContext.scenegraph.instancedshape.InstancedModel` per
@@ -460,8 +461,8 @@ def projectile_bodies(table: Any = None
     """
     if table is None:
         table = projectilesmod.default_table()
-    bodies: Dict[str, InstancedModel] = {}
-    children: List[Any] = []
+    bodies: dict[str, InstancedModel] = {}
+    children: list[Any] = []
     for kind in table.kinds:
         look = art.load(str(kind.model)) if str(kind.model) else None
         if look is None:
@@ -510,7 +511,7 @@ def heading_quaternions(directions: Any,
 
 def heading_rotation(direction: Sequence[float],
                      forward: Sequence[float] = MODEL_FORWARD,
-                     ) -> Tuple[float, float, float, float]:
+                     ) -> tuple[float, float, float, float]:
     """The axis and angle that turn ``forward`` onto ``direction``.
 
     ``forward`` is which way the model is authored to face in its own frame,
@@ -542,7 +543,7 @@ def heading_rotation(direction: Sequence[float],
     return (float(axis[0]), float(axis[1]), float(axis[2]), float(angle))
 
 
-def move_projectiles(flight: Any, bodies: Dict[str, InstancedModel]) -> None:
+def move_projectiles(flight: Any, bodies: dict[str, InstancedModel]) -> None:
     """Place each kind's model once per projectile of that kind in the air.
 
     The batch keeps its living entries packed at the front, but *its* slot
@@ -551,7 +552,7 @@ def move_projectiles(flight: Any, bodies: Dict[str, InstancedModel]) -> None:
     air is placed nowhere, which is what draws nothing.
     """
     live = 0 if flight is None else len(flight)
-    slots: Dict[str, List[int]] = {key: [] for key in bodies}
+    slots: dict[str, list[int]] = {key: [] for key in bodies}
     for slot in range(live):
         kind = flight.kind_at(slot)
         if kind is not None and str(kind.key) in slots:
@@ -642,7 +643,7 @@ def item_look(kind: Any) -> Any:
     return Shape(geometry=Box(size=(ITEM_SIZE,) * 3), appearance=look)
 
 
-def item_bodies(pickups: Any) -> Tuple[Group, List[Transform]]:
+def item_bodies(pickups: Any) -> tuple[Group, list[Transform]]:
     """A group holding a body for each pickup, and the transforms to move them.
 
     One :func:`item_look` each, shared between every pickup of a kind, in a
@@ -653,8 +654,8 @@ def item_bodies(pickups: Any) -> Tuple[Group, List[Transform]]:
     (``SPEC-Q3ENTITIES §3.1.1``) and a scenegraph edited every time one is
     collected is one rebuilt through every firefight.
     """
-    bodies: List[Transform] = []
-    looks: Dict[str, Any] = {}
+    bodies: list[Transform] = []
+    looks: dict[str, Any] = {}
     for item in (pickups.items if pickups is not None else []):
         key = str(item.kind.key)
         if key not in looks:
@@ -713,7 +714,7 @@ class ItemRooms:
         return drawn
 
 
-def move_items(pickups: Any, bodies: List[Transform], now: float,
+def move_items(pickups: Any, bodies: list[Transform], now: float,
                near: Any = None, rooms: Any = None) -> None:
     """Turn each pickup on the spot, and park the ones that have been taken.
 
@@ -788,7 +789,7 @@ class CombatantRooms:
 
     def __init__(self, visibility: Any, match: Any) -> None:
         self._visibility = visibility
-        self._rooms: Dict[str, int] = {}
+        self._rooms: dict[str, int] = {}
         if not visibility:
             return
         for id in match.ids():
@@ -828,7 +829,7 @@ def _unseen_combatants(match: Any, rooms: Any) -> frozenset:
                      if id != PLAYER_ID and not rooms.may_see(PLAYER_ID, id))
 
 
-def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
+def move_bodies(match: arenamod.Arena, bodies: dict[str, Transform],
                 cast: Optional[Any] = None, walking: Optional[Any] = None,
                 dt: float = 0.0, mode: Any = None,
                 rooms: Any = None) -> None:
@@ -918,7 +919,7 @@ def move_bodies(match: arenamod.Arena, bodies: Dict[str, Transform],
         cast.pose(dt, mode=mode, distances=gaps)
 
 
-def _wanted_facing(one: Any, walker: Any) -> Optional[Tuple[float, ...]]:
+def _wanted_facing(one: Any, walker: Any) -> Optional[tuple[float, ...]]:
     """Which way a body wants to be facing, or None for no opinion.
 
     **Where somebody is looking beats where they are going.** A combatant with
@@ -941,14 +942,14 @@ def _wanted_facing(one: Any, walker: Any) -> Optional[Tuple[float, ...]]:
     return None
 
 
-def messages(events: Sequence[Any], match: arenamod.Arena) -> List[str]:
+def messages(events: Sequence[Any], match: arenamod.Arena) -> list[str]:
     """What a player should be *told* about what just happened.
 
     Deaths and the end of the match; not every hit, because a line per bullet
     is a wall of text over the middle of a fight.  Hits are shown by the
     reticule's hit mark, which is what that is for.
     """
-    lines: List[str] = []
+    lines: list[str] = []
     for event in events:
         if isinstance(event, arenamod.Death):
             lines.append(_death_line(event, match))
@@ -985,7 +986,7 @@ def _death_line(event: arenamod.Death, match: arenamod.Arena) -> str:
     return '%s fragged %s' % (killer.name, who)
 
 
-def scoreboard_lines(match: arenamod.Arena) -> List[str]:
+def scoreboard_lines(match: arenamod.Arena) -> list[str]:
     """The scoreboard, as lines a HUD can show."""
     lines = ['%-16s %5s %6s' % ('', 'FRAGS', 'DEATHS')]
     for row in match.scoreboard():

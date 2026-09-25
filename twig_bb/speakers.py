@@ -30,7 +30,8 @@ load; see :mod:`twig_bb.sounds`.
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
+from collections.abc import Iterable
 
 import numpy as np
 

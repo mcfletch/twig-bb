@@ -16,7 +16,8 @@ should be in no doubt which of the three they are in.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Sequence
 
 from OpenGLContext.scenegraph.fog import Fog
 from OpenGLContext.scenegraph.water import medium as water_medium
@@ -30,7 +31,7 @@ __all__ = ['LIQUIDS', 'apply', 'liquid_fog', 'muffle_for', 'update']
 #: this game's names for the same three substances -- which are the same names,
 #: because the engine took its spelling from the shader parameter this game
 #: reads them out of.
-LIQUIDS: Dict[str, water_medium.Medium] = {
+LIQUIDS: dict[str, water_medium.Medium] = {
     liquids.WATER: water_medium.MEDIA[water_medium.WATER],
     liquids.SLIME: water_medium.MEDIA[water_medium.SLIME],
     liquids.LAVA: water_medium.MEDIA[water_medium.LAVA],

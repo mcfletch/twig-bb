@@ -21,7 +21,8 @@ import copy
 import logging
 import random
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 from omi_physics import character
@@ -51,8 +52,8 @@ class Tick:
     is how the arena addresses everybody.
     """
 
-    events: List[Any] = field(default_factory=list)
-    respawned: Dict[str, np.ndarray] = field(default_factory=dict)
+    events: list[Any] = field(default_factory=list)
+    respawned: dict[str, np.ndarray] = field(default_factory=dict)
 
 
 class Rules:
@@ -62,7 +63,7 @@ class Rules:
     and reads the physics world; it holds no scenegraph, no HUD and no clock.
     """
 
-    def __init__(self, arena: Any, minds: Dict[str, Any], flight: Any,
+    def __init__(self, arena: Any, minds: dict[str, Any], flight: Any,
                  spawns: Sequence[Any] = (), harm: Any = None,
                  floor: Any = None, capabilities: Any = None,
                  gravity: float = 9.81, seed: Optional[int] = None) -> None:
@@ -106,7 +107,7 @@ class Rules:
         #: the trigger is what ends it.  A bot asks for itself; see
         #: :meth:`respawn_due`.
         self.on_request = {game.PLAYER_ID}
-        self._asked: Set[str] = set()
+        self._asked: set[str] = set()
         #: What decides between several equally good spawn points.  Its own
         #: stream rather than the module's, so a match seeded the same way
         #: plays out the same way -- which is what a replay and, later, a
@@ -160,7 +161,7 @@ class Rules:
         back = self.respawn_due()
         return Tick(events=self.arena.drain(), respawned=back)
 
-    def respawn_due(self) -> Dict[str, np.ndarray]:
+    def respawn_due(self) -> dict[str, np.ndarray]:
         """Bring back everybody whose wait is over; returns where, by id.
 
         The **feet**, which is where a body stands and what a shot meets;
@@ -173,7 +174,7 @@ class Rules:
         respawn arrives standing rather than still carrying the fall that
         killed it.
         """
-        found: Dict[str, np.ndarray] = {}
+        found: dict[str, np.ndarray] = {}
         for id in self.arena.due_to_respawn():
             if id in self.on_request and id not in self._asked:
                 continue
@@ -249,9 +250,9 @@ class Rules:
                         - np.array([0.0, combat.EYE_HEIGHT, 0.0]))
         return True
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         """What is being played, as rows for the developer overlay."""
-        found: Dict[str, Any] = {'spawn points': len(self.spawns),
+        found: dict[str, Any] = {'spawn points': len(self.spawns),
                                  'minds': len(self.minds)}
         for part in (self.walking, self.pickups):
             if part is not None:

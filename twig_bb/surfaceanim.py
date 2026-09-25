@@ -32,7 +32,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any, List, Optional, Sequence, Tuple, Union
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -56,7 +57,7 @@ MIN_STRETCH = 1e-3
 #: churn that travels across a surface rather than sliding along one axis.
 TURB_SPATIAL_SCALE = 1.0 / 128.0
 
-Number = Union[float, np.ndarray]
+Number = float | np.ndarray
 
 
 def _fraction(value: Number) -> Number:
@@ -410,7 +411,7 @@ class DeformWave(Deform):
 class DeformMove(Deform):
     """Displace the whole surface along one axis by a wave."""
 
-    axis: Tuple[float, float, float] = (0.0, 0.0, 1.0)
+    axis: tuple[float, float, float] = (0.0, 0.0, 1.0)
     wave: Wave = field(default_factory=Wave)
 
     def displace(self, points: Any, normals: Any, time: float) -> np.ndarray:
@@ -490,7 +491,7 @@ class ColorGen:
     """
 
     wave_source: Optional[Wave] = None
-    fixed: Optional[Tuple[float, float, float]] = None
+    fixed: Optional[tuple[float, float, float]] = None
 
     @classmethod
     def wave(cls, wave: Wave) -> 'ColorGen':
@@ -512,7 +513,7 @@ class ColorGen:
         """Whether the colour changes with time."""
         return self.wave_source is not None and self.wave_source.moving
 
-    def at(self, time: float) -> Tuple[float, float, float]:
+    def at(self, time: float) -> tuple[float, float, float]:
         """The colour at ``time``, each channel clamped into ``[0, 1]``."""
         if self.fixed is not None:
             return self.fixed
@@ -522,7 +523,7 @@ class ColorGen:
         return (level, level, level)
 
 
-def _bracketed(tokens: Sequence[str]) -> List[str]:
+def _bracketed(tokens: Sequence[str]) -> list[str]:
     """``tokens`` with any parentheses dropped, as `rgbGen const ( r g b )`."""
     return [token for token in tokens if token not in ('(', ')')]
 
@@ -600,7 +601,7 @@ class AnimMap:
     """A stage's texture cycling through frames at a fixed rate."""
 
     frequency: float = 0.0
-    frames: Tuple[str, ...] = ()
+    frames: tuple[str, ...] = ()
 
     @property
     def animated(self) -> bool:
@@ -640,8 +641,8 @@ class SurfaceAnimation:
     not.
     """
 
-    tcmods: Tuple[TCMod, ...] = ()
-    deforms: Tuple[Deform, ...] = ()
+    tcmods: tuple[TCMod, ...] = ()
+    deforms: tuple[Deform, ...] = ()
     rgbgen: Optional[ColorGen] = None
     alphagen: Optional[AlphaGen] = None
     animmap: Optional[AnimMap] = None
@@ -714,7 +715,7 @@ class SurfaceAnimation:
             bent = deform.perturb(points, bent, time)
         return bent
 
-    def color_at(self, time: float) -> Tuple[float, float, float]:
+    def color_at(self, time: float) -> tuple[float, float, float]:
         """The material's generated colour at ``time``; white if none is."""
         if self.rgbgen is None:
             return (1.0, 1.0, 1.0)

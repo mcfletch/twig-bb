@@ -15,7 +15,8 @@ the acknowledgements screen from these entries.
 from __future__ import annotations
 
 import os
-from typing import List, Optional, Sequence
+from typing import Optional
+from collections.abc import Sequence
 
 from OpenGLContext.contentpacks import catalog as engine
 from OpenGLContext.contentpacks.catalog import BadCatalog
@@ -33,7 +34,7 @@ CATALOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 NAMESPACE = 'twig-bb'
 
 
-def load(path: Optional[str] = None) -> List[AssetPack]:
+def load(path: Optional[str] = None) -> list[AssetPack]:
     """Every pack the registry declares, in file order.
 
     One file, validated on its own. What a pack needs is checked against the

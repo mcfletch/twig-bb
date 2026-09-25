@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
 import numpy as np
 
@@ -121,7 +121,7 @@ def fixed_string(raw: np.ndarray) -> str:
     return bytes(raw).split(b'\x00', 1)[0].decode('latin-1')
 
 
-def sniff_version(path: str) -> Optional[Tuple[bytes, int]]:
+def sniff_version(path: str) -> Optional[tuple[bytes, int]]:
     """``(identifier, version)`` of a map file, or None if it is not one.
 
     Used by the dispatching loader to pick a family reader without reading the

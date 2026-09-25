@@ -9,7 +9,8 @@ are self-consistent.
 from __future__ import annotations
 
 import struct
-from typing import Dict, Optional, Sequence, Tuple
+from typing import Optional
+from collections.abc import Sequence
 
 # SPEC-BSP46 §1.1/§1.5.
 MAGIC = b'IBSP'
@@ -24,7 +25,7 @@ V46_INDEX = {
 }
 
 
-def build(version: int, lumps: Dict[str, bytes]) -> bytes:
+def build(version: int, lumps: dict[str, bytes]) -> bytes:
     """Assemble a whole file from ``{lump name: payload}``.
 
     ``version`` is written into the header verbatim, so a test can hand the
@@ -46,7 +47,7 @@ def build(version: int, lumps: Dict[str, bytes]) -> bytes:
     return head + payload
 
 
-def entity_text(entities: Sequence[Dict[str, str]]) -> bytes:
+def entity_text(entities: Sequence[dict[str, str]]) -> bytes:
     """The entity lump for a list of key dicts (SPEC-BSP46 §5.2)."""
     blocks = []
     for entity in entities:
@@ -125,7 +126,7 @@ def v46_lightmap(value: int = 128) -> bytes:
 
 def v46_quad(size: float = 64.0, texture: str = 'textures/base/wall',
              lm_index: int = -1,
-             lightmaps: Optional[bytes] = None) -> Dict[str, bytes]:
+             lightmaps: Optional[bytes] = None) -> dict[str, bytes]:
     """A one-face map: an axis-aligned square drawn from four meshverts."""
     corners = [(0, 0, 0), (size, 0, 0), (size, size, 0), (0, size, 0)]
     uvs = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
@@ -156,7 +157,7 @@ def v46_brushside(plane: int, texture: int = 0) -> bytes:
 
 
 def v46_box_brush(mins, maxs, texture: int = 0,
-                  first_plane: int = 0) -> Tuple[bytes, bytes, bytes]:
+                  first_plane: int = 0) -> tuple[bytes, bytes, bytes]:
     """A box brush as ``(brush, brushsides, planes)``.
 
     Six axis-aligned planes, each facing *out* of the box, which is how a
@@ -180,7 +181,7 @@ def _axis_normal(axis: int, sign: int):
 
 
 def v46_water(size: float = 64.0, depth: float = 32.0,
-              brush_maxs=None) -> Dict[str, bytes]:
+              brush_maxs=None) -> dict[str, bytes]:
     """A map whose one leaf holds a brush textured with a liquid shader.
 
     Version 46 keeps no contents word on a leaf (SPEC-BSP46 §4.4.1), so the

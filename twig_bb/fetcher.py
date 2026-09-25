@@ -11,7 +11,8 @@ game's store.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Callable, Sequence
 
 from OpenGLContext.contentpacks.fetch import Cancelled
 from OpenGLContext.contentpacks.fetch import FetchJob as _FetchJob

@@ -22,7 +22,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Dict, Optional, Sequence
+from typing import Optional
+from collections.abc import Sequence
 
 from .contentsearch import ContentSearch
 
@@ -54,7 +55,7 @@ class SoundLibrary:
     def __init__(self, roots: Sequence[str]) -> None:
         self.roots = [os.path.abspath(root) for root in roots]
         self._files = ContentSearch(self.roots)
-        self._resolved: Dict[str, Optional[str]] = {}
+        self._resolved: dict[str, Optional[str]] = {}
 
     def resolve(self, noise: str) -> Optional[str]:
         """The file a ``noise`` key names, or None.

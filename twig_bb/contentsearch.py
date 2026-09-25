@@ -25,7 +25,8 @@ most once and the answer — including "there is no such directory" — is kept.
 from __future__ import annotations
 
 import os
-from typing import Dict, Optional, Sequence, Tuple
+from typing import Optional
+from collections.abc import Sequence
 
 
 class ContentSearch:
@@ -33,7 +34,7 @@ class ContentSearch:
 
     def __init__(self, roots: Sequence[str]) -> None:
         self.roots = [os.path.abspath(root) for root in roots]
-        self._listings: Dict[Tuple[str, str], Optional[Dict[str, str]]] = {}
+        self._listings: dict[tuple[str, str], Optional[dict[str, str]]] = {}
 
     def find(self, relative: str,
              extensions: Sequence[str]) -> Optional[str]:
@@ -85,7 +86,7 @@ class ContentSearch:
                 return match
         return None
 
-    def _listing(self, root: str, directory: str) -> Optional[Dict[str, str]]:
+    def _listing(self, root: str, directory: str) -> Optional[dict[str, str]]:
         """``{lower-case filename: full path}`` for one directory, listed once.
 
         The directory itself may also be differently cased, so each segment of
@@ -99,7 +100,7 @@ class ContentSearch:
             path = _child_directory(path, segment)
             if path is None:
                 break
-        listing: Optional[Dict[str, str]] = None
+        listing: Optional[dict[str, str]] = None
         if path is not None and os.path.isdir(path):
             try:
                 listing = {name.lower(): os.path.join(path, name)

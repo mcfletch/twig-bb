@@ -15,7 +15,6 @@ so no flag table is defined here.
 
 from __future__ import annotations
 
-from typing import List
 
 import numpy as np
 
@@ -150,7 +149,7 @@ class Q3BSP:
         # SPEC-BSP46 §4.15: the visibility lump is carried but not decoded.
         self.visdata = bspfile.lump_bytes(data, self.directory, LUMP_VISDATA,
                                           'visdata')
-        self.entities: List[Entity] = parse_entities(
+        self.entities: list[Entity] = parse_entities(
             bytes(bspfile.lump_bytes(data, self.directory, LUMP_ENTITIES,
                                      'entities')))
 

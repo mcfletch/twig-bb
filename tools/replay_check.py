@@ -33,7 +33,8 @@ import re
 import subprocess
 import sys
 import tempfile
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Sequence
 
 #: A hidden window that renders and reads back exactly as a mapped one does.
 #: A window nothing is showing is never handed a frame callback by a Wayland
@@ -77,7 +78,7 @@ SCRIPT: Sequence[Any] = (
 
 # -- the child that plays ----------------------------------------------------
 
-def play(argv: List[str], scripted: bool = True) -> None:
+def play(argv: list[str], scripted: bool = True) -> None:
     """Run the game, with the script above driving it when it is the recording.
 
     The **replayed** run takes no script at all: its input is the journal, and
@@ -149,7 +150,7 @@ def play(argv: List[str], scripted: bool = True) -> None:
 
 # -- the two runs ------------------------------------------------------------
 
-def run(stage: str, game: List[str], environment: Dict[str, str],
+def run(stage: str, game: list[str], environment: dict[str, str],
         verbose: bool = False) -> str:
     """Run one stage as a child process and answer everything it said.
 
@@ -163,7 +164,7 @@ def run(stage: str, game: List[str], environment: Dict[str, str],
         [sys.executable, os.path.abspath(__file__), '--stage', stage] + game,
         env=settings, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True)
-    said: List[str] = []
+    said: list[str] = []
     assert child.stdout is not None
     for line in child.stdout:
         said.append(line)
@@ -188,7 +189,7 @@ def verdict_of(output: str) -> Optional[str]:
     return found.group(1).strip() if found is not None else None
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog='replay_check.py',
         description=__doc__.split('    tools/')[0].strip(),

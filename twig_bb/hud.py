@@ -26,7 +26,8 @@ the difference between them.
 from __future__ import annotations
 
 import math
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Optional
+from collections.abc import Sequence
 
 from vrml import field
 
@@ -121,7 +122,7 @@ class WeaponBar(HUDWidget):
         super(WeaponBar, self).__init__(**named)
         #: What is on the bar right now.  Not a field: it is this frame's
         #: reading of the player's state.
-        self.slots: List[WeaponSlot] = []
+        self.slots: list[WeaponSlot] = []
         #: Whether there is room for the weapons' names as well as their keys.
         #: Decided by :meth:`arrange` against the window it is being laid out
         #: in; True until something has measured it, so a bar nobody has
@@ -156,7 +157,7 @@ class WeaponBar(HUDWidget):
         return slot.label
 
     def content_size(self, metrics: FontMetrics,
-                     available: Optional[int] = None) -> Tuple[int, int]:
+                     available: Optional[int] = None) -> tuple[int, int]:
         """How much room the bar wants, dropping the titles if it must.
 
         Decided while it is being measured, because it is a question about the
@@ -178,7 +179,7 @@ class WeaponBar(HUDWidget):
             for slot in self.slots)
         return width + spacing * (len(self.slots) - 1)
 
-    def slotRects(self, metrics: FontMetrics) -> List[Tuple[WeaponSlot, Rect]]:
+    def slotRects(self, metrics: FontMetrics) -> list[tuple[WeaponSlot, Rect]]:
         """Each slot and where it is drawn, left to right."""
         spacing = metrics.pixels(self.spacing)
         cursor = self.rect.x

@@ -33,7 +33,8 @@ map's scrolling textures move together rather than drift apart.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, List, Optional, Sequence, Tuple
+from typing import Any, Optional
+from collections.abc import Callable, Sequence
 
 import numpy as np
 
@@ -69,7 +70,7 @@ class SurfaceDeformer:
         self.time = 0.0
 
     def __call__(self, positions: Any, normals: Any,
-                 texcoords: Any) -> Tuple[Any, Any, Any]:
+                 texcoords: Any) -> tuple[Any, Any, Any]:
         """The rest pose moved for :attr:`time`.
 
         Positions arrive in scene metres and the script's numbers are in map
@@ -175,7 +176,7 @@ class SurfaceAnimator:
     """
 
     def __init__(self, surfaces: Sequence[Any] = ()) -> None:
-        self._surfaces: List[_AnimatedSurface] = list(surfaces)
+        self._surfaces: list[_AnimatedSurface] = list(surfaces)
         #: The time everything is currently at, so asking twice costs nothing.
         self._time: Optional[float] = None
 

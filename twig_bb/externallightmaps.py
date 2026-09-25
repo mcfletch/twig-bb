@@ -21,7 +21,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Dict, List, Optional, Sequence
+from typing import Optional
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -53,7 +54,7 @@ def wanted(bsp: object) -> bool:
     return bool((np.asarray(faces['lm_index']) >= 0).any())
 
 
-def indices(bsp: object) -> List[int]:
+def indices(bsp: object) -> list[int]:
     """The page indices this map's faces actually name, ascending.
 
     ``SPEC-EXTLM §3.3``: any negative index means the face has no page, so only
@@ -80,7 +81,7 @@ class ExternalLightmaps:
         self.directory = directory
         self.count = count
         self.extensions = tuple(extensions)
-        self._pages: Dict[int, Optional[np.ndarray]] = {}
+        self._pages: dict[int, Optional[np.ndarray]] = {}
         self._search = ContentSearch([directory])
 
     def __len__(self) -> int:

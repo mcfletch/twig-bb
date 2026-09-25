@@ -23,7 +23,8 @@ import math
 import random
 import weakref
 from dataclasses import dataclass
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Optional
+from collections.abc import Sequence
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -110,7 +111,7 @@ class Hit:
 def fire(world: Any, arena: Any, shooter: str, weapon: Any,
          origin: Sequence[float], direction: Sequence[float],
          spread: float = 0.0, seed: Optional[int] = None,
-         surfaces: Optional[Any] = None) -> List[Hit]:
+         surfaces: Optional[Any] = None) -> list[Hit]:
     """Fire one shot; returns every impact it made and applies the damage.
 
     ``spread`` is the half-angle of the cone in **degrees**, which is what the
@@ -146,7 +147,7 @@ def fire(world: Any, arena: Any, shooter: str, weapon: Any,
     bodies = stage(world, arena, without=shooter)
     scatter = (random.Random(seed) if seed is not None
                else entropy.randomizer(SCATTER_STREAM))
-    landed: List[Hit] = []
+    landed: list[Hit] = []
     for _pellet in range(max(1, int(weapon.pellets))):
         trace = _scattered(heading, spread, scatter) if spread > 0.0 else heading
         found = raycast.raycast(world, start, trace, max_distance=TRACE_RANGE)
@@ -255,7 +256,7 @@ def visible_targets(world: Any, arena: Any, looker: str,
                     facing: Optional[ArrayLike] = None,
                     cone: Optional[float] = None,
                     seen: Optional[dict] = None,
-                    rooms: Any = None) -> List[str]:
+                    rooms: Any = None) -> list[str]:
     """Everyone alive that ``looker`` can see, nearest first.
 
     The question a bot's perception asks each time it thinks.  It goes through
@@ -347,7 +348,7 @@ class _Capsules:
         middle = max(BODY_HEIGHT - 2 * BODY_RADIUS, 1e-3)
         self.shape = world.add_shape(model.Shape.capsule(height=middle,
                                                          radius=BODY_RADIUS))
-        self.bodies: List[int] = []
+        self.bodies: list[int] = []
         #: How many of them are staged right now.
         self.taken = 0
 
@@ -430,7 +431,7 @@ def _scattered(heading: np.ndarray, spread: float,
             + up * (sine * math.sin(about)))
 
 
-def _frame(heading: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def _frame(heading: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Two unit vectors across ``heading``, however it is pointed."""
     # Whichever world axis the heading is least aligned with, so the cross
     # product never collapses -- straight up is the case that would.

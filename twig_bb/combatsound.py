@@ -44,7 +44,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Callable, Dict, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Callable, Sequence
 
 from vrml import field, node
 
@@ -375,7 +376,7 @@ class SoundBank:
         self.table = table if table is not None else default_table()
         self.assets = assets
         #: What each key resolved to, by key.  None is a remembered miss.
-        self.resolved: Dict[str, Any] = {}
+        self.resolved: dict[str, Any] = {}
 
     def clip(self, engine: Any, key: str) -> Any:
         """The clip for a key, or None if there is nothing to play."""
