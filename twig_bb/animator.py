@@ -215,19 +215,21 @@ class SurfaceAnimator:
         recomputing an unchanged wave -- which for a liquid means a whole vertex
         pass and a buffer re-upload -- is pure waste.
 
-        A material that raises is dropped for the frame rather than taking the
-        rest of the map with it: one bad surface should cost its own animation,
-        not freeze a level.
+        A material that raises is logged with its traceback and retired: it
+        stays where it last was and is not asked again, and the rest of the
+        map keeps moving.
         """
         if time == self._time:
             return 0
         self._time = time
         moved = 0
-        for surface in self._surfaces:
+        for surface in list(self._surfaces):
             try:
                 surface.update(time)
-            except Exception as error:
-                log.warning('surface animation failed, leaving it still: %s', error)
+            except Exception:   # one surface's error must not stop the frame
+                log.warning('surface animation failed, leaving it still',
+                            exc_info=True)
+                self._surfaces.remove(surface)
                 continue
             moved += 1
         return moved

@@ -247,12 +247,9 @@ def _own_roots(content: Sequence[str], root: str,
 
 def _embedded_message(loaded: Any) -> str:
     """``worldspawn``'s ``message``, or empty when the map carries none."""
-    try:
-        for entity in loaded.entities:
-            if entity.classname == 'worldspawn':
-                return str(entity.get('message', '') or '')
-    except Exception:                                   # pragma: no cover
-        return ''
+    for entity in loaded.entities:
+        if entity.classname == 'worldspawn':
+            return str(entity.get('message', '') or '')
     return ''
 
 
@@ -267,13 +264,7 @@ def _pack_roots(packs: Optional[Sequence[Any]],
         from . import download
         packs = download.ASSET_PACKS if packs is None else packs
         directory_of = directory_of or download.pack_directory
-    found: list[tuple[Any, str]] = []
-    for pack in packs:
-        try:
-            found.append((pack, os.path.abspath(directory_of(pack))))
-        except Exception:                               # pragma: no cover
-            continue
-    return found
+    return [(pack, os.path.abspath(directory_of(pack))) for pack in packs]
 
 
 def _pack_for(path: str,

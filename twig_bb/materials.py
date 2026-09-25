@@ -295,6 +295,12 @@ def open_image(path: Optional[str]) -> Any:
         image = Image.open(path)
         image.load()
         return image
-    except Exception as error:                  # noqa: BLE001 - never fail a load
+    except OSError as error:
+        # Absent, unreadable, or not an image Pillow recognises.
         log.warning('cannot read texture %s: %s', path, error)
+        return None
+    except Exception:
+        # Pillow's decoders raise ValueError, SyntaxError and others for a
+        # damaged file, and one texture must not fail a load.
+        log.warning('cannot decode texture %s', path, exc_info=True)
         return None

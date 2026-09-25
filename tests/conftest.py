@@ -17,12 +17,14 @@ QUAKE3_MAP = os.path.join(WORKSPACE, 'tmp', 'q3', 'ztn', 'maps', 'ztn3dm1.bsp')
 
 # Two test modules define an OpenGLContext window class at import time, which
 # needs a real GL backend: with none present (a headless box, plain `tox`) the
-# class body raises a metaclass conflict before any test is collected, and the
-# whole run errors out.  Skip *collecting* those files when the viewer will not
-# import, so the suite is green headless and still runs them where GL is up.
+# engine raises RuntimeError naming the backend it could not find before any
+# test is collected, and the whole run errors out.  Skip *collecting* those
+# files when the viewer will not import, so the suite is green headless and
+# still runs them where GL is up.  Any other error from the import is a defect
+# in the viewer, and is left to fail the run.
 try:
     from twig_bb import viewer as _viewer  # noqa: F401
-except Exception:
+except (ImportError, RuntimeError):
     collect_ignore = ['test_viewer.py', 'test_viewer_match.py',
                       'test_hudsample.py']
 
@@ -63,7 +65,7 @@ def _map_from_pack() -> Optional[str]:
     """
     try:
         from twig_bb import download
-    except Exception:                       # pragma: no cover - twig_bb absent
+    except ImportError:                     # pragma: no cover - twig_bb absent
         return None
     key, name = PACK_MAP
     pack = download.pack_for_key(key)

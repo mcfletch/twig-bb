@@ -108,6 +108,15 @@ class TestWhichPackItCameFrom:
         assert notice.pack == 'OpenArena maps'
         assert notice.licence == 'OpenArena project, CC BY-SA 3.0'
 
+    def test_a_locator_that_raises_is_not_hidden(self, tmp_path):
+        """Where a pack unpacks is a path computation; its failure is a defect."""
+        def broken(pack):
+            raise ValueError('a bug in the locator')
+
+        with pytest.raises(ValueError):
+            mapnotice.for_map(_Map(), packs=[self._pack(str(tmp_path))],
+                              directory_of=broken)
+
     def test_a_map_of_your_own_claims_no_packs_terms(self, tmp_path):
         """Someone playing their own map is told nothing about OpenArena."""
         root = tmp_path / 'openarena-maps'

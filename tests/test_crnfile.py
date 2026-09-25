@@ -8,6 +8,7 @@ sample file, and skips without them.
 
 from __future__ import annotations
 
+import logging
 import os
 import struct
 
@@ -70,6 +71,28 @@ def test_a_file_that_is_not_crunch_loads_as_none(tmp_path):
     path = tmp_path / 'bad.crn'
     path.write_bytes(b'not a crunch file at all')
     assert crnfile.load(str(path)) is None
+
+
+def test_a_decoder_failure_is_logged_with_its_traceback(monkeypatch, caplog):
+    """The decoder is a compiled extension; what it raises is reported whole."""
+    class Broken:
+        @staticmethod
+        def unpack_unity_crunch(data):
+            raise RuntimeError('inside the decoder')
+
+    monkeypatch.setattr(crnfile, '_decoder', lambda: Broken)
+    with caplog.at_level(logging.WARNING, logger=crnfile.__name__):
+        assert crnfile.loads(_header(64, 64) + b'\x00' * 64, 'x.crn') is None
+    assert caplog.records[-1].exc_info is not None
+
+
+def test_a_malformed_file_is_reported_without_a_traceback(monkeypatch, caplog):
+    """Bad content is a fact about the file, not a fault in this code."""
+    monkeypatch.setattr(crnfile, '_decoder', lambda: object())
+    with caplog.at_level(logging.WARNING, logger=crnfile.__name__):
+        assert crnfile.loads(b'not a crunch file at all', 'x.crn') is None
+    assert 'x.crn' in caplog.text
+    assert caplog.records[-1].exc_info is None
 
 
 def test_the_block_size_comes_from_the_payload_not_the_format_code():

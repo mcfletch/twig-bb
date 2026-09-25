@@ -256,6 +256,17 @@ def test_a_failed_download_does_not_stop_the_map_loading(monkeypatch):
     assert viewer.available_textures(_Loaded(['a']), _texture_options('always')) == []
 
 
+def test_a_defect_in_fetching_is_not_taken_for_a_failed_download(monkeypatch):
+    """Only a download that did not arrive (an OSError) is skipped over."""
+    def broken(pack, cache_dir=None):
+        raise TypeError('a bug, not a network')
+
+    monkeypatch.setattr(viewer.download, 'pack_root', lambda pack, cache_dir=None: None)
+    monkeypatch.setattr(viewer.download, 'fetch_pack', broken)
+    with pytest.raises(TypeError):
+        viewer.available_textures(_Loaded(['a']), _texture_options('always'))
+
+
 def test_the_download_choice_is_a_command_line_option():
     assert viewer.build_parser().parse_args(['m.bsp']).core_textures == 'ask'
     for choice in ('ask', 'always', 'never'):

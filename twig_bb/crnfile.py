@@ -112,8 +112,13 @@ def loads(data: bytes, path: str = '<bytes>') -> Optional[Any]:
         from PIL import Image
         return Image.frombytes('RGBA', (width, height),
                                decode(pixels, width, height), 'raw', 'BGRA')
-    except Exception as error:              # noqa: BLE001 - never fail a load
+    except MalformedCRN as error:
         log.warning('cannot decode Crunch texture %s: %s', path, error)
+        return None
+    except Exception:
+        # texture2ddecoder is compiled and documents no exceptions, and one
+        # texture must not fail a load.
+        log.warning('cannot decode Crunch texture %s', path, exc_info=True)
         return None
 
 

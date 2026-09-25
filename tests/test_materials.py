@@ -5,9 +5,12 @@ Facts under test are SPEC-BSP46 §6.1/§7.3 and SPEC-Q3SHADER §1.6.
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pytest
 
+from twig_bb import materials
 from twig_bb.materials import MaterialLibrary
 from twig_bb.surfaces import SurfaceStyle
 
@@ -279,3 +282,27 @@ class TestTextureForName:
         Image.new('RGB', (4, 4), (0, 255, 0)).save(directory / 'frame.png')
         library = MaterialLibrary([str(tmp_path)])
         assert library.texture_for('textures/frame') is library.texture_for('textures/frame')
+
+
+class TestOpenImage:
+    """A texture that cannot be decoded is None, and says why."""
+
+    def test_a_file_that_is_not_an_image_is_none(self, tmp_path, caplog):
+        path = tmp_path / 'bad.png'
+        path.write_bytes(b'not an image')
+        with caplog.at_level(logging.WARNING, logger=materials.__name__):
+            assert materials.open_image(str(path)) is None
+        assert str(path) in caplog.text
+
+    def test_a_decoder_failure_is_logged_with_its_traceback(self, tmp_path,
+                                                            monkeypatch, caplog):
+        """Anything past "not an image" is a decoder's fault, worth a traceback."""
+        from PIL import Image
+
+        def broken(path):
+            raise ValueError('a damaged stream')
+
+        monkeypatch.setattr(Image, 'open', broken)
+        with caplog.at_level(logging.WARNING, logger=materials.__name__):
+            assert materials.open_image(str(tmp_path / 'any.png')) is None
+        assert caplog.records[-1].exc_info is not None

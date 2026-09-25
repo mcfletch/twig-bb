@@ -1040,7 +1040,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         for pack in texture_pack_offer(self.loaded, self.config):
             try:
                 root = download.fetch_pack(pack, self.config.cache_dir)
-            except Exception as error:          # noqa: BLE001 - never fail a frame
+            except OSError as error:
                 log.warning('could not fetch %s: %s', pack.key, error)
                 continue
             self.config.content = (list(self.config.content)
@@ -1988,7 +1988,7 @@ def available_textures(loaded: Any,
         elif options.core_textures == 'always':
             try:
                 roots.append(download.fetch_pack(pack, options.cache_dir))
-            except Exception as error:          # noqa: BLE001 - never fail a load
+            except OSError as error:
                 log.warning('could not fetch %s: %s', pack.key, error)
     return roots
 

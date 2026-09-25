@@ -114,6 +114,11 @@ select = [
     # Annotations use the builtin generics and `X | Y`, and abstract types come
     # from collections.abc.
     "UP006", "UP007", "UP035",
+    # An `except Exception` either logs the traceback or names why it need not,
+    # and nothing is swallowed with a bare pass or continue.
+    "BLE001", "S110", "S112",
+    # Every noqa silences something.
+    "RUF100",
 ]
 ignore = ["E501"]
 

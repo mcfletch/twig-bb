@@ -100,7 +100,7 @@ def load(relative: str, mount: Optional[str] = None) -> Optional[Any]:
             return scene.group
         from OpenGLContext.character.attachment import mounted
         return mounted(scene, mount)
-    except Exception:                       # noqa: BLE001 - art, not rules
+    except Exception:                       # art, not rules
         log.warning('could not load the model %s', path, exc_info=True)
         return None
 

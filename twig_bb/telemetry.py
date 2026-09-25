@@ -343,7 +343,7 @@ def _level(loaded: Any) -> dict[str, Any]:
         if callable(counter):
             try:
                 found[name] = len(counter())
-            except Exception:               # noqa: BLE001 - diagnostic only
+            except Exception:               # diagnostic only
                 log.debug('could not count a level\'s %s', name, exc_info=True)
     world = getattr(loaded, 'world', None)
     triangles = getattr(world, 'triangle_count', None)

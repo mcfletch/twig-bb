@@ -85,14 +85,14 @@ def render():
 
         try:
             context = _Ctx()
-        except Exception as error:      # pragma: no cover - a broken GL stack
+        except Exception as error:  # pragma: no cover  # noqa: BLE001 - a GL stack that cannot open a window skips, naming its error
             pytest.skip('no usable GL context: %r' % (error,))
         context.deferRedraw = True
         try:
             # A hidden window is never presented, so a swap that waits for a
             # vertical blank waits for one that never comes.
             glfw.swap_interval(0)
-        except Exception:               # pragma: no cover - an older glfw
+        except (AttributeError, glfw.GLFWError):  # pragma: no cover - an older glfw
             pass
         made['context'] = context
         return context

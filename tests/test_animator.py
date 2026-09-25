@@ -6,6 +6,8 @@ the clock does to it, and the unit conversion between what a `.shader` script
 writes and what the scenegraph is in.
 """
 
+import logging
+
 import numpy as np
 import pytest
 
@@ -296,6 +298,30 @@ class TestClock:
         driver.add(style(animation=scrolling()), good)
         driver.update(1.0)
         assert good.uv_transform is not None
+
+    def test_a_failing_surface_is_reported_once_and_retired(self, caplog):
+        """The traceback is logged the first time, not sixty times a second."""
+        class Exploding(PBRMaterial):
+            armed = False
+
+            def __setattr__(self, name, value):
+                if name == 'uv_transform' and self.armed:
+                    raise RuntimeError('no')
+                super().__setattr__(name, value)
+
+        bad = Exploding()
+        driver = animator.SurfaceAnimator()
+        driver.add(style(animation=scrolling()), bad)
+        driver.add(style(animation=scrolling()), PBRMaterial())
+        bad.armed = True
+        with caplog.at_level(logging.WARNING, logger=animator.__name__):
+            assert driver.update(1.0) == 1
+            assert driver.update(2.0) == 1
+        failures = [record for record in caplog.records
+                    if record.name == animator.__name__]
+        assert len(failures) == 1
+        assert failures[0].exc_info is not None
+        assert len(driver) == 1
 
 
 def test_a_scene_can_be_collected_from_its_batches():

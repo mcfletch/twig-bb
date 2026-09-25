@@ -615,7 +615,7 @@ def _level_document(name: str) -> Any:
     try:
         from OpenGLContext.loaders.gltf import parse_gltf
         return parse_gltf(path)
-    except Exception:                       # noqa: BLE001 - art, not rules
+    except Exception:                       # art, not rules
         log.warning('could not parse the character level %s', path, exc_info=True)
         return None
 
@@ -631,7 +631,7 @@ def _parse_document(name: str) -> Any:
     try:
         from OpenGLContext.loaders.gltf import parse_gltf
         return parse_gltf(path)
-    except Exception:                       # noqa: BLE001 - art, not rules
+    except Exception:                       # art, not rules
         log.warning('could not parse the character %s', path, exc_info=True)
         return None
 
@@ -659,7 +659,7 @@ def load(name: str, group: Any = None, document: Any = None,
         if level is not None:
             model.add_level(None, LOD_DISTANCE, document=level)
         return Character(model)
-    except Exception:                       # noqa: BLE001 - art, not rules
+    except Exception:                       # art, not rules
         log.warning('could not load the character %s', name, exc_info=True)
         return Character(group=group)
 

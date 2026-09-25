@@ -420,7 +420,8 @@ def fetch_pack(pack: AssetPack, cache_dir: Optional[str] = None) -> str:
     """Fetch and unpack ``pack``; return its content root.
 
     A no-op when it is already unpacked, so a caller may use it as "make sure
-    this is available".
+    this is available". Raises ``OSError`` when the pack does not arrive or
+    will not unpack.
     """
     from OpenGLContext.contentpacks import fetch as engine_fetch
     return engine_fetch.fetch_pack(pack, store(cache_dir))
