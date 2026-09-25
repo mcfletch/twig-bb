@@ -32,8 +32,8 @@ def fetch_pack(pack: AssetPack, progress: Any, cancel: Any,
 class FetchJob(_FetchJob):
     """One user-consented download of one or more packs, into this game's store.
 
-    The engine's job takes the store it writes to; this one works it out, so a
-    caller here passes what it has always passed.
+    The engine's job takes the store it writes to; this one opens the game's
+    store, at ``cache_dir`` if given, so a caller names packs and no store.
     """
 
     def __init__(self, packs: Sequence[AssetPack],

@@ -79,6 +79,7 @@ from OpenGLContext.ui.overlay import OverlayMixin                # noqa: E402
 from OpenGLContext.viewer.asyncscene import AsyncSceneMixin      # noqa: E402
 from OpenGLContext.ui.panel import Panel                         # noqa: E402
 
+from . import art                                               # noqa: E402
 from . import avatar                                            # noqa: E402
 from . import blast, collision, combat, combatsound             # noqa: E402
 from . import controls                                          # noqa: E402
@@ -614,10 +615,9 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
     notice: Optional[mapnotice.MapNotice] = None
     #: The start screen while it is up, so it can be taken down again.
     _menuPanel: Any = None
-    #: A download in progress, or None.  Polled once a frame; see
-    #: :meth:`_pollDownload`.
-    _fetch: Any = None
-    _fetchPanel: Any = None
+    #: The content screen and the download it started, or None.  Polled once
+    #: a frame, open or closed; see :meth:`_pollDownload`.
+    _content: Any = None
     #: The map's :class:`~twig_bb.collision.MapCollision` once walking has
     #: begun, or None.  What a shot asks for the surface it met.
     _collision: Any = None
@@ -688,6 +688,16 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             self._capture = SettleCapture(self.config.capture,
                                           delay=self.config.capture_delay,
                                           min_frames=self.config.frames)
+        if not art.art_is_here(self.config.cache_dir):
+            # Every weapon, pickup and character is drawn from the art pack,
+            # so nothing below is built until it has arrived.
+            self.sg = SceneGraph(children=[])
+            self._showFirstRun()
+            return
+        self._begin()
+
+    def _begin(self) -> None:                   # pragma: no cover - needs a window
+        """Build the match and its screens, then load a map or offer the menu."""
         # Before the scene: the weapon in the player's hands is part of it, so
         # what is held has to be settled before the children are gathered.
         self._buildLoadout()
@@ -928,31 +938,61 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             return
         self._loadLevel(str(setup.level))
 
+    def _showFirstRun(self) -> None:            # pragma: no cover - GL
+        """Ask to fetch the game's art, which a match cannot be played without.
+
+        Closing the screen without it leaves the game.
+        """
+        store = download.store(self.config.cache_dir)
+        self._content = menu.first_run_screen(
+            art.CONTENT.needed_to_start(store),
+            on_fetch=lambda _pack: art.CONTENT.base_job(
+                store, on_progress=lambda: self.triggerRedraw(1)),
+            on_finished=self._firstRunFinished, on_close=self.OnQuit)
+        self.pushOverlay(self._content.panel)
+
+    def _firstRunFinished(self, job: Any) -> None:  # pragma: no cover - GL
+        if job.failed is not None or job.cancelled \
+                or not art.art_is_here(self.config.cache_dir):
+            return
+        screen, self._content = self._content, None
+        if screen is not None:
+            screen.on_close = None
+            screen.panel.close(True)
+        self._begin()
+
     def _contentScreen(self) -> None:           # pragma: no cover - GL
         """Offer the packs that are not yet on disk, with their size and terms."""
         self._closeMenu()
-        wanted = [pack for pack in download.ASSET_PACKS
-                  if download.pack_root(pack, self.config.cache_dir) is None]
-        if not wanted:
+        running = self._content is not None and self._content.running
+        wanted = self._missingPacks()
+        if not wanted and not running:
             self.pushOverlay(dialogs.message(
                 'Everything in the catalogue is already downloaded.',
                 title='Content', on_close=lambda panel: self.showMenu()))
             return
         # The screen decides which of them, so it is the screen that says: one
-        # set and the packs it needs, not the whole catalogue.
-        self.pushOverlay(menu.download_screen(
-            wanted, on_start=self._startDownload,
-            on_cancel=self.showMenu))
+        # set and the packs it needs, not the whole catalogue.  A download a
+        # closed screen started carries on, and this one shows it.
+        screen = menu.download_screen(
+            wanted, on_fetch=self._startDownload,
+            on_finished=self._downloadFinished, on_close=self.showMenu,
+            job=self._content.job if self._content is not None else None)
+        self._content = screen
+        self.pushOverlay(screen.panel)
 
-    def _startDownload(self, packs: Any) -> None:   # pragma: no cover - GL
-        """Fetch the packs on a worker, and watch it from the frame loop."""
-        self._fetch = fetcher.FetchJob(packs, cache_dir=self.config.cache_dir,
-                                       on_progress=lambda: self.triggerRedraw(1))
-        self._fetch.start()
+    def _missingPacks(self) -> Any:
+        """Every pack in the catalogue not yet on disk."""
+        return [pack for pack in download.ASSET_PACKS
+                if download.pack_root(pack, self.config.cache_dir) is None]
+
+    def _startDownload(self, pack: Any) -> Any:  # pragma: no cover - GL
+        """Fetch the chosen set on a worker; the job, for the screen to show."""
+        packs = self._content.whole() if self._content is not None else [pack]
+        job = fetcher.FetchJob(packs, cache_dir=self.config.cache_dir,
+                               on_progress=lambda: self.triggerRedraw(1))
         self.marks.downloading(packs)
-        self._fetchPanel = menu.progress_screen(
-            self._fetch, on_cancel=lambda: None)
-        self.pushOverlay(self._fetchPanel)
+        return job
 
     def _pollDownload(self) -> None:            # pragma: no cover - GL
         """Publish what the download has managed, once a frame.
@@ -960,23 +1000,17 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         The only place the worker is read, which is what lets everything the
         screen touches be touched without a lock.
         """
-        job = getattr(self, '_fetch', None)
-        if job is None:
-            return
-        job.poll()
-        menu.refresh_progress(getattr(self, '_fetchPanel', None), job)
-        if not job.finished:
-            return
-        self._fetch = None
+        if self._content is not None and self._content.poll():
+            self.triggerRedraw(1)
+
+    def _downloadFinished(self, job: Any) -> None:
+        """A download ended: record it, and use what arrived."""
         self.marks.downloaded(job)
         self.config.content = (list(self.config.content)
                                + [root for pack_root in job.roots
                                   for root in download.content_roots(pack_root)])
-        panel = getattr(self, '_fetchPanel', None)
-        if panel is not None:
-            panel.close(True)
-        self._fetchPanel = None
-        self.showMenu()
+        if self._content is not None:
+            self._content.offer(self._missingPacks())
 
     def _creditsScreen(self) -> None:           # pragma: no cover - GL
         """What this is built from and what it is playing."""
@@ -1733,7 +1767,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
             # On the start screen: nothing to animate and nobody to walk, so
             # the loop should go quiet -- a static menu that redrew sixty times
             # a second would spin a laptop's fans for nothing.
-            if getattr(self, '_fetch', None) is not None:
+            if self._content is not None and self._content.running:
                 return 1                        # a bar is moving
             if self._capture is not None:
                 # A capture is settled by *drawn frames*, and with nothing
@@ -2035,6 +2069,9 @@ def main(argv: Optional[List[str]] = None) -> None:
     if options.list_packs:
         list_packs()
         raise SystemExit(0)
+    # Before anything looks for content: packs an earlier layout left on this
+    # machine are moved into the store rather than fetched again.
+    download.adopt_on_start()
     if options.fetch:
         pack = download.pack_for_key(options.fetch)
         if pack is None:

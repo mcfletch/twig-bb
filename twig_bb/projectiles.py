@@ -136,7 +136,8 @@ class Projectile(node.Node):
     #: because it has to be a *decision*.
     selfDamage = field.newField('selfDamage', 'SFFloat', 1, 0.5)
 
-    #: What one looks like in the air, relative to :data:`twig_bb.art.ASSETS`,
+    #: What one looks like in the air, relative to the art directory
+    #: (:func:`twig_bb.art.assets_directory`),
     #: and how big it is drawn.  A rocket and a grenade differ by three numbers
     #: in this table and not in code (see the module docstring); what they are
     #: *shaped* like is a fourth, and belongs here for the same reason.  Empty

@@ -584,6 +584,7 @@ class TestContentAPreviousVersionUnpacked:
     def store(self, tmp_path, monkeypatch):
         monkeypatch.setattr(download, '_default_cache', lambda: str(tmp_path))
         monkeypatch.setattr(download, '_adopted', set())
+        download.adopt_on_start()
         return download.store()
 
     def test_it_is_found_where_the_store_now_looks(self, tmp_path, monkeypatch):
@@ -613,8 +614,7 @@ class TestContentAPreviousVersionUnpacked:
         with open(os.path.join(kept, 'newer.tga'), 'w') as handle:
             handle.write('newer')
         self.legacy(str(tmp_path), pack)
-        download._adopted.clear()
-        download.store()
+        download.adopt_on_start()
         assert os.path.isfile(os.path.join(kept, 'newer.tga'))
         assert not os.path.exists(os.path.join(kept, 'x.tga'))
 
@@ -647,12 +647,21 @@ class TestContentAPreviousVersionUnpacked:
         assert download.adopt_legacy_content(elsewhere) == []
         assert os.path.isfile(os.path.join(was, 'textures', 'x.tga'))
 
-    def test_it_is_done_once_per_store_rather_than_per_call(
-            self, tmp_path, monkeypatch):
-        """Every `pack_root` would otherwise walk the whole catalogue."""
+    def test_it_is_done_once_per_process(self, tmp_path, monkeypatch):
+        """Every command that starts asks for it; one move is enough."""
         pack = download.pack_for_key('quake3-core')
         self.legacy(str(tmp_path), pack)
         monkeypatch.setattr(download, '_default_cache', lambda: str(tmp_path))
         monkeypatch.setattr(download, '_adopted', set())
-        assert len(download.adopt_legacy_content(download.store())) == 0, (
-            'the first store() already adopted it')
+        assert len(download.adopt_on_start()) == 1
+        self.legacy(str(tmp_path), pack, files=('textures/y.tga',))
+        assert download.adopt_on_start() == []
+
+    def test_opening_the_store_moves_nothing(self, tmp_path, monkeypatch):
+        """Adoption is the game starting, not a lookup."""
+        pack = download.pack_for_key('quake3-core')
+        was = self.legacy(str(tmp_path), pack)
+        monkeypatch.setattr(download, '_default_cache', lambda: str(tmp_path))
+        monkeypatch.setattr(download, '_adopted', set())
+        download.pack_root(pack)
+        assert os.path.isdir(was)

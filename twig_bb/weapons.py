@@ -15,7 +15,7 @@ switching that node rather than branching in the drawing code, and a weapon
 whose accuracy falls off while firing shows that by widening its own reticule.
 
 **The model is data too.**  ``model`` names a file under
-:data:`twig_bb.art.ASSETS`, so re-modelling a weapon is an edit to this table
+:func:`twig_bb.art.assets_directory`, so re-modelling a weapon is an edit to this table
 and not a code change.  Every model that ships with us is this project's own and
 BSD; how each is built is in
 [assets/weapons/CREDITS.md](assets/weapons/CREDITS.md).
@@ -30,11 +30,11 @@ from vrml import field, node
 
 from OpenGLContext.ui.hudwidgets import CIRCLE, CROSS, CROSS_DOT, Crosshair
 
-from .art import ASSETS, path_for
+from .art import path_for
 
 __all__ = [
     'Weapon', 'WeaponTable', 'default_table', 'model_path', 'spread_pixels',
-    'reticule_spread', 'ASSETS',
+    'reticule_spread',
 ]
 
 
@@ -141,7 +141,7 @@ class Weapon(node.Node):
     recoilRise = field.newField('recoilRise', 'SFFloat', 1, 3.5)
     recoilRecovery = field.newField('recoilRecovery', 'SFFloat', 1, 0.16)
 
-    #: The first-person model, relative to :data:`ASSETS`, and where it sits.
+    #: The first-person model, relative to the art directory, and where it sits.
     #: The offset is in metres in view space -- right, up and forward -- and
     #: ``modelScale`` converts the source's units to metres (0.01 for art
     #: modelled in centimetres, which most of it is).

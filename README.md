@@ -672,9 +672,14 @@ for the registry format, every field, and how a set of packs from elsewhere is
 offered alongside these.
 
 One entry in it is ours: `twig-bb/art`, the characters, weapons and pickups the
-game is played with, which is a base pack fetched before the first match rather
-than 15 MB inside the wheel. `./release-assets.py` builds it, writes that entry
-from the archive it built, and publishes it:
+game is played with, a base pack. The package carries a copy of that art, which
+the game reads while the pack is not installed. Where neither is present, the
+game asks in its window, before anything else, to fetch the pack, showing its
+size and terms with a bar and a Stop button; closing that screen without it
+leaves the game. Packs unpacked by an earlier version into the flat
+`twig-bb-content` directory are moved into the store when `twig-bb` or
+`twig-bb-fetch` starts, rather than fetched again. `./release-assets.py` builds
+the art pack, writes that entry from the archive it built, and publishes it:
 
 ```bash
 ./release-assets.py                   # build the archive and its registry
@@ -703,7 +708,10 @@ published, with no packaging layer to unwrap.
 not yet on disk, and the screen shows that set's size, its terms and what it is
 for, with a button that fetches that one. A set that another cannot do without
 brings it along and says so first, since a map fetched without its art renders
-in grey. It is one at a time because the screen is a fixed shape and the
+in grey. Once the button is pressed a bar says how far the download has got, a
+Stop button stops it, and the screen ends on `Done.`, `Stopped.` or the reason
+it failed; a download carries on if the screen is closed, and opening it again
+shows it. It is one at a time because the screen is a fixed shape and the
 catalogue is not: laying every set out at once made the panel as tall as the
 catalogue and pushed the buttons off the bottom of the display, where a
 catalogue of any size eventually puts them.

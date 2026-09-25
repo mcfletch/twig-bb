@@ -16,7 +16,7 @@ handling without knowing anything about any of it:
     screen that was closed.
 :func:`download_screen`
     What a pack costs and what its terms are, then a bar that moves and a
-    button that stops it.
+    button that stops it: the engine's content screen.
 
 Everything a test needs to know about these is structural — which buttons a
 screen has, what each one does to the draft, which levels it offers — so all of
@@ -29,6 +29,7 @@ import logging
 from typing import Any, Callable, List, Optional, Sequence
 
 from OpenGLContext.ui import generate
+from OpenGLContext.ui.contentscreen import ContentScreen
 from OpenGLContext.ui.gallery import Carousel
 from OpenGLContext.ui.layout import Column, Row
 from OpenGLContext.ui.panel import Panel
@@ -42,8 +43,8 @@ from .assetpack import AssetPack
 
 log = logging.getLogger(__name__)
 
-__all__ = ['GAME_TITLE', 'download_screen', 'main_menu', 'play_screen',
-           'progress_line']
+__all__ = ['GAME_TITLE', 'download_screen', 'first_run_screen', 'main_menu',
+           'play_screen', 'wanted_from']
 
 #: The working title, in exactly one place.  Nothing stored is keyed to it —
 #: the settings namespace and the content cache belong to ``twig_bb``, the
@@ -200,159 +201,64 @@ def _level_chooser(draft: match.MatchSetup,
 
 
 def download_screen(packs: Sequence[AssetPack],
-                    on_start: Optional[Callable[[Sequence[AssetPack]], None]] = None,
-                    on_cancel: Optional[Callable[[], None]] = None) -> Panel:
-    """What one download costs and on what terms, before any of it happens.
+                    on_fetch: Optional[Callable[[AssetPack], Any]] = None,
+                    on_finished: Optional[Callable[[Any], None]] = None,
+                    on_close: Optional[Callable[[], None]] = None,
+                    job: Any = None) -> ContentScreen:
+    """What one download costs and on what terms, then how far it has got.
 
-    The size and the licence are **on the screen that asks**, not only in
-    ``--list-packs``: a user consenting to hundreds of megabytes of CC BY-SA
-    content should be able to see that is what they are agreeing to at the
-    moment they agree to it.
+    The engine's :class:`~OpenGLContext.ui.contentscreen.ContentScreen`, as
+    this game shows it. The size and the licence are **on the screen that
+    asks**, not only in ``--list-packs``: a user consenting to hundreds of
+    megabytes of CC BY-SA content should be able to see that is what they are
+    agreeing to at the moment they agree to it.
 
-    **One set at a time**, chosen with the arrows.  Laying every set out at
-    once made the screen as tall as the catalogue -- and a catalogue grows,
-    while a screen does not, so the buttons went off the bottom and nothing
-    could be downloaded at all.  A fixed shape also matches how the content is
-    actually taken: a map and its art now, the rest another day.
-
-    ``on_start`` is handed the packs the user settled on, which is the chosen
-    one and whichever of the packs it needs are not on disk yet -- a map fetched
-    without its art renders in grey, so the two travel together and the screen
-    says so before the button is pressed.
+    **One set at a time**, chosen with the arrows, since a screen is a fixed
+    shape and a catalogue is not; the line above it says what the whole
+    catalogue comes to. ``packs`` is what is not on disk. Choosing one fetches
+    it and whichever of ``packs`` it needs (:func:`wanted_from`), since a map
+    fetched without its art renders in grey. ``on_fetch(pack)`` returns the
+    job it started; the screen shows it, with Stop, until the player closes it.
+    ``job`` is one a previous screen started, which carries on when its screen
+    is closed.
     """
     packs = list(packs)
     catalogue = sum(pack.approximate_bytes for pack in packs)
-    chooser = Select(name='pack',
-                     options=[pack.key for pack in packs] or [''],
-                     optionLabels=[_offer_label(pack) for pack in packs] or ['nothing'],
-                     value=packs[0].key if packs else '')
-    summary = Label(text='', wrap=True, top=4, name='detail')
-    notes = Label(text='', wrap=True, name='notes')
-    needs = Label(text='', wrap=True, top=2, name='needs')
-
-    def selected() -> List[AssetPack]:
-        """The chosen pack and the packs it cannot do without."""
-        for pack in packs:
-            if pack.key == chooser.value:
-                return [pack] + [other for other in packs
-                                 if other.key in pack.needs]
-        return packs[:1]
-
-    def describe(_widget: Any = None) -> None:
-        chosen = selected()
-        if not chosen:
-            return
-        pack, needed = chosen[0], chosen[1:]
-        summary.text = '%s — %d MB\n%s' % (pack.title,
-                                           round(pack.approximate_bytes / 1e6),
-                                           pack.copyright)
-        notes.text = pack.notes
-        if needed:
-            needs.text = ('Needs %s as well, which this fetches too.  '
-                          '%d MB together.'
-                          % (_listed(needed),
-                             round(sum(one.approximate_bytes
-                                       for one in chosen) / 1e6)))
-        else:
-            needs.text = ''
-
-    chooser.on_change = describe
-    describe()
-
-    start = Button(text='Download', name='download', role='primary')
-    cancel = Button(text='Not now', name='cancel')
-    body: List[Any] = [
-        Label(text='%d %s to choose from, %d MB in all.  One at a time:'
-                   % (len(packs), 'set' if len(packs) == 1 else 'sets',
-                      round(catalogue / 1e6)),
-              wrap=True, name='question'),
-        chooser, summary, notes, needs,
-        Row(children=[Spacer(), cancel, start], spacing=8, top=8,
-            name='buttons'),
-    ]
-    panel = Panel(title='Content', scrim=True, modal=True,
-                  preferredColumns=MENU_COLUMNS + 12,
-                  children=[Column(children=body, spacing=4)])
-    answered: List[bool] = []
-
-    def answer(yes: bool) -> None:
-        if answered:
-            return
-        answered.append(yes)
-        panel.close(yes)
-        if yes and on_start is not None:
-            on_start(selected())
-        elif not yes and on_cancel is not None:
-            on_cancel()
-
-    start.on_activate = lambda _widget: answer(True)
-    cancel.on_activate = lambda _widget: answer(False)
-    panel.on_close = lambda _closing: answer(False)
-    return panel
+    return ContentScreen(
+        packs, on_fetch=on_fetch, wanted=wanted_from(packs),
+        on_finished=on_finished, on_close=on_close, title='Content',
+        columns=MENU_COLUMNS + 12, job=job,
+        heading='%d %s to choose from, %d MB in all.  One at a time:'
+                % (len(packs), 'set' if len(packs) == 1 else 'sets',
+                   round(catalogue / 1e6)))
 
 
-def _offer_label(pack: AssetPack) -> str:
-    """One line for the chooser: what it is and what it costs."""
-    return '%s — %d MB' % (pack.title, round(pack.approximate_bytes / 1e6))
+def first_run_screen(packs: Sequence[AssetPack],
+                     on_fetch: Optional[Callable[[AssetPack], Any]] = None,
+                     on_finished: Optional[Callable[[Any], None]] = None,
+                     on_close: Optional[Callable[[], None]] = None
+                     ) -> ContentScreen:
+    """The download a game with none of its own art needs before a match.
 
-
-def progress_screen(job: Any,
-                    on_cancel: Optional[Callable[[], None]] = None) -> Panel:
-    """A download in progress: what it is doing, and a way to stop it.
-
-    The label is refreshed by :func:`refresh_progress` from the frame loop,
-    which is also where the job is polled — nothing here reads the worker.
+    The art pack and what it needs, offered as one set with the size and the
+    terms. ``on_fetch(pack)`` returns the job that fetches the set.
     """
-    line = Label(text=progress_line(job), wrap=True, name='progress')
-    stop = Button(text='Stop', name='stop')
-    panel = Panel(title='Downloading', scrim=True, modal=True,
-                  closeOnEscape=False,
-                  preferredColumns=MENU_COLUMNS + 12,
-                  children=[Column(spacing=4, children=[
-                      line,
-                      Row(children=[Spacer(), stop], spacing=8, top=8,
-                          name='buttons'),
-                  ])])
-
-    def stopped(_widget: Any) -> None:
-        job.cancel()
-        if on_cancel is not None:
-            on_cancel()
-    stop.on_activate = stopped
-    return panel
+    return ContentScreen(packs, on_fetch=on_fetch, on_finished=on_finished,
+                         on_close=on_close, together=True,
+                         title='%s needs its art' % (GAME_TITLE,),
+                         columns=MENU_COLUMNS + 12)
 
 
-def refresh_progress(panel: Any, job: Any) -> bool:
-    """Put the job's latest state on its screen; returns whether it changed.
+def wanted_from(packs: Sequence[AssetPack]
+                ) -> Callable[[AssetPack], List[AssetPack]]:
+    """Given the packs on offer, the set choosing one of them fetches.
 
-    The label is found by the name it was built with, which is what a panel's
-    parts are named for -- there is nothing to keep in step, and a screen read
-    back from a file works the same way as one built here.
+    The pack and those of ``packs`` it names in ``needs``. A need not among
+    them is on disk already, so it is not fetched again.
     """
-    label = panel.find('progress') if panel is not None else None
-    if label is None:
-        return False
-    line = progress_line(job)
-    if line == label.text:
-        return False
-    label.text = line
-    return True
+    offered = list(packs)
 
-
-def progress_line(job: Any) -> str:
-    """One line of what a download is doing, for a user to read."""
-    if job.finished:
-        if job.cancelled:
-            return 'Stopped.'
-        if job.failed is not None:
-            return 'Could not finish: %s' % (job.failed,)
-        return 'Done.'
-    return job.state
-
-
-def _listed(packs: Sequence[AssetPack]) -> str:
-    """The pack titles, as a sentence."""
-    titles = [pack.title for pack in packs]
-    if len(titles) <= 1:
-        return titles[0] if titles else 'nothing'
-    return '%s and %s' % (', '.join(titles[:-1]), titles[-1])
+    def wanted(pack: AssetPack) -> List[AssetPack]:
+        return [pack] + [other for other in offered
+                         if other.key in pack.needs]
+    return wanted

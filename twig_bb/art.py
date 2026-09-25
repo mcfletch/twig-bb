@@ -2,7 +2,7 @@
 
 **A table names a file; this finds it and loads it.**  Both the weapons
 (:mod:`twig_bb.weapons`) and the pickups (:mod:`twig_bb.items`) declare
-their model as a path relative to :data:`ASSETS`, so putting §7's commissioned
+their model as a path relative to the art directory (:func:`assets_directory`), so putting §7's commissioned
 art in front of a stand-in is an edit to a table and never a code change.  The
 one thing they both need from code is this: turn that relative name into a
 subtree, and do something sensible when it will not load.
@@ -24,41 +24,56 @@ import logging
 import os
 from typing import Any, Iterator, Optional, Sequence
 
+from OpenGLContext.contentpacks import Application, ContentStore
+
+from . import catalog
+
 log = logging.getLogger(__name__)
 
-__all__ = ['ASSETS', 'IN_WHEEL', 'assets_directory', 'brighten', 'path_for',
+__all__ = ['CONTENT', 'IN_WHEEL', 'art_is_here', 'assets_directory', 'brighten', 'path_for',
            'load', 'recolour', 'shapes']
 
-#: The copy that ships inside the package, and the fallback while one does.
+#: The copy that ships inside the package, read while the art pack is not here.
 IN_WHEEL = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets')
 
 
-def assets_directory(cache_dir: Optional[str] = None) -> str:
-    """Where this game's own art is read from.
+class _Content(Application):
+    """The game's packs, in the store :func:`twig_bb.download.store` opens."""
 
-    The base pack once it has been fetched, and the copy inside the wheel until
-    then. Both, deliberately: 15 MB of characters and weapons is not something
-    an index should carry, so the art leaves the wheel when the release holding
-    it exists -- and until that day an install has to work anyway. When it does
-    leave, this is the only place that has to stop looking there.
+    def store(self, root: Optional[str] = None) -> ContentStore:
+        from . import download
+        return download.store(root or self.root)
+
+
+#: The game's content: its registry, its store, and its art pack.
+CONTENT = _Content('twig-bb', catalog.CATALOG_PATH, base='twig-bb/art',
+                   fallback=IN_WHEEL)
+
+
+def assets_directory(cache_dir: Optional[str] = None) -> str:
+    """Where this game's own art is read from, as of now.
+
+    The art pack once it is installed, else the copy inside the wheel;
+    :class:`~OpenGLContext.contentpacks.application.NotInstalled` if neither.
+    Asked each time, since the game is imported before a first run can have
+    fetched anything.
     """
     from . import download
-    pack = download.pack_for_key('twig-bb/art')
-    if pack is not None:
-        root = download.store(cache_dir).root_for(pack)
-        if root is not None:
-            return str(root)
-    return IN_WHEEL
+    return CONTENT.base_directory(download.store(cache_dir))
 
 
-#: Where the art this game is played with lives, resolved once at import the
-#: way it always was. :func:`assets_directory` is the live answer.
-ASSETS = assets_directory()
+def art_is_here(cache_dir: Optional[str] = None) -> bool:
+    """Whether the game's own art can be read: the pack, or the wheel's copy."""
+    try:
+        assets_directory(cache_dir)
+    except LookupError:
+        return False
+    return True
 
 
 def path_for(relative: str) -> str:
     """Where a table's model name actually is on disk."""
-    return os.path.join(ASSETS, relative)
+    return os.path.join(assets_directory(), relative)
 
 
 def load(relative: str, mount: Optional[str] = None) -> Optional[Any]:
@@ -75,8 +90,9 @@ def load(relative: str, mount: Optional[str] = None) -> Optional[Any]:
     point comes back placed by its own origin, which is what every model does
     without this.
     """
-    path = path_for(relative)
+    path = relative
     try:
+        path = path_for(relative)
         from OpenGLContext.loaders.gltf import load_gltf
         scene = load_gltf(path)
         if mount is None:

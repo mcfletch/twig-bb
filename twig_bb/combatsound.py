@@ -60,7 +60,7 @@ log = logging.getLogger(__name__)
 __all__ = [
     'CombatSound', 'SoundBank', 'SoundTable', 'Voice', 'default_table',
     'DEATH', 'EXPLOSION', 'FIRE', 'FLESH', 'IMPACT', 'PICKUP', 'RUMBLE',
-    'WORLD', 'ASSETS',
+    'WORLD',
 ]
 
 #: The two ways a synthesised voice is made, named by :attr:`Voice.shape`.
@@ -70,14 +70,6 @@ __all__ = [
 #: detonation are made of, and what noise alone can never be.
 IMPACT = 'impact'
 RUMBLE = 'rumble'
-
-#: Where sound content that ships with this package would live.  Shared with
-#: :mod:`twig_bb.weapons`, because a weapon's model and a weapon's sound are
-#: the same kind of thing: art named by the table.
-#: The same root :mod:`twig_bb.art` resolves -- the base pack once it is
-#: fetched, the copy in the wheel until then. A weapon's sound travels with
-#: its model.
-ASSETS = art.assets_directory()
 
 #: The keys the game asks for by name.  A weapon may name its own fire sound
 #: instead of :data:`FIRE`, which is what makes a shotgun sound unlike a rifle.
@@ -110,7 +102,8 @@ ECHO_TAPS = 3
 class Voice(node.Node):
     """One sound the game can make, as data.
 
-    ``file`` names content under :data:`ASSETS` and wins when it is set.  With
+    ``file`` names content in the game's art directory, where a weapon's model
+    is (:func:`twig_bb.art.assets_directory`), and wins when it is set.  With
     none, the sound is synthesised from the numbers below, which is what ships:
     ``duration`` seconds under an exponential ``decay`` (larger is drier and
     shorter), at ``amplitude``.  ``seed`` fixes the noise so a reference
@@ -378,7 +371,7 @@ class SoundBank:
     """
 
     def __init__(self, table: Optional[SoundTable] = None,
-                 assets: str = ASSETS) -> None:
+                 assets: Optional[str] = None) -> None:
         self.table = table if table is not None else default_table()
         self.assets = assets
         #: What each key resolved to, by key.  None is a remembered miss.
@@ -408,7 +401,7 @@ class SoundBank:
             return None
         named = str(voice.file)
         if named:
-            path = os.path.join(self.assets, named)
+            path = os.path.join(self.assets or art.assets_directory(), named)
             if not os.path.exists(path):
                 log.warning('no sound file at %s; %s will be silent',
                             path, voice.key)

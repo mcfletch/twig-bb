@@ -26,7 +26,7 @@ from OpenGLContext.contentpacks import ContentStore, archive as engine_archive
 from OpenGLContext.contentpacks import catalog as engine_catalog
 from OpenGLContext.contentpacks.archive import UnsafeArchive as UnsafeArchive
 # Re-exported: what a pack of a declared size is fetched under is the
-# engine's answer, and callers here have always asked this module.
+# engine's answer, and the game's callers ask it here.
 from OpenGLContext.contentpacks.fetch import fetch_limit as fetch_limit
 from OpenGLContext.loaders import resolver
 
@@ -47,20 +47,15 @@ MAP_EXTENSION = '.bsp'
 #: downloads may share a base name.
 CACHE_SUBDIR = 'twig-bb-maps'
 
-#: Where shared content -- content wanted by many maps rather than by one --
-#: is unpacked.  Named after the pack rather than hashed: every Quake 3 map
-#: wants the same core textures, so this is a directory a user can find, point
-#: another tool at, or delete on purpose.
-CONTENT_SUBDIR = 'twig-bb-content'
-
 #: Every pack this build offers, read from :mod:`twig_bb.catalog` at import.
 #: A list rather than a literal here so a pack can be added or corrected in
 #: `packs.json` without touching Python.
 ASSET_PACKS = tuple(engine_catalog.merge(catalog.load()))
 
-#: Where a previous version unpacked shared content: one flat directory per
-#: pack. The engine's store partitions by namespace instead, so content already
-#: on a player's disk is moved into place rather than downloaded again.
+#: Where an earlier layout unpacked shared content, under the per-user cache:
+#: one flat directory per pack. The engine's store partitions by namespace
+#: instead, so content already on a player's disk is moved into place rather
+#: than downloaded again (:func:`adopt_on_start`).
 LEGACY_CONTENT = 'twig-bb-content'
 
 _adopted: set = set()
@@ -70,17 +65,24 @@ def store(cache_dir: Optional[str] = None) -> ContentStore:
     """This game's content store.
 
     ``cache_dir`` names the root to use instead of the per-user one, which is
-    what a test and the ``--cache-dir`` option pass. The per-user store has
-    anything an earlier layout left adopted into it the first time it is
-    opened; a store opened anywhere else adopts nothing.
+    what a test and the ``--cache-dir`` option pass. Opening one writes
+    nothing.
     """
-    if cache_dir:
-        return ContentStore('twig-bb', root=cache_dir)
-    made = ContentStore('twig-bb', root=_default_store_root())
-    if made.root not in _adopted:
-        _adopted.add(made.root)
-        adopt_legacy_content(made)
-    return made
+    return ContentStore('twig-bb', root=cache_dir or _default_store_root())
+
+
+def adopt_on_start() -> List[str]:
+    """Adopt what an earlier layout left into the per-user store; what moved.
+
+    Called by the game's commands as they start, before anything looks for
+    content, and once per process: a move of a pack is a rename on one
+    filesystem and a copy of hundreds of megabytes across two.
+    """
+    where = store()
+    if where.root in _adopted:
+        return []
+    _adopted.add(where.root)
+    return adopt_legacy_content(where)
 
 
 def adopt_legacy_content(store: ContentStore) -> List[str]:
@@ -441,15 +443,28 @@ def _default_cache() -> str:
 
 
 def purge(cache_dir: Optional[str] = None) -> None:
-    """Delete every unpacked tree, both the per-map ones and shared content."""
-    base = cache_dir or _default_cache()
-    for subdir in (CACHE_SUBDIR, CONTENT_SUBDIR):
-        directory = base if cache_dir else os.path.join(base, subdir)
+    """Delete every unpacked tree: the per-map ones and the content packs.
+
+    With ``cache_dir``, that directory as a whole. Otherwise the per-map
+    unpacking directory, every pack in the per-user store, and anything an
+    earlier layout left.
+    """
+    if cache_dir:
+        if os.path.isdir(cache_dir):
+            shutil.rmtree(cache_dir)
+            log.info('removed %s', cache_dir)
+        return
+    base = _default_cache()
+    for directory in (os.path.join(base, CACHE_SUBDIR),
+                      os.path.join(base, LEGACY_CONTENT)):
         if os.path.isdir(directory):
             shutil.rmtree(directory)
             log.info('removed %s', directory)
-        if cache_dir:
-            break
+    where = store()
+    for pack in ASSET_PACKS:
+        if where.root_for(pack) is not None:
+            where.remove(pack)
+            log.info('removed %s', pack.key)
 
 
 def main() -> None:
@@ -471,6 +486,7 @@ def main() -> None:
     if options.purge:
         purge(options.cache_dir)
         return
+    adopt_on_start()
     path = resolve_target(options.target, cache_dir=options.cache_dir,
                           map_name=options.map_name, force=options.force)
     print(path)

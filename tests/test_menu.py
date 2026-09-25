@@ -238,12 +238,12 @@ class TestTheDownloadConsent:
 
     def test_the_size_is_on_the_screen_that_asks(self):
         """Not only in --list-packs: it is what the answer turns on."""
-        panel = menu.download_screen([pack()])
-        assert '42 MB' in widget(panel, 'question').text
+        screen = menu.download_screen([pack()])
+        assert '42 MB' in screen.caption.text
 
     def test_the_licence_is_on_the_screen_that_asks(self):
-        panel = menu.download_screen([pack()])
-        assert 'CC BY-SA' in widget(panel, 'detail').text
+        screen = menu.download_screen([pack()])
+        assert 'CC BY-SA' in screen.caption.text
 
     def test_the_sets_are_offered_one_at_a_time(self):
         """The screen is a fixed shape and the catalogue is not.
@@ -251,142 +251,61 @@ class TestTheDownloadConsent:
         Laying all of them out made it as tall as the catalogue, and the
         buttons went off the bottom where nothing could reach them.
         """
-        panel = menu.download_screen([pack(key='a'), pack(key='b')])
-        chooser = widget(panel, 'pack')
-        assert list(chooser.options) == ['a', 'b']
-        assert widget(panel, 'buttons') is not None
+        screen = menu.download_screen([pack(key='a'), pack(key='b')])
+        assert list(screen.chooser.options) == ['a', 'b']
+        assert widget(screen.panel, 'buttons') is not None
 
     def test_the_screen_does_not_grow_with_the_catalogue(self):
         """What the bug was: eighteen sets, and no button on the screen."""
         small = menu.download_screen([pack(key='a')])
         large = menu.download_screen([pack(key='k%d' % n) for n in range(18)])
-        assert _shape(small) == _shape(large)
+        assert _shape(small.panel) == _shape(large.panel)
 
     def test_the_catalogue_total_is_still_shown(self):
         """One at a time is not the same as not saying what it all comes to."""
-        panel = menu.download_screen([pack(key='a', approximate_bytes=1_000_000),
-                                      pack(key='b', approximate_bytes=3_000_000)])
-        assert '4 MB' in widget(panel, 'question').text
-        assert '2 sets' in widget(panel, 'question').text
+        screen = menu.download_screen([
+            pack(key='a', approximate_bytes=1_000_000),
+            pack(key='b', approximate_bytes=3_000_000)])
+        assert '4 MB' in screen.heading.text
+        assert '2 sets' in screen.heading.text
 
     def test_choosing_changes_what_is_described(self):
-        panel = menu.download_screen([pack(key='a', title='Alpha'),
-                                      pack(key='b', title='Beta')])
-        chooser = widget(panel, 'pack')
-        assert 'Alpha' in widget(panel, 'detail').text
-        chooser.write('b')
-        assert 'Beta' in widget(panel, 'detail').text
+        screen = menu.download_screen([pack(key='a', title='Alpha'),
+                                       pack(key='b', title='Beta')])
+        assert 'Alpha' in screen.caption.text
+        screen.chooser.write('b')
+        assert 'Beta' in screen.caption.text
 
     def test_accepting_starts_the_chosen_set(self):
         started = []
-        panel = menu.download_screen([pack(key='a'), pack(key='b')],
-                                     on_start=started.append)
-        widget(panel, 'pack').write('b')
-        widget(panel, 'download').on_activate(None)
-        assert [one.key for one in started[0]] == ['b']
+        screen = menu.download_screen([pack(key='a'), pack(key='b')],
+                                      on_fetch=started.append)
+        screen.chooser.write('b')
+        screen.fetch_button.on_activate(None)
+        assert [one.key for one in started] == ['b']
+        assert [one.key for one in screen.whole()] == ['b']
 
     def test_a_set_brings_the_needs_it_cannot_do_without(self):
         """A map fetched without its art renders in grey."""
-        packs = [pack(key='maps', needs=('art',)), pack(key='art')]
-        started = []
-        panel = menu.download_screen(packs, on_start=started.append)
-        assert 'art' in widget(panel, 'needs').text.lower() or \
-               'sample' in widget(panel, 'needs').text.lower()
-        widget(panel, 'download').on_activate(None)
-        assert [one.key for one in started[0]] == ['maps', 'art']
+        packs = [pack(key='maps', needs=('art',)), pack(key='art',
+                                                        title='The art')]
+        screen = menu.download_screen(packs)
+        assert 'The art' in screen.caption.text
+        assert [one.key for one in screen.whole()] == ['maps', 'art']
 
     def test_a_companion_already_on_disk_is_not_fetched_again(self):
         """The caller passes only what is missing, so absence means present."""
-        started = []
-        panel = menu.download_screen([pack(key='maps', needs=('art',))],
-                                     on_start=started.append)
-        widget(panel, 'download').on_activate(None)
-        assert [one.key for one in started[0]] == ['maps']
-        assert widget(panel, 'needs').text == ''
+        screen = menu.download_screen([pack(key='maps', needs=('art',))])
+        assert [one.key for one in screen.whole()] == ['maps']
 
-    def test_declining_does_not(self):
-        started, declined = [], []
-        panel = menu.download_screen([pack()], on_start=started.append,
-                                     on_cancel=lambda: declined.append(1))
-        widget(panel, 'cancel').on_activate(None)
-        assert (started, declined) == ([], [1])
+    def test_closing_it_says_so(self):
+        closed = []
+        screen = menu.download_screen([pack()],
+                                      on_close=lambda: closed.append(1))
+        screen.close_button.on_activate(None)
+        assert closed == [1] and screen.panel.closed
 
-    def test_closing_it_declines(self):
-        declined = []
-        panel = menu.download_screen([pack()],
-                                     on_cancel=lambda: declined.append(1))
-        panel.on_close(panel)
-        assert declined == [1]
-
-
-class FakeJob:
-    def __init__(self, **named):
-        self.finished = False
-        self.cancelled = False
-        self.failed = None
-        self.state = 'A sample pack — 40% of 42 MB'
-        self.__dict__.update(named)
-
-    def cancel(self):
-        self.cancelled = True
-
-
-class TestTheProgressScreen:
-
-    def test_it_shows_what_the_job_is_doing(self):
-        panel = menu.progress_screen(FakeJob())
-        assert '40%' in widget(panel, 'progress').text
-
-    def test_it_cannot_be_dismissed_by_accident(self):
-        """Escape closing it would leave a download running with no way back."""
-        assert not menu.progress_screen(FakeJob()).closeOnEscape
-
-    def test_stopping_cancels_the_job(self):
-        job = FakeJob()
-        panel = menu.progress_screen(job)
-        widget(panel, 'stop').on_activate(None)
-        assert job.cancelled
-
-    def test_refreshing_updates_the_line(self):
-        job = FakeJob()
-        panel = menu.progress_screen(job)
-        job.state = 'A sample pack — 90% of 42 MB'
-        assert menu.refresh_progress(panel, job)
-        assert '90%' in widget(panel, 'progress').text
-
-    def test_refreshing_with_nothing_new_reports_no_change(self):
-        """A redraw per frame for a bar that has not moved is a waste."""
-        job = FakeJob()
-        panel = menu.progress_screen(job)
-        menu.refresh_progress(panel, job)
-        assert not menu.refresh_progress(panel, job)
-
-    def test_a_finished_job_reads_as_done(self):
-        assert menu.progress_line(FakeJob(finished=True)) == 'Done.'
-
-    def test_a_cancelled_job_does_not_read_as_an_error(self):
-        """Nothing went wrong; the user changed their mind."""
-        line = menu.progress_line(FakeJob(finished=True, cancelled=True))
-        assert 'Stopped' in line and 'error' not in line.lower()
-
-    def test_a_failed_job_says_what_went_wrong(self):
-        line = menu.progress_line(FakeJob(finished=True,
-                                          failed=IOError('the network went away')))
-        assert 'network' in line
-
-
-class TestListingPacksInASentence:
-
-    def test_one_pack_is_its_title(self):
-        assert menu._listed([pack(title='Maps')]) == 'Maps'
-
-    def test_two_packs_are_joined_with_and(self):
-        assert menu._listed([pack(title='Maps'), pack(title='Art')]) == \
-            'Maps and Art'
-
-    def test_three_packs_read_as_a_list(self):
-        found = menu._listed([pack(title='A'), pack(title='B'), pack(title='C')])
-        assert found == 'A, B and C'
-
-    def test_no_packs_is_not_an_empty_sentence(self):
-        assert menu._listed([]) == 'nothing'
+    def test_a_download_can_be_stopped(self):
+        """The Stop button is the job's cancel."""
+        assert widget(menu.download_screen([pack()]).panel,
+                      'stop') is not None

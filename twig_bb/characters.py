@@ -69,7 +69,8 @@ POSE_FAR_RATE = 10.0
 #: them, so a match of several bots is not several copies of one person.
 BUILDS = ('male_character', 'female_character')
 
-#: Where a character model lives, relative to :data:`twig_bb.art.ASSETS`.
+#: Where a character model lives, relative to the art directory
+#: (:func:`twig_bb.art.assets_directory`).
 CHARACTERS = 'characters'
 
 #: The movement clips the rig contract names, and which of them play once

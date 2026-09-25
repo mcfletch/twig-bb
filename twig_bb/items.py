@@ -168,7 +168,8 @@ class ItemKind(node.Node):
     #: map places no dynamic lights.
     tinted = vfield.newField('tinted', 'SFBool', 1, True)
 
-    #: The model, relative to :data:`twig_bb.art.ASSETS`, and how to place
+    #: The model, relative to the art directory
+    #: (:func:`twig_bb.art.assets_directory`), and how to place
     #: it.  Empty for a kind whose art has not been made yet, which is drawn as
     #: a coloured box instead.
     model = vfield.newField('model', 'SFString', 1, '')

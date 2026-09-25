@@ -32,14 +32,21 @@ def painted(colour=(1.0, 1.0, 1.0)):
 
 class TestWhereTheArtIs:
     def test_a_relative_name_lands_inside_the_package(self):
-        assert art.path_for('items/medpack.glb').startswith(art.ASSETS)
+        assert art.path_for('items/medpack.glb').startswith(
+            art.assets_directory())
 
     def test_the_medikit_is_shipped_with_us(self):
         assert os.path.exists(art.path_for(items.MEDPACK['model']))
 
-    def test_the_weapons_agree_about_where_that_is(self):
-        from twig_bb import weapons
-        assert weapons.ASSETS == art.ASSETS
+    def test_it_follows_a_pack_installed_after_import(self, tmp_path,
+                                                      monkeypatch):
+        from twig_bb import download
+        pack = download.pack_for_key('twig-bb/art')
+        root = tmp_path / 'local' / 'twig-bb' / pack.directory
+        (root / pack.marker).mkdir(parents=True)
+        monkeypatch.setenv('OPENGLCONTEXT_CONTENT', str(tmp_path / 'local'))
+        assert art.path_for('items/medpack.glb') == str(
+            root / 'items' / 'medpack.glb')
 
 
 class TestEveryShippedModelIsCredited:
@@ -55,9 +62,9 @@ class TestEveryShippedModelIsCredited:
 
     def art_directories(self):
         return sorted(
-            os.path.join(art.ASSETS, name)
-            for name in os.listdir(art.ASSETS)
-            if os.path.isdir(os.path.join(art.ASSETS, name)))
+            os.path.join(art.IN_WHEEL, name)
+            for name in os.listdir(art.IN_WHEEL)
+            if os.path.isdir(os.path.join(art.IN_WHEEL, name)))
 
     def test_there_is_more_than_one_kind_of_art_to_sweep(self):
         assert len(self.art_directories()) > 1
@@ -195,18 +202,15 @@ class TestPaintingOneModelFourWays:
 class TestWhereTheGamesOwnArtComesFrom:
     """15 MB of characters, weapons and pickups, which PyPI should not carry.
 
-    The art is a base pack now -- attached to a release and fetched before the
-    first match. Both sources are honoured on purpose: the art leaves the wheel
-    when the release carrying it exists, and until that day an install has to
-    work anyway.
+    The art is a base pack, attached to a release. The copy in the package is
+    read while the pack is not installed.
     """
 
     def test_it_is_the_wheel_until_the_pack_is_here(self, tmp_path):
         from twig_bb import art, download
         where = art.assets_directory(cache_dir=str(tmp_path))
         assert os.path.isdir(os.path.join(where, 'characters'))
-        assert not where.startswith(str(tmp_path))
-        assert where == download.art.ASSETS if hasattr(download, 'art') else True
+        assert where == art.IN_WHEEL
 
     def test_and_the_pack_once_it_is(self, tmp_path):
         from twig_bb import art, download
@@ -230,3 +234,23 @@ class TestWhereTheGamesOwnArtComesFrom:
         wanted = fetch.missing_base(list(download.ASSET_PACKS),
                                     download.store(str(tmp_path)))
         assert [one.key for one in wanted] == ['twig-bb/art']
+
+
+class TestImportingTheGameTouchesNoFiles:
+    """Adopting content an earlier layout left is a move of hundreds of
+    megabytes, and belongs to the game starting, not to a module loading."""
+
+    def test_importing_the_art_moves_nothing(self, tmp_path):
+        import subprocess
+        import sys
+        legacy = tmp_path / 'OpenGLContext' / 'twig-bb-content' / \
+            'xcsv_hires' / 'textures'
+        legacy.mkdir(parents=True)
+        (legacy / 'x.tga').write_text('x')
+        env = dict(os.environ, XDG_CONFIG_HOME=str(tmp_path),
+                   APPDATA=str(tmp_path))
+        subprocess.run([sys.executable, '-c',
+                        'import twig_bb.art, twig_bb.combatsound, '
+                        'twig_bb.weapons'], check=True, env=env)
+        assert (legacy / 'x.tga').is_file()
+        assert not (tmp_path / 'OpenGLContext' / 'content').exists()

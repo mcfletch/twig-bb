@@ -11,7 +11,7 @@ import math
 
 import pytest
 
-from twig_bb import weapons
+from twig_bb import art, weapons
 
 
 class TestTable:
@@ -259,14 +259,14 @@ class TestEveryModelIsCredited:
 
     def credits(self):
         import os
-        path = os.path.join(weapons.ASSETS, 'weapons', 'CREDITS.md')
+        path = os.path.join(art.IN_WHEEL, 'weapons', 'CREDITS.md')
         with open(path, encoding='utf-8') as source:
             return source.read()
 
     def shipped_models(self):
         import glob
         import os
-        return sorted(glob.glob(os.path.join(weapons.ASSETS, 'weapons',
+        return sorted(glob.glob(os.path.join(art.IN_WHEEL, 'weapons',
                                              '*.glb')))
 
     def test_there_is_art_to_credit(self):
@@ -320,5 +320,5 @@ class TestEveryModelIsCredited:
         """Self-contained .glb: no sidecar files to lose on the way in."""
         import glob
         import os
-        loose = glob.glob(os.path.join(weapons.ASSETS, 'weapons', '*', '*'))
+        loose = glob.glob(os.path.join(art.IN_WHEEL, 'weapons', '*', '*'))
         assert loose == [], 'a model depends on files beside it: %r' % (loose,)
