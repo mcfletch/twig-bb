@@ -665,3 +665,23 @@ class TestContentAPreviousVersionUnpacked:
         monkeypatch.setattr(download, '_adopted', set())
         download.pack_root(pack)
         assert os.path.isdir(was)
+
+
+class TestAnArchiveThatWouldFillTheDisk:
+    """A map archive is somebody else's file: a small one can deflate to far
+    more than any map, and is refused before anything is written."""
+
+    def bomb(self, tmp_path, members=1, size=200 * 1024 * 1024):
+        target = tmp_path / 'bomb.pk3'
+        with zipfile.ZipFile(str(target), 'w', zipfile.ZIP_DEFLATED) as zipped:
+            zipped.writestr('maps/test.bsp', b'IBSP')
+            for index in range(members):
+                zipped.writestr('textures/%d.tga' % (index,), b'\0' * size)
+        return target
+
+    def test_it_is_refused_by_what_it_would_write(self, tmp_path):
+        from OpenGLContext.contentpacks.archive import TooLarge
+        target = self.bomb(tmp_path)
+        with pytest.raises(TooLarge):
+            download.unpack(str(target), str(tmp_path / 'out'))
+        assert not (tmp_path / 'out' / 'maps' / 'test.bsp').exists()

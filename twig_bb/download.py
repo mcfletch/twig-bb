@@ -8,8 +8,10 @@ per-user app-data directory rather than world-writable system temp.  Using it
 is also why this module needs no HTTP library of its own.
 
 Unpacking is equally untrusted.  A `.pk3` is an ordinary ZIP archive
-(``SPEC-BSP46 §7.1``) whose entry names come from whoever built it, so every
-name is checked to lie inside the destination before anything is written.
+(``SPEC-BSP46 §7.1``) whose entry names come from whoever built it, so it is
+extracted by the engine's reader (:func:`OpenGLContext.contentpacks.archive.extract`):
+every name is checked to lie inside the destination, and what the archive
+would write is bounded by its own size, before anything is written.
 """
 
 from __future__ import annotations
@@ -338,7 +340,13 @@ def unpack(archive: str, directory: str, map_name: Optional[str] = None,
         if not maps and not nested and require_map:
             raise NoMapFound('%s contains no %s file' % (archive, MAP_EXTENSION))
         if force or not _already_unpacked(directory, chosen):
-            zip_file.extractall(directory)
+            # The engine's reader: every name held to the directory, and what
+            # the archive would write, in bytes and in entries, bounded by
+            # its own size before anything is written.
+            engine_archive.extract(
+                archive, directory, 'zip',
+                max_bytes=engine_archive.unpacked_limit(
+                    os.path.getsize(archive)))
     if chosen:
         return os.path.join(directory, chosen)
     if nested:
@@ -415,16 +423,6 @@ def fetch_pack(pack: AssetPack, cache_dir: Optional[str] = None) -> str:
     """
     from OpenGLContext.contentpacks import fetch as engine_fetch
     return engine_fetch.fetch_pack(pack, store(cache_dir))
-
-
-def _extract_tar(archive: str, directory: str) -> None:
-    """Extract a source tarball, refusing any entry that escapes ``directory``.
-
-    Archive content is untrusted whatever its format, and what bounds it -- the
-    escape check, the refusal of links and device nodes, and the cap on what it
-    unpacks to -- is :mod:`OpenGLContext.contentpacks.archive`.
-    """
-    engine_archive.extract(archive, directory, 'tar')
 
 
 def _unpack_dir(target: str, cache_dir: Optional[str]) -> str:
