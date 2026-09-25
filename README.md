@@ -677,15 +677,21 @@ than 15 MB inside the wheel. `./release-assets.py` builds it, writes that entry
 from the archive it built, and publishes it:
 
 ```bash
-./release-assets.py                 # build the archive, write the entry
-./release-assets.py --install       # ...and install it in this machine's store
-./release-assets.py --reinstall     # ...over whatever that store already holds
-./release-assets.py --push          # ...and attach it to the release tag
+./release-assets.py                   # build the archive and its registry
+./release-assets.py --install         # ...and install it in this machine's store
+./release-assets.py --reinstall       # ...replacing the copy installed there
+./release-assets.py --write-registry  # ...and write the entry in packs.json
+./release-assets.py --push            # ...attach it to the release tag, and
+                                      #    write the entry in packs.json
 ```
 
-`--install` is how the pack is played against before there is a release to
-fetch it from; it leaves a pack already in the store where it is, and `--reinstall` does the same over whatever the store already holds, which is what a rebuilt world needs to be the one that opens. The other eighteen entries are other people's packages on other
-people's servers, and nothing here rewrites them.
+The archive and a registry describing it go to `dist/content/`;
+`twig_bb/packs.json` is rewritten only by `--write-registry` or `--push`, so a
+trial build never changes what an install fetches. `--install` is how the pack
+is played against before there is a release to fetch it from. `--install` keeps
+a pack that is already installed; `--reinstall` replaces it with the one just
+built. The other eighteen entries are other people's packages on other people's
+servers, and are kept as they are.
 
 The OpenArena release is split, so what one map needs spans several packs:
 fetching only the maps gets you geometry and baked lighting rendered in grey.

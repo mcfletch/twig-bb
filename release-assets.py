@@ -7,158 +7,66 @@ install would download from an index that should be serving code. They are a
 :mod:`OpenGLContext.contentpacks` before the first match. One command covers
 the whole of that:
 
-    ./release-assets.py                 # build the archive, write the registry
-    ./release-assets.py --install       # ...and put it in this machine's store
-    ./release-assets.py --reinstall     # ...over whatever that store already holds
-    ./release-assets.py --push          # ...and attach it to the release tag
+    ./release-assets.py                   # build the archive and its registry
+    ./release-assets.py --install         # ...and put it in this machine's store
+    ./release-assets.py --reinstall       # ...replacing the copy installed there
+    ./release-assets.py --push            # ...attach it to the release tag and
+                                          #    write the entry in packs.json
 
 ``--install`` is what makes a content release testable before it is a release:
 the game then finds the art in its own store and plays as an installed copy
 would, with nothing published and no network reached.
 
 Only ``twig-bb/art`` is built here. The other entries in ``twig_bb/packs.json``
-are other people's packages on other people's servers, and this rewrites the
-one entry whose bytes are ours -- from the archive it just built, so the digest
-cannot describe a file that was never made.
+are other people's packages on other people's servers, and are kept as they
+are; the one entry written is the one whose bytes this command produced, from
+the archive it just built. The registry is written beside the archive, and
+``twig_bb/packs.json`` only by ``--push`` or ``--write-registry``. The options,
+the install and the push are :func:`OpenGLContext.contentpacks.publish.main`'s.
 """
 
 from __future__ import annotations
 
-import argparse
-import json
 import os
-import sys
 
-from OpenGLContext.contentpacks import archive, catalog, publish
-
-#: Where a release's artefacts are fetched from.
-URL = 'https://github.com/mcfletch/twig-bb/releases/download/%s/%s'
-
-#: The namespace this game's packs sit under.
-NAMESPACE = 'twig-bb'
-
-#: The pack this builds: the art the game cannot be played without.
-KEY = '%s/art' % (NAMESPACE,)
-
-#: What proves it is unpacked.
-MARKER = 'characters'
+from OpenGLContext.contentpacks import ContentStore, publish
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(HERE, 'twig_bb', 'assets')
 CATALOG = os.path.join(HERE, 'twig_bb', 'packs.json')
 
 
-def build(where: str, name: str, into: str) -> tuple[str, int, str]:
-    """Archive ``where`` as ``name``; return its path, size and digest."""
-    path = archive.write(where, os.path.join(into, '%s.tar.gz' % (name,)))
-    return path, os.path.getsize(path), archive.digest(path)
-
-
-def entry(tag: str, path: str, size: int, sha: str) -> dict:
-    """What the registry says about the art this built."""
-    return {
-        'key': KEY,
-        'title': 'twig-bb art',
-        'url': URL % (tag, os.path.basename(path)),
-        'directory': 'twig-bb-art',
-        'archive': 'tar',
-        'approximate_bytes': size,
-        'sha256': sha,
-        'base': True,
-        'copyright': 'The twig-bb project, BSD-3-Clause; characters, weapons '
-                     'and pickups modelled for this game.',
-        'notes': 'The characters, weapons and pickups the game is played '
-                 'with. Fetched before the first match, because a game with '
-                 'none of it has nothing to draw.',
-        'marker': MARKER,
-    }
-
-
-def rewrite(declared: dict) -> None:
-    """Put ``declared`` in the registry, leaving every other entry alone.
-
-    The rest of the file is eighteen packages on other people's servers, whose
-    sizes and terms are theirs to state; the one entry rewritten here is the
-    one whose bytes this command produced.
-    """
-    with open(CATALOG, encoding='utf-8') as handle:
-        document = json.load(handle)
-    packs = document.get('packs') or []
-    for index, one in enumerate(packs):
-        if one.get('key') == KEY:
-            packs[index] = declared
-            break
-    else:
-        packs.insert(0, declared)
-    with open(CATALOG, 'w', encoding='utf-8') as handle:
-        json.dump(document, handle, indent=1)
-        handle.write('\n')
-
-
-def install(into: str, replace: bool = False) -> None:
-    """Put what was built into the store the game reads, and say where.
-
-    ``replace`` throws away what is installed under each key first, which is
-    what a second build of a world wants: the store holds the last one, and an
-    install that leaves it there shows the world before the change.
-
-    Through the game's own :mod:`twig_bb.download`, so what is installed is
-    what it will look for.
-    """
-    from twig_bb import download
-
-    store = download.store()
-    print('store: %s' % (store.root,))
-    pack = catalog.pack_for_key(KEY, catalog.load(CATALOG))
-    where = publish.install(pack, store, into, replace=replace)
-    print('  %-24s %s' % (pack.key, os.path.relpath(where, store.root)))
-
-
-def push(tag: str, paths: list[str]) -> None:
-    """Attach the built archive to the release the registry names."""
-    publish.push(publish.repository(URL % (tag, 'x')), tag, paths,
-                 title='twig-bb art %s' % (tag,),
-                 notes='The characters, weapons and pickups the game is '
-                       'played with, fetched before the first match.')
-    print('attached %d file(s) to %s' % (len(paths), tag))
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
-    parser.add_argument('--tag', default='content-v1',
-                        help='the release tag the artefact is attached to '
-                             '(default: %(default)s)')
-    parser.add_argument('--into', default=os.path.join(HERE, 'dist', 'content'),
-                        help='where to write the archive')
-    parser.add_argument('--install', action='store_true',
-                        help="install what was built into this machine's own "
-                             'store, so the game runs against it with nothing '
-                             'published')
-    parser.add_argument('--reinstall', action='store_true',
-                        help='install, throwing away what is already in the '
-                             'store under this key first, which is what a '
-                             'rebuilt world needs to be the one that opens')
-    parser.add_argument('--push', action='store_true',
-                        help='attach the archive to the release at --tag, '
-                             'creating it if it is not there yet (needs the '
-                             'GitHub CLI, and an account that may write here)')
-    options = parser.parse_args(argv)
+def declare(build: publish.Build) -> list[dict]:
+    """Build the art pack; what the registry says about it."""
     if not os.path.isdir(ASSETS):
-        print('no art at %s' % (ASSETS,), file=sys.stderr)
-        return 2
-    os.makedirs(options.into, exist_ok=True)
+        raise SystemExit('no art at %s' % (ASSETS,))
+    built = build.archive(ASSETS, 'twig-bb-art')
+    return [build.entry(
+        'art', built, title='twig-bb art', directory='twig-bb-art', base=True,
+        # A directory the pack always has at its top.
+        marker='characters',
+        copyright='The twig-bb project, BSD-3-Clause; characters, weapons '
+                  'and pickups modelled for this game.',
+        notes='The characters, weapons and pickups the game is played with. '
+              'Fetched before the first match, because a game with none of '
+              'it has nothing to draw.')]
 
-    path, size, sha = build(ASSETS, 'twig-bb-art', options.into)
-    rewrite(entry(options.tag, path, size, sha))
-    print('twig-bb art: %.1f MB, sha256 %s, registry written to %s'
-          % (size / 1048576, sha[:12], os.path.relpath(CATALOG, HERE)))
 
-    if options.install or options.reinstall:
-        install(options.into, replace=options.reinstall)
-    if options.push:
-        push(options.tag, [path])
-    return 0
+def store() -> ContentStore:
+    """The store the game reads, which is where ``--install`` puts the art."""
+    from twig_bb import download
+    return download.store()
+
+
+RELEASE = publish.Release(
+    namespace='twig-bb',
+    url='https://github.com/mcfletch/twig-bb/releases/download/%s/%s',
+    catalog=CATALOG, declare=declare,
+    into=os.path.join(HERE, 'dist', 'content'), keep_unbuilt=True,
+    store=store, description=__doc__.split('\n\n')[0], title='twig-bb art',
+    notes='The characters, weapons and pickups the game is played with, '
+          'fetched before the first match.')
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    raise SystemExit(publish.main(RELEASE))
