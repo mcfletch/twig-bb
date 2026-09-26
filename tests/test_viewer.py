@@ -45,7 +45,7 @@ def test_the_viewer_draws_in_a_core_profile_with_the_pbr_pass():
     """
     assert ContextDefinition().profile == 'core'
     assert os.environ['OPENGLCONTEXT_RENDERER'] == 'pbr'
-    assert os.environ['OPENGLCONTEXT_BACKEND'] == 'glfw'
+    assert viewer.TwigContext.windowSystemName == 'glfw'
 
 
 def test_a_capture_run_silences_the_frame_counter():
@@ -445,10 +445,19 @@ class TestHowBigTheWindowOpens:
         assert not viewer.wants_fullscreen(options)
 
 
+def test_the_free_fly_camera_is_declared_for_g_to_return_to():
+    assert viewer.navigation().examines()
+
+
+def test_the_game_switches_modes_itself():
+    """``m`` and ``f`` are the game's own keys, so the engine binds none."""
+    assert list(viewer.navigation().modeSwitching) == []
+
+
 def test_the_modes_reach_the_context_definition():
     definition = viewer.context_definition()
-    assert list(definition.movementModes)
-    assert [m.name for m in definition.movementModes] == \
+    assert list(definition.navigation.movingModes())
+    assert [m.name for m in definition.navigation.movingModes()] == \
         [m.name for m in viewer.movement_modes()]
 
 
@@ -747,7 +756,7 @@ def test_the_mouse_look_mode_is_the_one_the_viewer_starts_in():
     """
     definition = viewer.context_definition()
     NavigationManager(definition, _platform_stub())
-    assert str(definition.movementMode.name) == 'fps'
+    assert str(definition.navigation.current.name) == 'fps'
 
 
 def test_the_viewer_still_offers_the_keyboard_only_walk():
@@ -924,7 +933,7 @@ def test_being_in_a_liquid_volume_puts_the_avatar_in_the_swim_mode(tmp_path):
                              maxs=np.array([100.0, 100.0, 100.0]))])
     viewer.update_submerged(nav, volumes)
     context.updateNavigation(0.05)
-    assert context.contextDefinition.movementMode.name == 'swim'
+    assert context.contextDefinition.navigation.current.name == 'swim'
 
 
 def test_leaving_the_water_gives_the_mode_back(tmp_path):
@@ -933,7 +942,7 @@ def test_leaving_the_water_gives_the_mode_back(tmp_path):
     empty = liquids.LiquidVolumes([])
     viewer.update_submerged(nav, empty)
     context.updateNavigation(0.05)
-    assert context.contextDefinition.movementMode.name != 'swim'
+    assert context.contextDefinition.navigation.current.name != 'swim'
 
 
 def test_a_map_with_no_liquid_never_reports_being_submerged(tmp_path):
@@ -1234,7 +1243,7 @@ def _mode_row(definition):
 
 def test_the_overlay_names_the_mode_in_force():
     """Nothing else on screen says which way of moving is live."""
-    definition = ContextDefinition(movementModes=viewer.movement_modes())
+    definition = viewer.context_definition()
     navigation = NavigationManager(definition, _ModePlatform())
     navigation.select('fps')
     assert _mode_row(definition) == 'fps'
@@ -1249,7 +1258,7 @@ def test_no_mode_in_force_is_not_an_empty_row():
 def test_a_world_imposed_mode_shows_too():
     """Swimming is imposed rather than chosen, and that is exactly when being
     told which mode you are in matters."""
-    definition = ContextDefinition(movementModes=viewer.movement_modes())
+    definition = viewer.context_definition()
     platform = _ModePlatform()
     navigation = NavigationManager(definition, platform)
     platform.submerged = True

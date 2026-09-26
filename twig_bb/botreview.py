@@ -33,14 +33,14 @@ from typing import (
     Optional,
 )
 
-os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
 os.environ.setdefault('OPENGLCONTEXT_SHADOWS', '0')
 os.environ.setdefault('OPENGLCONTEXT_DISABLE_FPS_DISPLAY', '1')
 os.environ.setdefault('OPENGLCONTEXT_HIDDEN', '1')
 
 import numpy as np
-from OpenGLContext import contactsheet, testingcontext
+from OpenGLContext import contactsheet
+from OpenGLContext.context import Context
 from OpenGLContext.capture import read_back_buffer
 from OpenGLContext.scenegraph import basenodes
 
@@ -348,12 +348,13 @@ class ReviewContext:
         self.context: Any = None
 
     def build(self) -> None:
-        base: Any = testingcontext.getInteractive()
         self.stage = Stage(self.review)
         scene = self.stage.scene
         camera = CAMERA
 
-        class _Context(base):
+        class _Context(Context):
+            windowSystemName = 'glfw'
+
             def OnInit(self) -> None:
                 self.sg = scene
                 self.getViewPlatform().setPosition(camera)
