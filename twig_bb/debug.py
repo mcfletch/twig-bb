@@ -126,8 +126,9 @@ def player_provider(context: Any) -> Any:
         found: list[tuple[str, Any]] = []
         # A NULL SFNode is falsy, and is what a context with no declared
         # modes carries; an empty row would be a mode called nothing.
-        mode = getattr(getattr(context, 'contextDefinition', None),
-                       'movementMode', None)
+        declared = getattr(getattr(context, 'contextDefinition', None),
+                           'navigation', None)
+        mode = declared.current if declared else None
         if mode:
             found.append(('mode', str(getattr(mode, 'name', '') or '-')))
         found.append(('navigation',

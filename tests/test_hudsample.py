@@ -57,8 +57,7 @@ def test_the_demo_renders_the_hud_and_the_weapon(tmp_path):
         [VENV_PYTHON, '-m', 'twig_bb.hudsample', '--capture', str(out),
          '--frames', '6', '--capture-delay', '0.2'],
         capture_output=True, text=True, timeout=300,
-        env=dict(os.environ, OPENGLCONTEXT_PROFILE='core',
-                 OPENGLCONTEXT_BACKEND='glfw'))
+        env=dict(os.environ, OPENGLCONTEXT_PROFILE='core'))
     assert out.exists(), 'no capture written:\n%s\n%s' % (result.stdout,
                                                           result.stderr)
     pixels = np.asarray(Image.open(out).convert('RGB')).astype(int)

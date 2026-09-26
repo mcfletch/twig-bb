@@ -45,10 +45,9 @@ import sys
 from collections.abc import Sequence
 from typing import Any
 
-os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
 
-from OpenGLContext import testingcontext
+from OpenGLContext.context import Context
 from OpenGLContext.capture import SettleCapture
 from OpenGLContext.contextdefinition import ContextDefinition
 from OpenGLContext.events.mouseevents import WHEEL_DOWN, WHEEL_UP
@@ -78,8 +77,6 @@ from .player import PlayerState
 from .viewer import disable_vsync
 
 log = logging.getLogger(__name__)
-
-BaseContext: Any = testingcontext.getInteractive()
 
 #: The room: half-width in metres, and how tall.  Small enough to walk across in
 #: a few seconds, because what is being looked at is the HUD.
@@ -147,8 +144,10 @@ def build_room() -> list[Any]:
 
 
 # -- the window ------------------------------------------------------------
-class HUDSampleContext(OverlayMixin, BaseContext):      # pragma: no cover - GL
+class HUDSampleContext(OverlayMixin, Context):      # pragma: no cover - GL
     """The demo window: a room, a weapon in hand, and the HUD over both."""
+
+    windowSystemName = 'glfw'
 
     config: Any = None
     platform: Any

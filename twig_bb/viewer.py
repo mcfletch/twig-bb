@@ -52,7 +52,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Optional
 
-os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')  # noqa: TID251 the program's start-up sets the environment the engine reads
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')  # noqa: TID251 the program's start-up sets the environment the engine reads
 # A map's own baked lighting is the point; a full-strength analytic sky washes
 # it out, so the environment probe is dimmed rather than switched off (metals
@@ -61,13 +60,15 @@ os.environ.setdefault('OPENGLCONTEXT_IBL_INTENSITY', '0.15')  # noqa: TID251 the
 
 import numpy as np
 from omi_physics.character import CharacterCapabilities
-from OpenGLContext import renderoptions, testingcontext
+from OpenGLContext import renderoptions
+from OpenGLContext.context import Context
 from OpenGLContext.audio import scene as audioscene
 from OpenGLContext.capture import SettleCapture
 from OpenGLContext.contextdefinition import ContextDefinition
 from OpenGLContext.events import systemtime
 from OpenGLContext.events.mouseevents import WHEEL_DOWN, WHEEL_UP
 from OpenGLContext.move import modes as movemodes
+from OpenGLContext.move.navigationdefinition import Navigation
 from OpenGLContext.move.physicsplatform import PhysicsViewPlatform
 from OpenGLContext.scenegraph.background import Background
 from OpenGLContext.scenegraph.light import (
@@ -122,8 +123,6 @@ from .player import PlayerState
 from .worldgeometry import SCENE_SCALE
 
 log = logging.getLogger(__name__)
-
-BaseContext: Any = testingcontext.getInteractive()
 
 #: Radians per second the turn keys sweep, and the look keys tilt.
 TURN_RATE = 2.0
@@ -499,15 +498,30 @@ def wants_fullscreen(options: argparse.Namespace) -> bool:
     return bool(options.fullscreen) and not options.capture
 
 
+def navigation() -> Navigation:
+    """How the viewer is moved through: the free-fly camera, and the modes a body walks by.
+
+    ``examine`` is the free-fly camera ``g`` returns to.  No ``modeSwitching``:
+    ``m`` and ``f`` are the game's own keys, which choose between the modes
+    through the navigation manager and mark the choice in a session recording.
+    """
+    return Navigation(modes=[movemodes.examineMode(), *movement_modes()])
+
+
+def current_mode(definition: Any) -> Any:
+    """The movement mode in force on ``definition``, or None where there is none."""
+    declared = getattr(definition, 'navigation', None)
+    return declared.current if declared else None
+
+
 def context_definition(fullscreen: bool = True) -> ContextDefinition:
-    """A context definition carrying this viewer's declared modes.
+    """A context definition carrying this viewer's declared navigation.
 
     Full-screen by default, because that is how the game is played; the
     settings screen offers the same field, so a player who wants a window can
     have one without restarting.
     """
-    return ContextDefinition(movementModes=movement_modes(),
-                             fullscreen=fullscreen)
+    return ContextDefinition(navigation=navigation(), fullscreen=fullscreen)
 
 
 def character_capabilities() -> CharacterCapabilities:
@@ -614,7 +628,7 @@ def load_level(config: Any, weapons: Any, target: str) -> LevelBundle:
     return build_match(config, weapons, load_map(config, target))
 
 
-class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
+class TwigContext(OverlayMixin, AsyncSceneMixin, Context):
     """The viewer window: a loaded map, a walking camera, and jump pads.
 
     :class:`~OpenGLContext.ui.overlay.OverlayMixin` comes first so its event
@@ -623,6 +637,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
     while they answer a question.
     """
 
+    windowSystemName = 'glfw'
     config: Any = None
     #: What this game tells a session recording about itself; see
     #: :mod:`twig_bb.telemetry`.  :meth:`OnInit` replaces it with one bound to
@@ -661,13 +676,6 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
     #: Where the view goes while the player is dead; see
     #: :mod:`twig_bb.deathcam`.
     deathCamera: Any = None
-    # Supplied by the interactive runtime base (event + navigation mixins),
-    # which the minimal type-check-time Context alias does not expose.
-    platform: Any
-    movementManager: Any
-    addEventHandler: Any
-    triggerRedraw: Any
-    sg: Any
 
     def OnInit(self) -> None:                   # pragma: no cover - needs a window
         """Open the window, and either load the named map or offer the menu.
@@ -697,7 +705,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         # and the key silently stops working.  Every handler below is a bound
         # method of this long-lived context, which is what keeps them alive.
         self._walking = False
-        self._free_manager = getattr(self, 'movementManager', None)
+        self._free_manager = self.movementManager
         self._nav: Optional[PhysicsViewPlatform] = None
         #: The unsighted field of view, in radians, read from the platform on
         #: the first frame; see :meth:`_sight`.
@@ -1696,7 +1704,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
                 self.movementManager = self._free_manager
         self._walking = walking
         self.marks.walking(walking, mode=str(getattr(
-            getattr(self.contextDefinition, 'movementMode', None), 'name', '')))
+            current_mode(self.contextDefinition), 'name', '')))
         self.triggerRedraw(1)
         return True
 
@@ -1769,7 +1777,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         navigation = self.getNavigation()
         if navigation is None:
             return
-        current = getattr(self.contextDefinition, 'movementMode', None)
+        current = current_mode(self.contextDefinition)
         wanted = 'walk' if current is not None and current.name == 'fly' else 'fly'
         navigation.select(wanted)
         self.marks.movement(wanted)
@@ -1778,8 +1786,8 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         navigation = self.getNavigation()
         if navigation is not None:
             navigation.cycle()
-            self.marks.movement(str(getattr(getattr(
-                self.contextDefinition, 'movementMode', None), 'name', '')))
+            self.marks.movement(str(getattr(
+                current_mode(self.contextDefinition), 'name', '')))
 
     # -- frame -----------------------------------------------------------
     def OnIdle(self, *args: Any) -> int:  # pragma: no cover - needs a window  # noqa: ARG002 overrides the engine's OnIdle, which is called with arguments
@@ -1832,7 +1840,7 @@ class TwigContext(OverlayMixin, AsyncSceneMixin, BaseContext):
         with self.tracePhase('navigation'):
             self.updateNavigation(dt)
             apply_mode(self._nav,
-                       getattr(self.contextDefinition, 'movementMode', None))
+                       current_mode(self.contextDefinition))
         with self.tracePhase('character'):
             self._nav.update(dt)
             self._apply_pushes(dt)

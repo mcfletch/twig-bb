@@ -51,8 +51,12 @@ class FakeMode:
     name = 'walk'
 
 
+class FakeNavigation:
+    current = FakeMode()
+
+
 class FakeDefinition:
-    movementMode = FakeMode()
+    navigation = FakeNavigation()
 
 
 class FakeNav:
