@@ -78,7 +78,6 @@ from OpenGLContext.scenegraph.light import (
 from OpenGLContext.scenegraph.scenegraph import SceneGraph
 from OpenGLContext.processexit import flush_and_exit
 from OpenGLContext.ui import bindings, dialogs, settings
-from OpenGLContext.ui.overlay import OverlayMixin
 from OpenGLContext.ui.panel import Panel
 from OpenGLContext.viewer.asyncscene import AsyncSceneMixin
 
@@ -628,11 +627,11 @@ def load_level(config: Any, weapons: Any, target: str) -> LevelBundle:
     return build_match(config, weapons, load_map(config, target))
 
 
-class TwigContext(OverlayMixin, AsyncSceneMixin, Context):
+class TwigContext(AsyncSceneMixin, Context):
     """The viewer window: a loaded map, a walking camera, and jump pads.
 
-    :class:`~OpenGLContext.ui.overlay.OverlayMixin` comes first so its event
-    routing runs before the navigation mix-in's: while a modal panel is up the
+    The overlay's event routing runs before the navigation's, as in every
+    context: while a modal panel is up the
     input sampler is not fed at all, which is what stops the player walking on
     while they answer a question.
     """

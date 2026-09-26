@@ -65,7 +65,6 @@ from OpenGLContext.scenegraph.light import (
 from OpenGLContext.scenegraph.scenegraph import SceneGraph
 from OpenGLContext.processexit import flush_and_exit
 from OpenGLContext.ui import bindings, settings
-from OpenGLContext.ui.overlay import OverlayMixin
 
 from . import controls
 from . import debug as twigdebug
@@ -144,7 +143,7 @@ def build_room() -> list[Any]:
 
 
 # -- the window ------------------------------------------------------------
-class HUDSampleContext(OverlayMixin, Context):      # pragma: no cover - GL
+class HUDSampleContext(Context):      # pragma: no cover - GL
     """The demo window: a room, a weapon in hand, and the HUD over both."""
 
     windowSystemName = 'glfw'
