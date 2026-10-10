@@ -249,7 +249,8 @@ def _floor(size: float = 12.0, grid: int = 12) -> Any:
             appearance=basenodes.Appearance(
                 material=basenodes.Material(diffuseColor=(.13, .14, .16))),
             geometry=basenodes.Box(size=(size, 0.02, size))),
-    ] + tiles)
+        *tiles,
+    ])
 
 
 class Stage:

@@ -3,16 +3,16 @@
 :mod:`twig_bb.surfaceanim` says *what* a surface does at time ``t``; this
 says where each answer goes, and how much it costs:
 
-===========================  ==============================  ================
-Directive                    Lands on                        Cost per frame
-===========================  ==============================  ================
-``tcMod`` (affine)           ``PBRMaterial.uv_transform``    one uniform
-``rgbGen``                   ``PBRMaterial.baseColor``       one uniform
-``alphaGen``                 ``PBRMaterial.transparency``    one uniform
-``animMap``                  ``PBRMaterial.textures``        one texture bind
-``deformVertexes``           the mesh's vertex buffers       the vertices
-``tcMod turb``               the mesh's texcoord buffer      the vertices
-===========================  ==============================  ================
+===========================  ==================================  ================
+Directive                    Lands on                            Cost per frame
+===========================  ==================================  ================
+``tcMod`` (affine)           ``Appearance.textureTransform``     one uniform
+``rgbGen``                   ``PhysicalMaterial.baseColor``      one uniform
+``alphaGen``                 ``PhysicalMaterial.transparency``   one uniform
+``animMap``                  ``PhysicalMaterial.baseTexture``    one texture bind
+``deformVertexes``           the mesh's vertex buffers           the vertices
+``tcMod turb``               the mesh's texcoord buffer          the vertices
+===========================  ==================================  ================
 
 The top four are why nearly every animated surface in a map is free: a scrolling
 conveyor, a rotating fan, a pulsing light and a flickering screen all cost one
@@ -37,6 +37,7 @@ from typing import Any, Optional
 from collections.abc import Callable, Sequence
 
 import numpy as np
+from vrml.x3d.nodes import TextureTransformMatrix3D
 
 from .surfaceanim import SurfaceAnimation
 from .surfaces import SurfaceStyle
@@ -44,15 +45,15 @@ from .worldgeometry import SCENE_SCALE
 
 log = logging.getLogger(__name__)
 
-#: ``texCoordMask`` bits, matching ``PBRMaterial.texCoordMask`` and the
-#: ``uvFor()`` decode in ``pbr.frag``: the low bit picks the second UV set for a
-#: channel, the same bit shifted by 8 applies the UV transform to it.
-BASE_COLOR_BIT = 1
-LIGHTMAP_BIT = 32
-TRANSFORM_SHIFT = 8
+#: The mapping label a transformed surface's base colour map reads its
+#: coordinates under: the first UV set, through the transform carrying the same
+#: label.  A transform with an empty label would apply to every channel, the
+#: lightmap included.
+BASE_COLOR_MAPPING = 'TEXCOORD_0:surface'
 
-#: What a texture name resolves to -- a ``PBRTexture``, or None if it will not
-#: load.  Supplied by the material library, which owns the caching.
+#: What a texture name resolves to -- an X3D texture node such as an
+#: ``ImageDataTexture``, or None if it will not load.  Supplied by the material
+#: library, which owns the caching.
 Resolver = Callable[[str], Any]
 
 
@@ -97,22 +98,26 @@ class SurfaceDeformer:
 
 
 class _AnimatedSurface:
-    """One batch of a map whose material moves, and everything it moves."""
+    """One batch of a map whose appearance moves, and everything it moves."""
 
-    __slots__ = ('animation', 'material', 'mesh', 'resolve', 'deformer',
-                 'base_color', 'frame')
+    __slots__ = ('animation', 'appearance', 'material', 'transform', 'mesh',
+                 'resolve', 'deformer', 'base_color', 'frame')
 
-    def __init__(self, animation: SurfaceAnimation, material: Any,
+    def __init__(self, animation: SurfaceAnimation, appearance: Any,
                  mesh: Any = None, resolve: Optional[Resolver] = None) -> None:
         self.animation = animation
-        self.material = material
+        self.appearance = appearance
+        material = self.material = appearance.material
+        #: The base colour map's transform node, where the animation has one.
+        self.transform = (base_color_transform(appearance)
+                          if animation.transforming else None)
         self.mesh = mesh
         self.resolve = resolve
         self.deformer: Optional[SurfaceDeformer] = None
         #: The authored colour, kept because ``rgbGen`` *multiplies* it rather
         #: than replacing it -- a material with no texture carries its own
         #: colour there, and overwriting it would repaint the surface white.
-        self.base_color = tuple(getattr(material, 'baseColor', (1.0, 1.0, 1.0)))
+        self.base_color = tuple(material.baseColor)
         #: The frame currently bound, so an unchanged frame costs nothing.
         self.frame: Optional[str] = None
 
@@ -120,14 +125,14 @@ class _AnimatedSurface:
         """Move this surface to where it is at ``time``."""
         animation = self.animation
         material = self.material
-        if animation.transforming:
-            material.uv_transform = _uv_matrix(animation, time)
+        if self.transform is not None:
+            self.transform.matrix = _uv_matrix(animation, time)
         if animation.rgbgen is not None:
             generated = animation.color_at(time)
             material.baseColor = tuple(
                 authored * level
                 for authored, level in zip(self.base_color, generated, strict=True))
-        if animation.alphagen is not None and _blends(material):
+        if animation.alphagen is not None and _blends(self.appearance):
             material.transparency = 1.0 - animation.alpha_at(time)
         if animation.animmap is not None and self.resolve is not None:
             self._showFrame(time)
@@ -146,25 +151,16 @@ class _AnimatedSurface:
             # what a gap in a cycle should look like -- not a hole in the wall.
             return
         self.frame = name
-        # Replaced rather than mutated: the material bumps its upload version on
-        # assignment, and an in-place edit would serve a stale texture set.
-        textures = dict(material_textures(self.material))
-        textures['baseColor'] = texture
-        self.material.textures = textures
+        self.material.setTexture('baseColor', texture)
 
 
-def material_textures(material: Any) -> dict:
-    """A material's texture map, tolerating one that has none."""
-    return getattr(material, 'textures', None) or {}
-
-
-def _blends(material: Any) -> bool:
-    """Whether an opacity written to this material would be drawn.
+def _blends(appearance: Any) -> bool:
+    """Whether an opacity written to this appearance's material would be drawn.
 
     An ``alphaGen`` on a surface the map never asked to blend cannot be shown,
     and writing it anyway would make the surface vanish rather than shimmer.
     """
-    return getattr(material, 'alphaMode', None) == 'BLEND'
+    return str(appearance.alphaMode) == 'BLEND'
 
 
 class SurfaceAnimator:
@@ -183,22 +179,26 @@ class SurfaceAnimator:
     def __len__(self) -> int:
         return len(self._surfaces)
 
-    def add(self, style: SurfaceStyle, material: Any, mesh: Any = None,
+    def add(self, style: SurfaceStyle, appearance: Any, mesh: Any = None,
             resolve: Optional[Resolver] = None) -> bool:
         """Take on one batch; return whether it will actually be driven.
 
+        ``appearance`` is the batch's ``Appearance``, holding its
+        ``PhysicalMaterial``: a transform is the appearance's
+        ``textureTransform``, and the colour, opacity and frame are the
+        material's fields.
+
         A **constant** transform -- a `tcMod scale` that tiles the surface -- is
         applied here and then forgotten: it is a property of the surface rather
-        than an animation, and a material that never changes should not be
-        re-uploaded sixty times a second.
+        than an animation, and a transform that never changes should not be
+        set sixty times a second.
         """
         animation = style.animation
         if animation.transforming:
-            _applyTransformMask(material)
-            material.uv_transform = _uv_matrix(animation, 0.0)
+            base_color_transform(appearance).matrix = _uv_matrix(animation, 0.0)
         if not animation.animated:
             return False
-        surface = _AnimatedSurface(animation, material, mesh, resolve)
+        surface = _AnimatedSurface(animation, appearance, mesh, resolve)
         if mesh is not None and _needsVertices(animation):
             surface.deformer = SurfaceDeformer(animation)
             # Set before the mesh is first drawn, so its texture-coordinate
@@ -215,7 +215,7 @@ class SurfaceAnimator:
         recomputing an unchanged wave -- which for a liquid means a whole vertex
         pass and a buffer re-upload -- is pure waste.
 
-        A material that raises is logged with its traceback and retired: it
+        A surface that raises is logged with its traceback and retired: it
         stays where it last was and is not asked again, and the rest of the
         map keeps moving.
         """
@@ -235,20 +235,23 @@ class SurfaceAnimator:
         return moved
 
 
-def _uv_matrix(animation: SurfaceAnimation, time: float) -> list:
-    """The material's UV transform for ``animation`` at ``time``.
+def _uv_matrix(animation: SurfaceAnimation, time: float) -> np.ndarray:
+    """A ``TextureTransformMatrix3D.matrix`` for ``animation`` at ``time``.
 
     Transposed on the way across, because the two sides use opposite
     conventions and both are right for where they live:
     :mod:`twig_bb.surfaceanim` is row-vector like the rest of this
     workspace's geometry (``uv @ M``, translation in the last *row*), while
-    ``PBRMaterial.uv_transform`` follows ``KHR_texture_transform`` and the
-    shader's ``uvTransform * vec3(uv, 1.0)`` (translation in the last
-    *column*).  Handing one to the other untransposed does not fail -- it
-    silently scrolls the surface diagonally and scales it wrongly, which is a
-    much worse way to find out.
+    the transform node's 4x4 matrix is applied to a column ``(s, t, r, 1)``
+    (translation in the last *column*).  Handing one to the other untransposed
+    does not fail -- it silently scrolls the surface diagonally and scales it
+    wrongly, which is a much worse way to find out.
     """
-    return animation.transform_at(time).T.tolist()
+    affine = animation.transform_at(time).T
+    matrix = np.identity(4, dtype='f')
+    matrix[:2, :2] = affine[:2, :2]
+    matrix[:2, 3] = affine[:2, 2]
+    return matrix
 
 
 def _needsVertices(animation: SurfaceAnimation) -> bool:
@@ -256,11 +259,20 @@ def _needsVertices(animation: SurfaceAnimation) -> bool:
     return animation.deforming or animation.turbulent
 
 
-def _applyTransformMask(material: Any) -> None:
-    """Mark the base-colour channel as transformed, and only that one.
+def base_color_transform(appearance: Any) -> Any:
+    """The transform node of an appearance's base colour map, made on first use.
 
-    The lightmap is deliberately left out: a scrolling texture that dragged the
+    The material's ``baseTextureMapping`` and the transform's ``mapping`` carry
+    one label (:data:`BASE_COLOR_MAPPING` where the material has none), so the
+    transform applies to the base colour channel and only that one.  The
+    lightmap is deliberately left out: a scrolling texture that dragged the
     baked lighting along with it would take the shadows off the walls.
     """
-    mask = int(getattr(material, 'texCoordMask', 0) or 0)
-    material.texCoordMask = mask | (BASE_COLOR_BIT << TRANSFORM_SHIFT)
+    material = appearance.material
+    label = str(material.baseTextureMapping) or BASE_COLOR_MAPPING
+    transform = appearance.textureTransform
+    if not transform or str(transform.mapping) != label:
+        material.baseTextureMapping = label
+        transform = appearance.textureTransform = TextureTransformMatrix3D(
+            mapping=label)
+    return transform

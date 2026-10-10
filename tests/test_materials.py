@@ -9,6 +9,8 @@ import logging
 
 import numpy as np
 import pytest
+from OpenGLContext.scenegraph.physicalmaterial import appearance_alpha
+from OpenGLContext.scenegraph.texturemapping import label_set
 from PIL import Image
 
 from twig_bb import materials
@@ -54,40 +56,44 @@ def test_a_missing_texture_reports_the_documented_fallback_size(content):
     assert library.texture_size('nowhere/absent') == (64, 64)
 
 
-def test_the_base_colour_map_is_sampled_as_srgb(content):
-    """A diffuse map is authored in sRGB; a lightmap holds light and is not."""
+def test_the_diffuse_image_is_the_base_colour_map(content):
+    """A diffuse map is authored in sRGB, which is how the base colour channel is read."""
     library = MaterialLibrary([str(content)])
     material = library.material_for(SurfaceStyle(name='textures/xenos/comptile'))
-    assert material.textures['baseColor'].srgb
+    assert material.baseTexture.image.size == (16, 8)
+    assert material.textures['baseColor'] is material.baseTexture
 
 
-def test_an_opaque_style_produces_an_opaque_material(content):
+def test_an_opaque_style_produces_an_opaque_appearance(content):
     library = MaterialLibrary([str(content)])
-    material = library.material_for(SurfaceStyle(name='textures/xenos/comptile'))
-    assert material.alphaMode == 'OPAQUE'
-    assert material.transparency == 0.0
+    appearance = library.appearance_for(SurfaceStyle(name='textures/xenos/comptile'))
+    assert appearance.alphaMode == 'OPAQUE'
+    assert appearance.material.transparency == 0.0
+    assert appearance_alpha(appearance)[0] == 'OPAQUE'
 
 
-def test_a_translucent_style_produces_a_blended_material(content):
+def test_a_translucent_style_produces_a_blended_appearance(content):
     """SPEC-Q3SHADER §2.2: a translucent surface is drawn blended."""
     library = MaterialLibrary([str(content)])
-    material = library.material_for(SurfaceStyle(name='textures/xenos/comptile', opacity=1 / 3))
-    assert material.alphaMode == 'BLEND'
-    assert material.transparency == pytest.approx(2 / 3)
+    appearance = library.appearance_for(
+        SurfaceStyle(name='textures/xenos/comptile', opacity=1 / 3))
+    assert appearance.alphaMode == 'BLEND'
+    assert appearance.material.transparency == pytest.approx(2 / 3)
+    assert appearance_alpha(appearance)[0] == 'BLEND'
 
 
-def test_a_masked_style_produces_a_cut_out_material(content):
+def test_a_masked_style_produces_a_cut_out_appearance(content):
     """SPEC-Q3SHADER §2.3: `alphaFunc GE128` keeps alpha of at least 128/255."""
     library = MaterialLibrary([str(content)])
-    material = library.material_for(SurfaceStyle(name='textures/xenos/comptile', masked=True))
-    assert material.alphaMode == 'MASK'
-    assert material.alphaCutoff == pytest.approx(128.0 / 255.0)
+    appearance = library.appearance_for(
+        SurfaceStyle(name='textures/xenos/comptile', masked=True))
+    assert appearance_alpha(appearance) == ('MASK', pytest.approx(128.0 / 255.0))
 
 
-def test_a_double_sided_style_disables_backface_culling(content):
+def test_the_material_is_its_appearances(content):
     library = MaterialLibrary([str(content)])
-    material = library.material_for(SurfaceStyle(name='x', double_sided=True))
-    assert material.doubleSided
+    style = SurfaceStyle(name='textures/xenos/comptile')
+    assert library.material_for(style) is library.appearance_for(style).material
 
 
 def test_a_lightmap_page_is_wired_to_the_lightmap_channel(content):
@@ -97,26 +103,28 @@ def test_a_lightmap_page_is_wired_to_the_lightmap_channel(content):
     assert 'lightmap' in material.textures
 
 
-def test_the_lightmap_is_read_linearly_and_never_as_srgb(content):
+def test_the_lightmap_is_on_the_linear_channel_and_never_the_base_colour(content):
     """A lightmap holds light, not colour, so it must not be gamma-decoded."""
     library = MaterialLibrary([str(content)])
-    material = library.material_for(SurfaceStyle(name='x'),
-                                    lightmap=np.zeros((4, 4, 3), np.uint8))
-    assert not material.textures['lightmap'].srgb
+    page = np.full((4, 4, 3), 128, np.uint8)
+    material = library.material_for(SurfaceStyle(name='x'), lightmap=page)
+    assert material.lightmapTexture.image.getpixel((0, 0)) == (128, 128, 128)
+    assert 'baseColor' not in material.textures
 
 
 def test_the_lightmap_samples_the_second_uv_set(content):
-    """The atlas needs its own coordinates, so the lightmap bit selects UV set 1."""
+    """The atlas needs its own coordinates, so the lightmap's label names UV set 1."""
     library = MaterialLibrary([str(content)])
-    material = library.material_for(SurfaceStyle(name='x'),
+    material = library.material_for(SurfaceStyle(name='textures/xenos/comptile'),
                                     lightmap=np.zeros((4, 4, 3), np.uint8))
-    assert material.texCoordMask & 32
+    assert label_set(material.textureMapping('lightmap')) == 1
+    assert label_set(material.textureMapping('baseColor')) == 0
 
 
-def test_a_material_without_a_lightmap_selects_no_second_uv_set(content):
+def test_a_material_without_a_lightmap_names_no_second_uv_set(content):
     library = MaterialLibrary([str(content)])
     material = library.material_for(SurfaceStyle(name='x'))
-    assert not material.texCoordMask & 32
+    assert material.lightmapTextureMapping == ''
 
 
 def test_the_default_lightmap_strength_is_the_engines_two(content):

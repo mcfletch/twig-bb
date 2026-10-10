@@ -1,11 +1,12 @@
 """Build a PBR scenegraph from batched world geometry.
 
 One :class:`~OpenGLContext.scenegraph.shape.Shape` per batch, each holding a
-:class:`~OpenGLContext.scenegraph.pbrmesh.PBRMesh` and a ``PBRMaterial`` from
-:mod:`twig_bb.materials`.  Baked lighting is wired through the pass's
-``lightmap`` channel, which reads its texture linearly — a lightmap holds light
-rather than colour, so it must not be gamma-decoded — and samples the second UV
-set, where the atlas coordinates live.
+:class:`~OpenGLContext.scenegraph.pbrmesh.PBRMesh` and an ``Appearance`` with
+its ``PhysicalMaterial`` from :mod:`twig_bb.materials`.  Baked lighting is
+wired through the pass's ``lightmap`` channel, which reads its texture
+linearly — a lightmap holds light rather than colour, so it must not be
+gamma-decoded — and samples the second UV set, where the atlas coordinates
+live.
 
 Two kinds of batch are built but not drawn: an undrawn surface
 (``SPEC-Q3SHADER §2.2``'s nodraw), and sky.  Sky is left out deliberately:
@@ -19,7 +20,6 @@ import logging
 import re
 from typing import Any, Optional
 
-from OpenGLContext.scenegraph.appearance import Appearance
 from OpenGLContext.scenegraph.group import Group
 from OpenGLContext.scenegraph.pbrmesh import PBRMesh
 from OpenGLContext.scenegraph.shape import Shape
@@ -64,8 +64,8 @@ def build_shape(batch: Batch, index: int, atlas: LightmapAtlas,
     if not style.draw or style.sky:
         return None
     page = _page(atlas, batch.lightmap_page)
-    material = library.material_for(style, lightmap=page,
-                                    lightmap_key=batch.lightmap_page)
+    appearance = library.appearance_for(style, lightmap=page,
+                                        lightmap_key=batch.lightmap_page)
     mesh = PBRMesh(
         positions=batch.positions,
         normals=batch.normals,
@@ -73,16 +73,15 @@ def build_shape(batch: Batch, index: int, atlas: LightmapAtlas,
         texcoords1=batch.texcoords1,
         tangents=batch.tangents,
         indices=batch.indices,
-        material=material,
-        # PBRMesh.solid is the backface-culling flag, so a two-sided material
+        # PBRMesh.solid is the backface-culling flag, so a two-sided surface
         # must clear it (SPEC-Q3SHADER §2.1's `cull none`).
         solid=not style.double_sided)
     if animator is not None:
-        animator.add(style, material, mesh=mesh, resolve=library.texture_for)
+        animator.add(style, appearance, mesh=mesh, resolve=library.texture_for)
     # Sky is drawn by the backdrop rather than as geometry, so it must not be
     # written into a shadow map either. On the Shape: a shadow caster is a
     # renderable, and that is the node the shadow pass reads the flag from.
-    return Shape(geometry=mesh, appearance=Appearance(material=material),
+    return Shape(geometry=mesh, appearance=appearance,
                  castsShadow=style.casts_shadow,
                  DEF=_shape_name(style.name, index))
 

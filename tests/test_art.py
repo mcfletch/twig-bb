@@ -145,13 +145,13 @@ class TestPaintingOneModelFourWays:
         """The bubble is transmissive and 85% transparent; only its hue moves."""
         node = art.load(items.MEDPACK['model'])
         before = [(shape.appearance.material.transparency,
-                   shape.appearance.material.alphaMode,
+                   shape.appearance.alphaMode,
                    shape.appearance.material.metallic,
                    shape.appearance.material.roughness)
                   for shape in art.shapes(node)]
         art.recolour(node, (0.2, 0.55, 0.95), glow=0.45)
         after = [(shape.appearance.material.transparency,
-                  shape.appearance.material.alphaMode,
+                  shape.appearance.alphaMode,
                   shape.appearance.material.metallic,
                   shape.appearance.material.roughness)
                  for shape in art.shapes(node)]

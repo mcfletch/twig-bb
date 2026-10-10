@@ -1,15 +1,19 @@
-"""Resolve texture names to images, and surface styles to PBR materials.
+"""Resolve texture names to images, and surface styles to PBR appearances.
 
 Two lookups live here.  **Where a name's image is**: a version 46 name is
 already rooted at the archive (``SPEC-BSP46 §6.1``, ``§7.3``), and the extension
 it arrives with is advisory, so the supported ones are tried in turn
 (``SPEC-Q3SHADER §1.6``).
 
-**What a style becomes**: a :class:`SurfaceStyle` maps onto one ``PBRMaterial``.
+**What a style becomes**: a :class:`SurfaceStyle` maps onto one ``Appearance``
+holding a ``PhysicalMaterial``.  The material carries the colour, the maps and
+the lightmap exposure; the appearance carries how the surface's alpha is drawn
+(``alphaMode``, ``alphaCutoff``).
 
 The baked lightmap is wired in here too.  A lightmap holds light, not colour:
-its luxels are linear samples and must not be sRGB-decoded, which is why the
-channel is built with ``srgb=False``.
+its luxels are linear samples and must not be sRGB-decoded.  The channel a
+texture is set on decides that: the pass decodes ``baseTexture`` from sRGB and
+reads ``lightmapTexture`` as it is stored.
 """
 
 from __future__ import annotations
@@ -21,7 +25,9 @@ from collections.abc import Sequence
 from typing import Any, Optional
 
 import numpy as np
-from OpenGLContext.scenegraph.pbrmaterial import PBRMaterial, PBRTexture
+from OpenGLContext.scenegraph.appearance import Appearance
+from OpenGLContext.scenegraph.imagedata import ImageDataTexture
+from OpenGLContext.scenegraph.physicalmaterial import PhysicalMaterial
 from PIL import Image
 
 from . import crnfile
@@ -58,9 +64,9 @@ FALLBACK_BASE_COLOR = (0.25, 0.25, 0.25)
 #: surface has its highlights baked in already.
 ROUGHNESS_DEFAULT = 0.85
 
-#: ``PBRMaterial.texCoordMask`` bit that makes the lightmap channel sample the
-#: second UV set, which is where the atlas coordinates live.
-TEXCOORD_MASK_LIGHTMAP = 32
+#: ``PhysicalMaterial.lightmapTextureMapping`` label that makes the lightmap
+#: channel sample the second UV set, which is where the atlas coordinates live.
+LIGHTMAP_MAPPING = 'TEXCOORD_1'
 
 #: Default exposure applied to a baked lightmap.  Not a format constant: a map
 #: bakes absolute radiosity and every engine scales it at render time, so this
@@ -104,7 +110,7 @@ def auto_lightmap_strength(median: Optional[float]) -> float:
 
 
 class MaterialLibrary:
-    """Texture lookup and PBR material construction for one map's content."""
+    """Texture lookup and PBR appearance construction for one map's content."""
 
     def __init__(self, roots: Sequence[str], family: str = 'quake3',
                  lightmap_strength: float = DEFAULT_LIGHTMAP_STRENGTH) -> None:
@@ -112,9 +118,9 @@ class MaterialLibrary:
         self.family = family
         self.lightmap_strength = float(lightmap_strength)
         self._images: dict[str, Any] = {}
-        self._textures: dict[tuple[str, bool], PBRTexture] = {}
-        self._materials: dict[tuple[Any, ...], PBRMaterial] = {}
-        self._lightmaps: dict[int, PBRTexture] = {}
+        self._textures: dict[str, ImageDataTexture] = {}
+        self._appearances: dict[tuple[Any, ...], Appearance] = {}
+        self._lightmaps: dict[int, ImageDataTexture] = {}
         self._files = ContentSearch(self.roots)
 
     # -- name resolution -------------------------------------------------
@@ -184,18 +190,17 @@ class MaterialLibrary:
             return FALLBACK_TEXTURE_SIZE
         return (int(image.size[0]), int(image.size[1]))
 
-    def _texture(self, path: str, srgb: bool) -> Optional[PBRTexture]:
-        """A cached :class:`PBRTexture` for a file, or None if it will not open."""
-        key = (path, srgb)
-        texture = self._textures.get(key)
+    def _texture(self, path: str) -> Optional[ImageDataTexture]:
+        """A cached ``ImageDataTexture`` for a file, or None if it will not open."""
+        texture = self._textures.get(path)
         if texture is None:
             image = open_image(path)
             if image is None:
                 return None
-            texture = self._textures[key] = PBRTexture(image, srgb=srgb)
+            texture = self._textures[path] = ImageDataTexture(image=image)
         return texture
 
-    def texture_for(self, name: str) -> Optional[PBRTexture]:
+    def texture_for(self, name: str) -> Optional[ImageDataTexture]:
         """A base-colour texture for a texture *name*, or None if it is absent.
 
         The name goes through the same resolution and the same cache an ordinary
@@ -206,67 +211,77 @@ class MaterialLibrary:
         path = self.resolve(name)
         if path is None:
             return None
-        return self._texture(path, srgb=True)
+        return self._texture(path)
 
     # -- materials -------------------------------------------------------
+    def appearance_for(self, style: SurfaceStyle,
+                       lightmap: Optional[np.ndarray] = None,
+                       lightmap_key: Optional[int] = None) -> Appearance:
+        """The appearance for a surface style, built once per style and page.
+
+        Its ``material`` is the style's ``PhysicalMaterial``; its ``alphaMode``
+        and ``alphaCutoff`` say whether the surface is opaque, cut out or
+        blended.  Whether both faces are drawn is the geometry's ``solid``
+        flag, which :mod:`twig_bb.scene` sets from ``style.double_sided``.
+        """
+        key = (style.batch_key(), lightmap_key if lightmap is not None else None)
+        appearance = self._appearances.get(key)
+        if appearance is None:
+            appearance = self._appearances[key] = Appearance(
+                material=self._build(style, lightmap, lightmap_key),
+                alphaMode=_alpha_mode(style),
+                alphaCutoff=style.alpha_cutoff)
+        return appearance
+
     def material_for(self, style: SurfaceStyle,
                      lightmap: Optional[np.ndarray] = None,
-                     lightmap_key: Optional[int] = None) -> PBRMaterial:
-        """The PBR material for a surface style, built once per style and page."""
-        key = (style.batch_key(), lightmap_key if lightmap is not None else None)
-        material = self._materials.get(key)
-        if material is None:
-            material = self._materials[key] = self._build(style, lightmap,
-                                                          lightmap_key)
+                     lightmap_key: Optional[int] = None) -> PhysicalMaterial:
+        """The material of :meth:`appearance_for`'s appearance."""
+        material: PhysicalMaterial = self.appearance_for(
+            style, lightmap, lightmap_key).material
         return material
 
     def _build(self, style: SurfaceStyle, lightmap: Optional[np.ndarray],
-               lightmap_key: Optional[int]) -> PBRMaterial:
-        textures: dict[str, PBRTexture] = {}
+               lightmap_key: Optional[int]) -> PhysicalMaterial:
+        base = None
         base_path = self.resolve(style.name)
         if base_path:
-            # A diffuse map is authored in sRGB; the lightmap below is not.
-            base = self._texture(base_path, srgb=True)
-            if base is not None:
-                textures['baseColor'] = base
-        texcoord_mask = 0
-        strength = 1.0
-        if lightmap is not None and style.lightmapped:
-            textures['lightmap'] = self._lightmap_texture(lightmap, lightmap_key)
-            texcoord_mask |= TEXCOORD_MASK_LIGHTMAP
-            strength = self.lightmap_strength
-        return PBRMaterial(
-            baseColor=(1.0, 1.0, 1.0) if 'baseColor' in textures
+            # A diffuse map is authored in sRGB, and the base colour channel
+            # is decoded from it; the lightmap channel below is not.
+            base = self._texture(base_path)
+        material = PhysicalMaterial(
+            baseColor=(1.0, 1.0, 1.0) if base is not None
             else FALLBACK_BASE_COLOR,
             metallic=0.0,
             roughness=ROUGHNESS_DEFAULT,
             emissiveColor=(0.0, 0.0, 0.0),
-            transparency=1.0 - style.opacity if style.transparent else 0.0,
-            alphaMode=_alpha_mode(style),
-            alphaCutoff=style.alpha_cutoff,
-            doubleSided=style.double_sided,
-            texCoordMask=texcoord_mask,
-            lightmapStrength=strength,
-            textures=textures)
+            transparency=1.0 - style.opacity if style.transparent else 0.0)
+        if base is not None:
+            material.baseTexture = base
+        if lightmap is not None and style.lightmapped:
+            material.lightmapTexture = self._lightmap_texture(lightmap, lightmap_key)
+            material.lightmapTextureMapping = LIGHTMAP_MAPPING
+            material.lightmapStrength = self.lightmap_strength
+        return material
 
     def _lightmap_texture(self, page: np.ndarray,
-                          key: Optional[int]) -> PBRTexture:
+                          key: Optional[int]) -> ImageDataTexture:
         """A cached texture for one atlas page.
 
         A lightmap holds light rather than colour: its luxels are linear
-        samples, so the channel must not be marked sRGB and gamma-decoded.
+        samples, and the lightmap channel reads them without an sRGB decode.
         """
         if key is not None and key in self._lightmaps:
             return self._lightmaps[key]
-        texture = PBRTexture(Image.fromarray(np.asarray(page, np.uint8), 'RGB'),
-                             srgb=False)
+        texture = ImageDataTexture(
+            image=Image.fromarray(np.asarray(page, np.uint8), 'RGB'))
         if key is not None:
             self._lightmaps[key] = texture
         return texture
 
 
 def _alpha_mode(style: SurfaceStyle) -> str:
-    """glTF alpha mode for a style.
+    """The ``Appearance.alphaMode`` for a style.
 
     ``SPEC-Q3SHADER §2.3`` makes a mask a discard rather than a blend, so the
     two are distinct modes rather than degrees of one.

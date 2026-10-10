@@ -80,10 +80,10 @@ def test_an_unlit_batch_gets_no_lightmap_texture(tmp_path):
     assert 'lightmap' not in shape.appearance.material.textures
 
 
-def test_a_transparent_batch_carries_a_blended_material(tmp_path):
+def test_a_transparent_batch_carries_a_blended_appearance(tmp_path):
     world = _world(SurfaceStyle(name='a', opacity=1 / 3))
     shape = build_scene(world, build_atlas([]), _library(tmp_path)).children[0]
-    assert shape.appearance.material.alphaMode == 'BLEND'
+    assert shape.appearance.alphaMode == 'BLEND'
 
 
 def test_a_double_sided_batch_is_not_marked_solid(tmp_path):
