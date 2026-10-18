@@ -10,7 +10,7 @@ the whole of that:
     ./release-assets.py                   # build the archive and its registry
     ./release-assets.py --install         # ...and put it in this machine's store
     ./release-assets.py --reinstall       # ...replacing the copy installed there
-    ./release-assets.py --push            # ...attach it to the release tag and
+    ./release-assets.py --push            # ...attach it to its release and
                                           #    write the entry in packs.json
 
 ``--install`` is what makes a content release testable before it is a release:

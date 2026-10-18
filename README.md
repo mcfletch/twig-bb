@@ -687,7 +687,7 @@ the art pack, writes that entry from the archive it built, and publishes it:
 ./release-assets.py --install         # ...and install it in this machine's store
 ./release-assets.py --reinstall       # ...replacing the copy installed there
 ./release-assets.py --write-registry  # ...and write the entry in packs.json
-./release-assets.py --push            # ...attach it to the release tag, and
+./release-assets.py --push            # ...attach it to its release, and
                                       #    write the entry in packs.json
 ```
 
