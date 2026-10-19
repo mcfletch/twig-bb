@@ -279,7 +279,7 @@ class HUDSampleContext(Context):      # pragma: no cover - GL
         self.triggerRedraw(1)
 
     # -- the frame --------------------------------------------------------
-    def OnIdle(self, *args: Any) -> int:  # noqa: ARG002 overrides the engine's OnIdle, which is called with arguments
+    def OnIdle(self, *arguments: Any) -> int:  # noqa: ARG002 overrides the engine's OnIdle, which is called with arguments
         state = self.getInputState()
         commands = self.weaponBindings.triggered(state)
         firing = self.weaponBindings.firing(state)

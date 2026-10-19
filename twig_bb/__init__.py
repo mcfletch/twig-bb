@@ -10,4 +10,10 @@ cites a numbered fact in one of the specifications under ``specs/``; none was
 derived from an engine implementation.
 """
 
+from OpenGLContext.plugins import Adapter
+
 __version__ = '1.0.0a1'
+
+# A map is read by ``SceneLoader.load('x.bsp')`` as it is by the game: the class
+# is named, not imported, until something loads one.
+Adapter('twig-level', 'twig_bb.viewer.LevelReader', ['.bsp', '.pk3'])

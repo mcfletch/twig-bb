@@ -50,7 +50,7 @@ import os
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, NamedTuple, Optional
 
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')  # noqa: TID251 the program's start-up sets the environment the engine reads
 # A map's own baked lighting is the point; a full-strength analytic sky washes
@@ -79,7 +79,8 @@ from OpenGLContext.scenegraph.scenegraph import SceneGraph
 from OpenGLContext.processexit import flush_and_exit
 from OpenGLContext.ui import bindings, dialogs, settings
 from OpenGLContext.ui.panel import Panel
-from OpenGLContext.viewer.asyncscene import AsyncSceneMixin
+from OpenGLContext.loaders.readers import SceneReader
+from OpenGLContext.loaders.sceneloader import LoadRequest
 
 from . import (
     arena,
@@ -627,7 +628,37 @@ def load_level(config: Any, weapons: Any, target: str) -> LevelBundle:
     return build_match(config, weapons, load_map(config, target))
 
 
-class TwigContext(AsyncSceneMixin, Context):
+class LevelSettings(NamedTuple):
+    """What reading a level needs beyond where it is: how it is played and with what."""
+
+    config: Any
+    weapons: Any
+
+
+class LevelReader(SceneReader):
+    """Reads a map, and stages a match in it, for a
+    :class:`~OpenGLContext.loaders.sceneloader.SceneLoader`.
+
+    Registered as ``twig-level`` for ``.bsp`` and ``.pk3`` (see
+    :mod:`twig_bb`); a target with no such suffix -- ``pack:mapname``, an
+    archive, a URL -- is read by naming the format.  ``options`` is a
+    :class:`LevelSettings`, and the result is a :class:`LevelBundle`.
+    """
+
+    name = 'twig-level'
+    settings: Optional[LevelSettings] = None
+
+    def configure(self, options: Any) -> None:
+        self.settings = options
+
+    def read(self, source: str) -> LevelBundle:
+        """Decode the map ``source`` names and stage a match in it.  Touches no GL."""
+        if self.settings is None:
+            raise ValueError('the twig-level reader needs LevelSettings as its options')
+        return load_level(self.settings.config, self.settings.weapons, source)
+
+
+class TwigContext(Context):
     """The viewer window: a loaded map, a walking camera, and jump pads.
 
     The overlay's event routing runs before the navigation's, as in every
@@ -655,6 +686,8 @@ class TwigContext(AsyncSceneMixin, Context):
     notice: Optional[mapnotice.MapNotice] = None
     #: The start screen while it is up, so it can be taken down again.
     _menuPanel: Any = None
+    #: The level being read, if one is.  Choosing another cancels it.
+    _levelRequest: Optional[LoadRequest] = None
     #: The content screen and the download it started, or None.  Polled once
     #: a frame, open or closed; see :meth:`_pollDownload`.
     _content: Any = None
@@ -687,9 +720,6 @@ class TwigContext(AsyncSceneMixin, Context):
         disable_vsync(self)
         if self.config is None:
             self.config = build_parser().parse_args([self.target or ''])
-        # The handover for loading a level off the render thread (see
-        # :meth:`_loadLevel`); set up before any level can be chosen.
-        self.setupAsyncScene()
         # What this game tells a session recording about itself; see
         # :mod:`twig_bb.telemetry`.  Built first, because everything below it
         # marks and a mark made before there is anything to mark on is the one
@@ -755,17 +785,25 @@ class TwigContext(AsyncSceneMixin, Context):
         the start screen when one is chosen. Decoding the map and staging the
         match -- seconds of work on a big level, and touching no GL -- runs on a
         worker (:func:`load_level`) so the window keeps drawing; the result is
-        mounted by :meth:`applyLoadedScene` on the render thread. A capture has no
+        mounted by :meth:`applyLoadedScene` on the render thread, from the
+        context's :attr:`~OpenGLContext.context.Context.sceneLoader`. A capture has no
         loop to keep alive and needs the very frame it is about to grab, so it
         loads in step instead.
         """
         self.target = target
         self.marks.loading(target)
         if self.config.capture:
-            self._applyLevel(load_level(self.config, self.weapons, target))
+            self._applyLevel(self.sceneLoader.load_now(
+                target, format=LevelReader.name,
+                options=LevelSettings(self.config, self.weapons)).result)
             return
-        self.requestScene(lambda: load_level(self.config, self.weapons, target),
-                          label=target)
+        if self._levelRequest is not None:
+            self._levelRequest.cancel()
+        self._levelRequest = self.sceneLoader.load(
+            target, format=LevelReader.name,
+            options=LevelSettings(self.config, self.weapons), label=target,
+            on_loaded=lambda request: self.applyLoadedScene(request.result),
+            on_failed=lambda request: self.applyFailedLoad(request.error))
 
     def applyLoadedScene(self, bundle: LevelBundle) -> None:  # pragma: no cover - GL
         """Render thread: mount a level the worker finished decoding."""
@@ -1789,13 +1827,9 @@ class TwigContext(AsyncSceneMixin, Context):
                 current_mode(self.contextDefinition), 'name', '')))
 
     # -- frame -----------------------------------------------------------
-    def OnIdle(self, *args: Any) -> int:  # pragma: no cover - needs a window  # noqa: ARG002 overrides the engine's OnIdle, which is called with arguments
+    def OnIdle(self, *arguments: Any) -> int:  # pragma: no cover - needs a window  # noqa: ARG002 overrides the engine's OnIdle, which is called with arguments
         # A download runs on a worker and is *published* here, once a frame.
         self._pollDownload()
-        # So does a level load: the worker decodes it, and this is where the
-        # finished level crosses back to be mounted on the render thread.
-        if self.pollPendingScene():
-            return 1
         if self.loaded is None:
             # On the start screen: nothing to animate and nobody to walk, so
             # the loop should go quiet -- a static menu that redrew sixty times
