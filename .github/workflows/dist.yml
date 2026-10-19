@@ -146,9 +146,7 @@ jobs:
       - name: Install the packaging tool
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --no-deps \
-            "OpenGLContext @ git+https://github.com/mcfletch/openglcontext@develop" \
-            "PyOpenGL @ git+https://github.com/mcfletch/pyopengl@develop"
+          python -m pip install --no-deps --pre OpenGLContext PyOpenGL
 
       # The sound backend is a Recommends rather than a Depends: miniaudio opens
       # ALSA at run time and a machine without it gets silence, not an error.

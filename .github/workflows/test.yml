@@ -42,15 +42,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libgl1 libglu1-mesa
 
-      # OpenGLContext 3.0 is not on PyPI, and the newest release there predates
-      # the scenegraph, movement and HUD modules this package imports, so it
-      # comes from source. Everything else -- PyOpenGL, PyVRML97, simpleparse,
-      # omi_audio, omi_physics -- resolves from PyPI as an ordinary dependency.
+      # Every dependency, OpenGLContext included, resolves from PyPI. `--pre`
+      # because the stack carries pre-release versions pip skips by default.
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "OpenGLContext @ git+https://github.com/mcfletch/openglcontext@main"
-          python -m pip install -e ".[dev]"
+          python -m pip install --pre -e ".[dev]"
 
       # The floor is a floor, not a target: it fails the run if a change drops
       # coverage off a cliff, and says nothing about a percentage point either
@@ -82,8 +79,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "OpenGLContext @ git+https://github.com/mcfletch/openglcontext@main"
-          python -m pip install -e ".[dev]"
+          python -m pip install --pre -e ".[dev]"
       - name: Run the headless suite
         run: python -m pytest -m "$MARKERS"
 
@@ -104,8 +100,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "OpenGLContext @ git+https://github.com/mcfletch/openglcontext@main"
-          python -m pip install -e ".[dev]"
+          python -m pip install --pre -e ".[dev]"
       - name: ruff
         run: python -m ruff check .
       # The package only -- the tests reach into scenegraph internals that carry
